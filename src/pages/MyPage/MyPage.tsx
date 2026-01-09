@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { Pencil, Save, LogOut, ChevronDown, Check, Settings, X, Mail, Phone, Lock, ChevronRight, Trash2 } from 'lucide-react';
+import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type GoalCategory = 'health' | 'learning' | 'achievement' | 'self_esteem' | 'other';
@@ -20,7 +20,7 @@ import { useLanguage } from '../../lib/i18n';
 
 export default function MyPage() {
     const { user, setUser, setMissions } = useStore();
-    const { language, t, isKo } = useLanguage();
+    const { t } = useLanguage();
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -63,7 +63,7 @@ export default function MyPage() {
 
     const fetchUserGoals = async () => {
         if (!user) return;
-        const { data, error } = await supabase
+        const { data } = await supabase
             .from('user_goals')
             .select('*')
             .eq('user_id', user.id);

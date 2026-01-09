@@ -11,7 +11,6 @@ export default function Dashboard() {
     const [goals, setGoals] = useState<any[]>([]);
     const [selectedGoalId, setSelectedGoalId] = useState<string | ('')>('');
     const [missions, setMissions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
 
     // Coaching State
     const [coaching, setCoaching] = useState<{ insight: string; encouragement: string } | null>(null);
@@ -41,7 +40,6 @@ export default function Dashboard() {
     };
 
     const fetchMissionsAndCoach = async () => {
-        setLoading(true);
         const { data } = await supabase
             .from('missions')
             .select('*')
@@ -59,7 +57,6 @@ export default function Dashboard() {
                 generateCoachInsight(goal, goalMissions);
             }
         }
-        setLoading(false);
     };
 
     // --- Date Helpers ---

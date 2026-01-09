@@ -160,7 +160,7 @@ export default function Today() {
 
         try {
             const fileName = `${user!.id}/${verifyingId}_${Date.now()}`;
-            const { data, error } = await supabase.storage.from('mission-proofs').upload(fileName, file);
+            const { error } = await supabase.storage.from('mission-proofs').upload(fileName, file);
             if (error) throw error;
             const publicUrl = supabase.storage.from('mission-proofs').getPublicUrl(fileName).data.publicUrl;
 

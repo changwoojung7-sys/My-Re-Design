@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserPlus, Phone, Share2, User, Mail, Calendar, Trophy, Heart, MessageCircle, Send, Trash2, X, Users } from 'lucide-react';
+import { Search, UserPlus, Phone, Share2, User, Mail, Trophy, Heart, MessageCircle, Send, Trash2, X, Users } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 
 export default function Friends() {
