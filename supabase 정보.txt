@@ -1,0 +1,10 @@
+Organization : changwoojung7-sys's Org
+
+Project name : CoreLoop
+
+Database password : wolsong@6963
+
+
+Project ID : kqclatbldzcbcgqnncny
+
+https://kqclatbldzcbcgqnncny.supabase.co
