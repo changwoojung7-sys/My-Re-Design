@@ -4,8 +4,10 @@ import { useStore } from '../../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Phone, Lock, ArrowRight } from 'lucide-react';
+import { useLanguage } from '../../lib/i18n';
 
 export default function Login() {
+    const { t } = useLanguage();
     const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
     const [isSignUp, setIsSignUp] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -108,9 +110,9 @@ export default function Login() {
                 className="w-full max-w-sm"
             >
                 <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    CoreLoop
+                    {t.appTitle}
                 </h1>
-                <p className="text-slate-400 text-center mb-8">Reconnect your daily rhythm.</p>
+                <p className="text-slate-400 text-center mb-8">{t.appSubtitle}</p>
 
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-2xl">
 
@@ -120,13 +122,13 @@ export default function Login() {
                             onClick={() => setAuthMethod('phone')}
                             className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${authMethod === 'phone' ? 'bg-white/10 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            <Phone size={16} /> Phone
+                            <Phone size={16} /> {t.phone}
                         </button>
                         <button
                             onClick={() => setAuthMethod('email')}
                             className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${authMethod === 'email' ? 'bg-white/10 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
                         >
-                            <Mail size={16} /> Email
+                            <Mail size={16} /> {t.email}
                         </button>
                     </div>
 
@@ -134,7 +136,7 @@ export default function Login() {
 
                         {/* Main Input based on Method */}
                         <div>
-                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{authMethod}</label>
+                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{authMethod === 'email' ? t.email : t.phone}</label>
                             {authMethod === 'phone' ? (
                                 <input
                                     type="tel"
@@ -157,7 +159,7 @@ export default function Login() {
                         </div>
 
                         <div>
-                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">Password</label>
+                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.password}</label>
                             <div className="relative">
                                 <input
                                     type="password"
@@ -205,7 +207,7 @@ export default function Login() {
                             disabled={loading}
                             className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
                         >
-                            {loading ? 'Processing...' : (isSignUp ? 'Create Account' : 'Login')}
+                            {loading ? (t.generating || 'Processing...') : (isSignUp ? t.createAccount : t.login)}
                             {!loading && <ArrowRight size={18} />}
                         </button>
                     </form>
@@ -213,13 +215,13 @@ export default function Login() {
                     {/* Toggle Mode */}
                     <div className="mt-6 text-center">
                         <p className="text-sm text-slate-400">
-                            {isSignUp ? "Already have an account?" : "Don't have an account?"}
+                            {isSignUp ? t.login : t.noAccount}
                         </p>
                         <button
                             onClick={() => setIsSignUp(!isSignUp)}
                             className="text-sm font-bold text-white hover:text-primary transition-colors mt-1"
                         >
-                            {isSignUp ? 'Sign In instead' : 'Create a new account'}
+                            {isSignUp ? t.login : t.createAccount}
                         </button>
                     </div>
 
@@ -229,7 +231,7 @@ export default function Login() {
                             setUser({ id: 'demo123', email: 'demo@coreloop.com', nickname: 'DemoUser', routine_dna: null });
                             navigate('/onboarding');
                         }} className="text-xs text-slate-500 hover:text-primary underline">
-                            Enter as Guest (MVP Demo)
+                            {t.guestLogin}
                         </button>
                     </div>
                 </div>

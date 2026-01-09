@@ -526,7 +526,7 @@ export default function MyPage() {
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                                    <Settings size={20} className="text-primary" /> Account Settings
+                                    <Settings size={20} className="text-primary" /> {t.accountSettings}
                                 </h2>
                                 <button onClick={() => setIsSettingsOpen(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20">
                                     <X size={20} className="text-white" />
@@ -536,12 +536,12 @@ export default function MyPage() {
                             <div className="space-y-5">
                                 {/* Login Info */}
                                 <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2">Login ID</label>
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2">{t.loginId}</label>
                                     <div className="flex items-center gap-3 bg-black/40 p-4 rounded-xl border border-white/5">
                                         {settingsData.isPhoneAuth ? <Phone size={20} className="text-slate-400" /> : <Mail size={20} className="text-slate-400" />}
                                         <div>
                                             <p className="font-mono text-lg text-white font-bold">{settingsData.loginId}</p>
-                                            <p className="text-[10px] text-slate-500">{settingsData.isPhoneAuth ? 'Phone Authentication' : 'Email Authentication'}</p>
+                                            <p className="text-[10px] text-slate-500">{settingsData.isPhoneAuth ? (t.phone + ' ' + t.verify) : t.emailAuth}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -549,7 +549,7 @@ export default function MyPage() {
                                 {/* Personal Info */}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="col-span-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">Nickname</label>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.nickname}</label>
                                         <input
                                             type="text"
                                             value={settingsData.nickname}
@@ -558,7 +558,7 @@ export default function MyPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">Age</label>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.age}</label>
                                         <input
                                             type="number"
                                             value={settingsData.age}
@@ -567,7 +567,7 @@ export default function MyPage() {
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">Gender</label>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.gender}</label>
                                         <select
                                             value={settingsData.gender}
                                             onChange={e => setSettingsData({ ...settingsData, gender: e.target.value })}
@@ -582,7 +582,7 @@ export default function MyPage() {
                                 {/* Backup Contact */}
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase mb-2">
-                                        {settingsData.isPhoneAuth ? 'Backup Email' : 'Backup Phone'}
+                                        {settingsData.isPhoneAuth ? t.backupEmail : t.backupPhone}
                                     </label>
                                     <div className="relative">
                                         {settingsData.isPhoneAuth ? (
@@ -591,7 +591,7 @@ export default function MyPage() {
                                                     type="email"
                                                     value={settingsData.backupEmail}
                                                     onChange={e => setSettingsData({ ...settingsData, backupEmail: e.target.value })}
-                                                    placeholder="Add recovery email"
+                                                    placeholder={t.addRecoveryEmail}
                                                     className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-primary"
                                                 />
                                                 <Mail size={18} className="absolute left-4 top-3.5 text-slate-500" />
@@ -602,7 +602,7 @@ export default function MyPage() {
                                                     type="tel"
                                                     value={settingsData.backupPhone}
                                                     onChange={e => setSettingsData({ ...settingsData, backupPhone: e.target.value })}
-                                                    placeholder="Add phone number"
+                                                    placeholder={t.addRecoveryPhone}
                                                     className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-primary"
                                                 />
                                                 <Phone size={18} className="absolute left-4 top-3.5 text-slate-500" />
@@ -614,23 +614,24 @@ export default function MyPage() {
                                 <button
                                     onClick={handleSaveSettings}
                                     disabled={loading}
-                                    className="w-full bg-primary text-black font-bold py-4 rounded-xl shadow-lg hover:brightness-110 transition-all mt-4"
+                                    className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98]"
                                 >
-                                    {loading ? 'Saving...' : 'Save Changes'}
+                                    {loading ? t.saving : t.saveChanges}
                                 </button>
 
-                                <div className="border-t border-white/10 my-6"></div>
+                                <div className="h-px bg-white/10 my-4" />
 
-                                {/* Security / Password */}
-                                <div>
+                                {/* Security Section */}
+                                <div className=" pt-2">
                                     <button
                                         onClick={() => setIsPasswordExpanded(!isPasswordExpanded)}
-                                        className="w-full flex justify-between items-center text-left mb-2"
+                                        className="w-full flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors"
                                     >
-                                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-1">
-                                            <Lock size={12} /> Security
-                                        </label>
-                                        <ChevronRight size={16} className={`text-slate-500 transition-transform ${isPasswordExpanded ? 'rotate-90' : ''}`} />
+                                        <div className="flex items-center gap-3">
+                                            <Lock size={20} className="text-slate-400" />
+                                            <span className="font-bold text-slate-300">{t.security} / {t.password}</span>
+                                        </div>
+                                        <ChevronRight size={20} className={`text-slate-500 transition-transform ${isPasswordExpanded ? 'rotate-90' : ''}`} />
                                     </button>
 
                                     <AnimatePresence>
@@ -642,24 +643,24 @@ export default function MyPage() {
                                                 className="overflow-hidden bg-black/20 rounded-xl"
                                             >
                                                 <div className="p-4 space-y-3">
-                                                    <h3 className="text-sm font-bold text-white mb-2">Change Password</h3>
+                                                    <h3 className="text-sm font-bold text-white mb-2">{t.changePassword}</h3>
                                                     <input
                                                         type="password"
-                                                        placeholder="Current Password"
+                                                        placeholder={t.currentPassword}
                                                         value={passwordData.current}
                                                         onChange={e => setPasswordData({ ...passwordData, current: e.target.value })}
                                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
                                                     />
                                                     <input
                                                         type="password"
-                                                        placeholder="New Password"
+                                                        placeholder={t.newPassword}
                                                         value={passwordData.new}
                                                         onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
                                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
                                                     />
                                                     <input
                                                         type="password"
-                                                        placeholder="Confirm New Password"
+                                                        placeholder={t.confirmNewPassword}
                                                         value={passwordData.confirm}
                                                         onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
                                                         className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
@@ -669,7 +670,7 @@ export default function MyPage() {
                                                         disabled={loading}
                                                         className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all text-sm"
                                                     >
-                                                        Update Password
+                                                        {t.updatePassword}
                                                     </button>
                                                 </div>
                                             </motion.div>

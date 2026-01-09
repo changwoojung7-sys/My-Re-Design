@@ -69,6 +69,36 @@ export const translations = {
         week: "Week",
         month_label: "Month",
         overall: "Overall",
+
+        // Login & Onboarding
+        appTitle: "My Re Design", // Brand name usually not translated, but consistent key
+        appSubtitle: "Reconnect your daily rhythm.",
+        login: "Login",
+        loginId: "LOGIN ID",
+        email: "Email",
+        phone: "Phone",
+        password: "Password",
+        noAccount: "Don't have an account?",
+        createAccount: "Create a new account",
+        guestLogin: "Enter as Guest (MVP Demo)",
+
+        // Account Settings
+        accountSettings: "Account Settings",
+        emailAuth: "Email Authentication",
+        nickname: "NICKNAME",
+        age: "AGE",
+        gender: "GENDER",
+        backupPhone: "BACKUP PHONE",
+        backupEmail: "BACKUP EMAIL",
+        addRecoveryEmail: "Add recovery email",
+        addRecoveryPhone: "Add recovery phone",
+        changePassword: "Change Password",
+        currentPassword: "Current Password",
+        newPassword: "New Password",
+        confirmNewPassword: "Confirm New Password",
+        updatePassword: "Update Password",
+        saveChanges: "Save Changes",
+        security: "SECURITY",
     },
     ko: {
         // My Page
@@ -136,6 +166,36 @@ export const translations = {
         week: "주간",
         month_label: "월간", // using month_label to avoid conflict with 'month' (month duration)
         overall: "전체",
+
+        // Login & Onboarding
+        appTitle: "My Re Design",
+        appSubtitle: "일상의 리듬을 다시 찾으세요.",
+        login: "로그인",
+        loginId: "로그인 ID",
+        email: "이메일",
+        phone: "휴대전화",
+        password: "비밀번호",
+        noAccount: "계정이 없으신가요?",
+        createAccount: "새 계정 만들기",
+        guestLogin: "게스트로 입장 (MVP 데모)",
+
+        // Account Settings
+        accountSettings: "계정 설정",
+        emailAuth: "이메일 인증",
+        nickname: "닉네임",
+        age: "나이",
+        gender: "성별",
+        backupPhone: "비상 연락처",
+        backupEmail: "비상 이메일",
+        addRecoveryEmail: "복구 이메일 추가",
+        addRecoveryPhone: "복구 전화번호 추가",
+        changePassword: "비밀번호 변경",
+        currentPassword: "현재 비밀번호",
+        newPassword: "새 비밀번호",
+        confirmNewPassword: "새 비밀번호 확인",
+        updatePassword: "비밀번호 변경하기",
+        saveChanges: "변경사항 저장",
+        security: "보안",
     }
 };
 
