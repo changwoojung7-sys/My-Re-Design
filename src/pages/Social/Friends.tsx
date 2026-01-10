@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, UserPlus, Phone, Share2, User, Mail, Trophy, Heart, MessageCircle, Send, Trash2, X, Users } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
+import HistoryDetail from '../History/HistoryDetail';
 
 export default function Friends() {
     const { user } = useStore();
@@ -16,8 +17,10 @@ export default function Friends() {
     // Social State
     const [likesMap, setLikesMap] = useState<Record<string, { count: number, isLiked: boolean }>>({});
     const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({});
+    const [permissionsMap, setPermissionsMap] = useState<Record<string, string>>({}); // goal_id -> status
     const [showCommentsId, setShowCommentsId] = useState<string | null>(null);
     const [commentInput, setCommentInput] = useState('');
+    const [viewingGoal, setViewingGoal] = useState<any | null>(null);
 
     useEffect(() => {
         if (user) fetchFriends();
@@ -73,6 +76,20 @@ export default function Friends() {
                 .select('id, goal_id, user_id, content, created_at, profiles:user_id(nickname)')
                 .in('goal_id', goalIds)
                 .order('created_at', { ascending: true });
+
+            // 7. Fetch Permissions (Requests by ME)
+            const { data: permissionsData } = await supabase
+                .from('friend_history_permissions')
+                .select('goal_id, status')
+                .eq('requester_id', user!.id)
+                .in('goal_id', goalIds);
+
+            // Process Permissions
+            const newPermissionsMap: Record<string, string> = {};
+            permissionsData?.forEach(p => {
+                newPermissionsMap[p.goal_id] = p.status;
+            });
+            setPermissionsMap(newPermissionsMap);
 
             // Process Likes
             const newLikesMap: Record<string, { count: number, isLiked: boolean }> = {};
@@ -317,9 +334,42 @@ export default function Friends() {
         await supabase.from('goal_comments').delete().eq('id', commentId);
     };
 
+    const handleRequestHistory = async (targetUserId: string, goalId: string) => {
+        // Find the goal's seq from our local friends list (which has userGoal)
+        const friend = friends.find(f => f.userGoal?.id === goalId);
+        const seq = friend?.userGoal?.seq || 1;
+
+        const { error } = await supabase
+            .from('friend_history_permissions')
+            .insert({
+                requester_id: user!.id,
+                target_user_id: targetUserId,
+                goal_id: goalId,
+                seq: seq, // Explicitly save seq
+                status: 'pending'
+            });
+
+        if (error) {
+            alert("Failed to request access.");
+            console.error(error);
+        } else {
+            alert("Request sent!");
+            setPermissionsMap(prev => ({ ...prev, [goalId]: 'pending' }));
+        }
+    };
+
+    const handleViewHistory = (goalId: string) => {
+        // Find the full goal object from our friends list or goals list
+        // Since we have friends list enriched with userGoal, we can find it there
+        const friend = friends.find(f => f.userGoal?.id === goalId);
+        if (friend && friend.userGoal) {
+            setViewingGoal(friend.userGoal);
+        }
+    };
+
     return (
         <div className="w-full flex-1 min-h-0 flex flex-col p-6 pt-10 pb-20">
-            <div className="flex justify-between items-center mb-6 shrink-0">
+            <div className="flex justify-between items-center mb-2 shrink-0">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Friends</h1>
                 <div className="bg-white/5 px-4 py-2 rounded-full flex items-center gap-2 border border-white/5">
                     <Users size={14} className="text-accent" />
@@ -473,6 +523,34 @@ export default function Friends() {
                                 </div>
                             )}
 
+                            {/* History Access Action */}
+                            {friend.hasGoal && (
+                                <div className="mt-3">
+                                    {permissionsMap[friend.userGoal.id] === 'approved' ? (
+                                        <button
+                                            onClick={() => handleViewHistory(friend.userGoal.id)}
+                                            className="w-full bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Trophy size={14} /> View Mission History
+                                        </button>
+                                    ) : permissionsMap[friend.userGoal.id] === 'pending' ? (
+                                        <button
+                                            disabled
+                                            className="w-full bg-slate-800 text-slate-500 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
+                                        >
+                                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> Request Pending...
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => handleRequestHistory(friend.id, friend.userGoal.id)}
+                                            className="w-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            🔒 Request to view History
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Social Actions */}
                             {friend.hasGoal && (
                                 <div className="mt-3 pt-3 border-t border-white/5 flex gap-4">
@@ -584,12 +662,24 @@ export default function Friends() {
                 )}
             </AnimatePresence>
 
+
+
+            {/* Friend History Modal */}
+            <AnimatePresence>
+                {viewingGoal && (
+                    <HistoryDetail
+                        goal={viewingGoal}
+                        onClose={() => setViewingGoal(null)}
+                    />
+                )}
+            </AnimatePresence>
+
             <div className="mt-4 text-center shrink-0">
                 <button className="flex items-center justify-center gap-2 mx-auto text-primary text-sm font-bold hover:underline">
                     <Share2 size={16} />
                     <span>Share Invite Link</span>
                 </button>
             </div>
-        </div>
+        </div >
     );
 }

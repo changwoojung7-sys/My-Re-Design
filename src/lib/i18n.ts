@@ -19,20 +19,25 @@ export const translations = {
         deletePlan: "Delete Plan",
         // Categories
         health: "Health",
-        learning: "Learning",
-        achievement: "Achievement",
-        self_esteem: "Self Esteem",
-        other: "Other",
+        growth: "Growth",
+        mindset: "Mindset",
+        career: "Career",
+        social: "Social",
+        vitality: "Vitality",
         // Form Labels
         height: "Height (cm)",
         weight: "Weight (kg)",
-        subject: "Subject",
+        growthTopic: "Topic (e.g. Reading, Coding)",
         currentLevel: "Current Level",
         targetLevel: "Target Level",
         projectName: "Project Name",
-        milestones: "Milestones",
-        currentState: "Current State",
-        desiredState: "Desired State",
+        kpi: "Key Outcome (KPI)",
+        currentMood: "Current Mood / State",
+        affirmation: "Daily Affirmation",
+        socialPeople: "Person to connect with",
+        socialActivity: "Activity (e.g. Call, Meet)",
+        vitalityHobby: "Hobby / Interest",
+        vitalityRoutine: "Routine to build",
         description: "Details...",
         whatToAchieve: "What do you want to achieve?",
 
@@ -45,7 +50,7 @@ export const translations = {
         inProgress: "In Progress",
 
         // Growth (Dashboard)
-        growth: "Growth",
+        // growth: "Growth", // Duplicated
         totalMissions: "Total Missions",
         successRate: "Success Rate",
         currentStreak: "Current Streak",
@@ -104,6 +109,7 @@ export const translations = {
         // Login & Onboarding
         appTitle: "My Re Design", // Brand name usually not translated, but consistent key
         appSubtitle: "Reconnect your daily rhythm.",
+        myLoopSubtitle: "Small challenges that awaken your daily life",
         login: "Login",
         loginId: "LOGIN ID",
         email: "Email",
@@ -130,6 +136,25 @@ export const translations = {
         updatePassword: "Update Password",
         saveChanges: "Save Changes",
         security: "SECURITY",
+
+        // Friend History Notification
+        accessRequests: "Access Requests",
+        allCaughtUp: "All caught up!",
+        noPendingRequests: "No pending requests.",
+        activeAccess: "Active Access (Friends)",
+        noActiveAccess: "No active access granted.",
+        revoke: "Revoke",
+        wantsToViewHistory: "{category} history requested by",
+        history: "history",
+        approve: "Approve",
+        reject: "Reject",
+        approved: "Approved",
+        rejected: "Rejected",
+        pending: "Pending",
+        sharePrompt: "Share missions with friends, family, and colleagues!",
+        unknownUser: "Unknown User",
+        unknownCategory: "Unknown",
+        historyAccessLog: "History Access Log",
     },
     ko: {
         // My Page
@@ -147,20 +172,25 @@ export const translations = {
         deletePlan: "계획 삭제",
         // Categories
         health: "건강",
-        learning: "학습",
-        achievement: "성취",
-        self_esteem: "자존감",
-        other: "기타",
+        growth: "성장",
+        mindset: "마인드",
+        career: "커리어",
+        social: "소셜",
+        vitality: "일상",
         // Form Labels
         height: "키 (cm)",
         weight: "몸무게 (kg)",
-        subject: "주제/과목",
+        growthTopic: "주제 (예: 독서, 코딩)",
         currentLevel: "현재 수준",
         targetLevel: "목표 수준",
         projectName: "프로젝트명",
-        milestones: "주요 마일스톤",
-        currentState: "현재 상태",
-        desiredState: "바라는 모습",
+        kpi: "핵심 성과 (KPI)",
+        currentMood: "현재 기분/상태",
+        affirmation: "나에게 해줄 말 (확언)",
+        socialPeople: "함께할 사람 (연락 대상)",
+        socialActivity: "활동 (예: 전화, 만남)",
+        vitalityHobby: "취미 / 관심사",
+        vitalityRoutine: "만들고 싶은 루틴",
         description: "상세 내용...",
         whatToAchieve: "무엇을 이루고 싶으신가요?",
 
@@ -173,7 +203,7 @@ export const translations = {
         inProgress: "진행 중",
 
         // Growth (Dashboard)
-        growth: "성장",
+        // growth: "성장", // Duplicated
         totalMissions: "총 미션",
         successRate: "성공률",
         currentStreak: "연속 달성",
@@ -232,6 +262,7 @@ export const translations = {
         // Login & Onboarding
         appTitle: "My Re Design",
         appSubtitle: "일상의 리듬을 다시 찾으세요.",
+        myLoopSubtitle: "나의 일상을 깨우는 작은 도전들",
         login: "로그인",
         loginId: "로그인 ID",
         email: "이메일",
@@ -258,6 +289,25 @@ export const translations = {
         updatePassword: "비밀번호 변경하기",
         saveChanges: "변경사항 저장",
         security: "보안",
+
+        // Friend History Notification
+        accessRequests: "요청 알림",
+        allCaughtUp: "새로운 알림이 없습니다!",
+        noPendingRequests: "대기 중인 요청이 없습니다.",
+        activeAccess: "활성 권한 (친구)",
+        noActiveAccess: "부여된 권한이 없습니다.",
+        revoke: "철회",
+        wantsToViewHistory: "님이 회원님의",
+        history: "기록을 보고 싶어합니다.",
+        approve: "수락",
+        reject: "거절",
+        approved: "승인됨",
+        rejected: "거절됨",
+        pending: "대기 중",
+        sharePrompt: "친구.가족.동료들과 미션을 함께하면서 공유해 보세요!",
+        unknownUser: "알 수 없는 사용자",
+        unknownCategory: "알 수 없음",
+        historyAccessLog: "히스토리 접근 로그",
     }
 };
 

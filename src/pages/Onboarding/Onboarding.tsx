@@ -17,10 +17,11 @@ export default function Onboarding() {
         phoneNumber: '',
         goals: {
             health: '',
-            learning: '',
-            achievement: '',
-            self_esteem: '',
-            other: ''
+            growth: '',
+            mindset: '',
+            career: '',
+            social: '',
+            vitality: ''
         }
     });
 
@@ -54,10 +55,11 @@ export default function Onboarding() {
                 age: formData.age,
                 gender: formData.gender,
                 goal_health: formData.goals.health,
-                goal_learning: formData.goals.learning,
-                goal_achievement: formData.goals.achievement,
-                goal_self_esteem: formData.goals.self_esteem,
-                goal_other: formData.goals.other,
+                goal_growth: formData.goals.growth,
+                goal_career: formData.goals.career,
+                goal_mindset: formData.goals.mindset,
+                goal_social: formData.goals.social,
+                goal_vitality: formData.goals.vitality,
             };
             setUser(updatedUser);
 
@@ -68,10 +70,11 @@ export default function Onboarding() {
                     age: formData.age,
                     gender: formData.gender,
                     goal_health: formData.goals.health,
-                    goal_learning: formData.goals.learning,
-                    goal_achievement: formData.goals.achievement,
-                    goal_self_esteem: formData.goals.self_esteem,
-                    goal_other: formData.goals.other,
+                    goal_growth: formData.goals.growth,
+                    goal_career: formData.goals.career,
+                    goal_mindset: formData.goals.mindset,
+                    goal_social: formData.goals.social,
+                    goal_vitality: formData.goals.vitality,
                     phone_number: formData.phoneNumber,
                     updated_at: new Date()
                 })
@@ -158,9 +161,9 @@ export default function Onboarding() {
             <button onClick={nextStep} className="w-full bg-white text-black font-bold py-3 rounded-xl mt-4">Next</button>
         </div>,
 
-        // Step 2: Goals (Health & Learning)
+        // Step 2: Health & Growth
         <div key="step2" className="space-y-6 w-full">
-            <h2 className="text-2xl font-bold">2. Core Goals</h2>
+            <h2 className="text-2xl font-bold">2. Foundation</h2>
 
             <div className="space-y-4">
                 <div>
@@ -173,11 +176,11 @@ export default function Onboarding() {
                     />
                 </div>
                 <div>
-                    <label className="text-sm text-accent font-bold">Learning Goal</label>
+                    <label className="text-sm text-accent font-bold">Growth Goal</label>
                     <input
                         type="text" placeholder="e.g. Read 1 book/month"
-                        value={formData.goals.learning}
-                        onChange={(e) => updateGoal('learning', e.target.value)}
+                        value={formData.goals.growth}
+                        onChange={(e) => updateGoal('growth', e.target.value)}
                         className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-accent focus:outline-none"
                     />
                 </div>
@@ -185,45 +188,56 @@ export default function Onboarding() {
             <button onClick={nextStep} className="w-full bg-white text-black font-bold py-3 rounded-xl mt-4">Next</button>
         </div>,
 
-        // Step 3: Goals (Achievement & Self-Esteem)
+        // Step 3: Mindset & Career
         <div key="step3" className="space-y-6 w-full">
-            <h2 className="text-2xl font-bold">3. Inner Growth</h2>
+            <h2 className="text-2xl font-bold">3. Inner & Outer</h2>
 
             <div className="space-y-4">
                 <div>
-                    <label className="text-sm text-yellow-500 font-bold">Achievement Goal</label>
+                    <label className="text-sm text-pink-500 font-bold">Mindset Goal</label>
                     <input
-                        type="text" placeholder="e.g. Launch Side Project"
-                        value={formData.goals.achievement}
-                        onChange={(e) => updateGoal('achievement', e.target.value)}
-                        className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none"
+                        type="text" placeholder="e.g. Daily Affirmation"
+                        value={formData.goals.mindset}
+                        onChange={(e) => updateGoal('mindset', e.target.value)}
+                        className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-pink-500 focus:outline-none"
                     />
                 </div>
                 <div>
-                    <label className="text-sm text-pink-500 font-bold">Self-Esteem Goal</label>
+                    <label className="text-sm text-yellow-500 font-bold">Career/Wealth Goal</label>
                     <input
-                        type="text" placeholder="e.g. Daily Affirmation"
-                        value={formData.goals.self_esteem}
-                        onChange={(e) => updateGoal('self_esteem', e.target.value)}
-                        className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-pink-500 focus:outline-none"
+                        type="text" placeholder="e.g. Launch Side Project"
+                        value={formData.goals.career}
+                        onChange={(e) => updateGoal('career', e.target.value)}
+                        className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none"
                     />
                 </div>
             </div>
             <button onClick={nextStep} className="w-full bg-white text-black font-bold py-3 rounded-xl mt-4">Next</button>
         </div>,
 
-        // Step 4: Other Goals
+        // Step 4: Social & Vitality
         <div key="step4" className="space-y-6 w-full">
-            <h2 className="text-2xl font-bold">4. Anything else?</h2>
+            <h2 className="text-2xl font-bold">4. Connection & Life</h2>
 
-            <div>
-                <label className="text-sm text-slate-400 font-bold">Other Goal (Optional)</label>
-                <textarea
-                    placeholder="Any other habits or goals..."
-                    value={formData.goals.other}
-                    onChange={(e) => updateGoal('other', e.target.value)}
-                    className="w-full h-32 mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-white focus:outline-none resize-none"
-                />
+            <div className="space-y-4">
+                <div>
+                    <label className="text-sm text-blue-400 font-bold">Social Goal</label>
+                    <input
+                        type="text" placeholder="e.g. Call parents weekly"
+                        value={formData.goals.social}
+                        onChange={(e) => updateGoal('social', e.target.value)}
+                        className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-400 focus:outline-none"
+                    />
+                </div>
+                <div>
+                    <label className="text-sm text-green-400 font-bold">Vitality (Hobbies)</label>
+                    <input
+                        placeholder="e.g. Play Guitar, Travel"
+                        value={formData.goals.vitality}
+                        onChange={(e) => updateGoal('vitality', e.target.value)}
+                        className="w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-green-400 focus:outline-none"
+                    />
+                </div>
             </div>
             <button onClick={finish} disabled={loading} className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3 rounded-xl mt-4">
                 {loading ? 'Creating Loop...' : 'Complete & Generate Missions'}

@@ -7,11 +7,11 @@ const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 const MOCK_MISSIONS: MissionData[] = [
     { category: 'health', content: 'Do 10 squats.' },
     { category: 'growth', content: 'Read one page of a book.' },
-    { category: 'relax', content: 'Close your eyes for 30 seconds.' }
+    { category: 'mindset', content: 'Takes 3 deep breaths.' }
 ];
 
 export interface MissionData {
-    category: 'growth' | 'health' | 'relax' | 'achievement' | 'self_esteem';
+    category: 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
     content: string;
     verification_type?: string;
 }
@@ -36,14 +36,6 @@ export async function generateMissions(userProfile: any, language: 'en' | 'ko' =
         return MOCK_MISSIONS;
     }
 
-    // Format goals for prompt
-    // We want to generate missions for ALL goals so the user can switch between them
-    // However, generating for 5 goals * 3 missions = 15 missions might be too expensive/slow for one call.
-    // Let's generate 1 mission per goal for now, OR group them.
-    // User asked "make 3 examples". 
-    // Let's try to generate 3 missions for each active goal.
-
-    // Construct a complex prompt asking for a JSON object grouped by category
     const goalList = userGoals.map((g: any) =>
         `- Category: ${g.category}\n  Goal: ${g.target_text}\n  Details: ${JSON.stringify(g.details)}`
     ).join('\n\n');
@@ -59,19 +51,21 @@ export async function generateMissions(userProfile: any, language: 'en' | 'ko' =
     For EACH active goal category listed above, create exactly 3 simple daily missions.
     - The missions must be relevant to the specific goal details.
     - Doable in < 15 mins.
-    - Return a flat list of missions, but make sure to assign the correct "category" corresponding to the goal (e.g. 'health', 'learning').
     - Output the content in ${language === 'ko' ? 'Korean' : 'English'}.
     
+    Category Specific Guidelines:
+    1. health: Focus on physical vitality, diet, sleep, or small exercises (e.g. squats, water, stretching).
+    2. growth: Focus on learning, reading, or practicing a skill (e.g. read 1 page, practice 10 mins).
+    3. mindset: Focus on mental health, gratitude, or affirmation (e.g. write gratitude, meditate 1 min).
+    4. career: Focus on work efficiency, planning, or financial check (e.g. organize desk, check expenses).
+    5. social: Focus on connection and relationships (e.g. send a nice text, compliment someone, family time).
+    6. vitality: Focus on hobbies, recharging, or cleaning (e.g. listen to music, clean one drawer).
+
     Output Format (JSON Array):
     [
-      { "category": "health", "content": "Squat 10 times" },
-      { "category": "health", "content": "Drink 1 cup of water" },
-      { "category": "health", "content": "Stretch for 1 min" },
-      { "category": "learning", "content": "Read 1 page" },
       { "category": "health", "content": "Squat 10 times", "verification_type": "image" },
-      { "category": "health", "content": "Drink 1 cup of water", "verification_type": "image" },
-      { "category": "health", "content": "Stretch for 1 min", "verification_type": "image" },
-      { "category": "learning", "content": "Read 1 page", "verification_type": "text" },
+      { "category": "mindset", "content": "Write 3 things grateful for", "verification_type": "text" },
+      { "category": "social", "content": "Send a text to a friend", "verification_type": "text" },
       ...
     ]
     `;
@@ -86,8 +80,8 @@ export async function generateMissions(userProfile: any, language: 'en' | 'ko' =
                     The output should be a flat JSON array of mission objects.
                     Each mission object must have "category", "content", and "verification_type" fields.
                     Valid values for "verification_type" are "text", "image", or "camera".
-                    Assign "text" for writing or journaling tasks (e.g., "list 3 things", "write a gratitude note").
-                    Assign "image" or "camera" for physical activities or actions (e.g., "take a walk", "drink water", "meditate").
+                    Assign "text" for writing, thinking, or social messaging tasks.
+                    Assign "image" or "camera" for physical activities, cleaning, or verifiable actions.
                     Ensure the content is written in ${language === 'ko' ? 'Korean' : 'English'}.
                     `
                 },

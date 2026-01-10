@@ -83,10 +83,11 @@ export default function Login() {
                         age: profile?.age,
                         gender: profile?.gender,
                         goal_health: profile?.goal_health,
-                        goal_learning: profile?.goal_learning,
-                        goal_achievement: profile?.goal_achievement,
-                        goal_self_esteem: profile?.goal_self_esteem,
-                        goal_other: profile?.goal_other,
+                        goal_growth: profile?.goal_growth,
+                        goal_career: profile?.goal_career,
+                        goal_mindset: profile?.goal_mindset,
+                        goal_social: profile?.goal_social,
+                        goal_vitality: profile?.goal_vitality,
                     });
                     navigate('/');
                 }

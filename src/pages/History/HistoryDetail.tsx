@@ -26,16 +26,23 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
         // Better: If missions have 'seq', use that. 
         // If not, we fall back to category + date range (created_at to created_at + duration).
 
+        // Calculate Date Range
+        const startDate = new Date(goal.created_at);
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + goal.duration_months);
+
         let query = supabase.from('missions')
             .select('*')
             .eq('user_id', goal.user_id)
             .eq('category', goal.category)
             .eq('is_completed', true)
+            .gte('date', startDate.toISOString().split('T')[0]) // Start Date
+            .lt('date', endDate.toISOString().split('T')[0])   // End Date (Exclusive)
             .order('date', { ascending: true });
 
-        // If missions have seq, match it.
+        // Optional: If missions happen to have seq, use it too
         if (goal.seq) {
-            query = query.eq('seq', goal.seq);
+            // query = query.eq('seq', goal.seq); // Commented out for now as mission seq might not be reliable
         }
 
         const { data } = await query;

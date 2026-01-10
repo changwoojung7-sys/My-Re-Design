@@ -6,7 +6,7 @@ import { ChevronDown, Calendar, ChevronRight, History as HistoryIcon } from 'luc
 import { motion, AnimatePresence } from 'framer-motion';
 import HistoryDetail from './HistoryDetail';
 
-type GoalCategory = 'health' | 'learning' | 'achievement' | 'self_esteem' | 'other';
+type GoalCategory = 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
 
 export default function History() {
     const { user } = useStore();
@@ -14,6 +14,63 @@ export default function History() {
     const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('health');
     const [historyGoals, setHistoryGoals] = useState<any[]>([]);
     const [selectedGoal, setSelectedGoal] = useState<any | null>(null);
+    const [missionCounts, setMissionCounts] = useState<Record<string, number>>({});
+    const [activeGoals, setActiveGoals] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        if (user) {
+            fetchMissionCounts();
+            fetchActiveGoals();
+        }
+    }, [user]);
+
+    const fetchActiveGoals = async () => {
+        // Verify active goals by checking user_goals table
+        const { data } = await supabase
+            .from('user_goals')
+            .select('category')
+            .eq('user_id', user!.id);
+
+        if (data) {
+            const active: Record<string, boolean> = {};
+            data.forEach((goal: any) => {
+                if (goal.category) {
+                    active[goal.category] = true;
+                }
+            });
+            setActiveGoals(active);
+
+            // Auto-select the first active category if one exists
+            const categories: GoalCategory[] = ['health', 'growth', 'mindset', 'career', 'social', 'vitality'];
+            const firstActive = categories.find(cat => active[cat]);
+
+            if (firstActive) {
+                setSelectedCategory(firstActive);
+            }
+        }
+    };
+
+    const fetchMissionCounts = async () => {
+        if (!user) return;
+        const today = new Date().toISOString().split('T')[0];
+
+        // Fetch incomplete missions for today
+        const { data } = await supabase
+            .from('missions')
+            .select('category')
+            .eq('user_id', user.id)
+            .eq('date', today)
+            .eq('is_completed', false);
+
+        if (data) {
+            const counts: Record<string, number> = {};
+            data.forEach((m: any) => {
+                const cat = m.category; // Ensure lowercase if needed
+                counts[cat] = (counts[cat] || 0) + 1;
+            });
+            setMissionCounts(counts);
+        }
+    };
 
     useEffect(() => {
         if (user) fetchGlobalHistory();
@@ -49,11 +106,20 @@ export default function History() {
                         onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
                         className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"
                     >
-                        {['health', 'learning', 'achievement', 'self_esteem', 'other'].map(cat => (
-                            <option key={cat} value={cat} className="bg-slate-900 text-white">
-                                {t[cat as GoalCategory]}
-                            </option>
-                        ))}
+                        {['health', 'growth', 'mindset', 'career', 'social', 'vitality'].map(cat => {
+                            const count = missionCounts[cat] || 0;
+                            const label = t[cat as GoalCategory];
+                            const enLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
+
+                            // Check if user has an active goal for this category using fresh state
+                            const hasGoal = activeGoals[cat];
+
+                            return (
+                                <option key={cat} value={cat} className="bg-slate-900 text-white">
+                                    {hasGoal ? '✔ ' : ''}{`[${enLabel}] ${label}`} {count > 0 ? `(${count})` : ''}
+                                </option>
+                            );
+                        })}
                     </select>
                     <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={24} />
                 </div>

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera } from 'lucide-react';
+import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import SubscriptionManager from './SubscriptionManager';
 
-type GoalCategory = 'health' | 'learning' | 'achievement' | 'self_esteem' | 'other';
+type GoalCategory = 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
 
 interface UserGoal {
     id?: string;
@@ -53,17 +53,119 @@ export default function MyPage() {
     const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('health');
     const [goals, setGoals] = useState<Record<GoalCategory, UserGoal>>({
         health: { category: 'health', target_text: '', duration_months: 1, details: { height: '', weight: '' }, seq: 1 },
-        learning: { category: 'learning', target_text: '', duration_months: 3, details: { subject: '', current_level: '', target_level: '' }, seq: 1 },
-        achievement: { category: 'achievement', target_text: '', duration_months: 6, details: { project_name: '', milestones: '' }, seq: 1 },
-        self_esteem: { category: 'self_esteem', target_text: '', duration_months: 1, details: { current_state: '', desired_state: '', daily_focus: '' }, seq: 1 },
-        other: { category: 'other', target_text: '', duration_months: 1, details: { description: '' }, seq: 1 }
+        growth: { category: 'growth', target_text: '', duration_months: 3, details: { topic: '', current_level: '', target_level: '' }, seq: 1 },
+        mindset: { category: 'mindset', target_text: '', duration_months: 1, details: { current_mood: '', affirmation: '' }, seq: 1 },
+        career: { category: 'career', target_text: '', duration_months: 6, details: { project_name: '', kpi: '' }, seq: 1 },
+        social: { category: 'social', target_text: '', duration_months: 1, details: { people: '', activity_type: '' }, seq: 1 },
+        vitality: { category: 'vitality', target_text: '', duration_months: 1, details: { hobby: '', routine: '' }, seq: 1 }
     });
+
+    // Request Approval State
+    const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
+    const [showRequestsModal, setShowRequestsModal] = useState(false);
+    const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
 
     useEffect(() => {
         if (user) {
             fetchUserGoals();
+            fetchIncomingRequests();
         }
     }, [user]);
+
+    const fetchIncomingRequests = async () => {
+        if (!user) return;
+
+        // 1. Fetch Requests directly (no joins to avoid RLS/Schema issues)
+        const { data: reqs, error } = await supabase
+            .from('friend_history_permissions')
+            .select('id, requester_id, goal_id, created_at, status')
+            .eq('target_user_id', user.id)
+            .in('status', ['pending', 'approved'])
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error("Error fetching requests:", error);
+            return;
+        }
+
+        if (!reqs || reqs.length === 0) {
+            setIncomingRequests([]);
+            return;
+        }
+
+        // 2. Fetch Requesters (Profiles)
+        const requesterIds = [...new Set(reqs.map(r => r.requester_id))];
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, nickname')
+            .in('id', requesterIds);
+
+        const profileMap = Object.fromEntries(profiles?.map(p => [p.id, p]) || []);
+
+        // 3. Fetch Goals (for category info)
+        const goalIds = [...new Set(reqs.map(r => r.goal_id))];
+        const { data: goalsData } = await supabase
+            .from('user_goals')
+            .select('id, category, target_text, seq')
+            .in('id', goalIds);
+
+        const goalMap = Object.fromEntries(goalsData?.map(g => [g.id, g]) || []);
+
+        // 4. Merge
+        const enrichedReqs = reqs.map(r => ({
+            ...r,
+            requester: profileMap[r.requester_id] || { nickname: t.unknownUser },
+            goal: goalMap[r.goal_id] || { category: t.unknownCategory, target_text: '', seq: 1 }
+        }));
+
+        setIncomingRequests(enrichedReqs);
+    };
+
+    const handleApproveRequest = async (id: string) => {
+        // 1. Visual Feedback First
+        setApprovingIds(prev => new Set(prev).add(id));
+
+        // 2. Perform DB Update
+        const { error } = await supabase
+            .from('friend_history_permissions')
+            .update({ status: 'approved' })
+            .eq('id', id);
+
+        if (error) {
+            console.error(error);
+            alert("Failed to approve.");
+            setApprovingIds(prev => {
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+            });
+        } else {
+            // 3. Delay slightly to show the "Approved" state, then move
+            setTimeout(() => {
+                setIncomingRequests(prev => prev.map(r =>
+                    r.id === id ? { ...r, status: 'approved' } : r
+                ));
+                setApprovingIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(id);
+                    return next;
+                });
+                // Force sync with DB to ensure persistence
+                fetchIncomingRequests();
+            }, 1000); // 1 second delay
+        }
+    };
+
+    const handleRejectRequest = async (id: string) => {
+        const { error } = await supabase
+            .from('friend_history_permissions')
+            .delete()
+            .eq('id', id);
+
+        if (!error) {
+            setIncomingRequests(prev => prev.filter(r => r.id !== id));
+        }
+    };
 
     const fetchUserGoals = async () => {
         if (!user) return;
@@ -416,11 +518,15 @@ export default function MyPage() {
     };
 
     return (
-        <div className="w-full h-full p-6 pt-10 pb-24 overflow-y-auto relative">
-            <div className="flex justify-between items-center mb-8">
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    My Re Design
-                </h1>
+        <div className="w-full h-full p-6 pt-6 pb-24 overflow-y-auto relative">
+            <div className="flex justify-between items-start mb-1">
+                <div className="flex flex-col">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        My Re Design
+                    </h1>
+                    <p className="text-xs font-medium text-slate-400 mt-0.5 whitespace-nowrap">{t.myLoopSubtitle}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">{t.sharePrompt}</p>
+                </div>
                 <div className="flex items-center gap-2">
                     <button
                         onClick={() => setIsSubManagerOpen(true)}
@@ -429,6 +535,18 @@ export default function MyPage() {
                         <CreditCard size={20} className="text-accent" />
                         <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
                     </button>
+
+                    {/* Notification Bell */}
+                    <button
+                        onClick={() => setShowRequestsModal(true)}
+                        className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors relative"
+                    >
+                        <Bell size={20} />
+                        {incomingRequests.some(r => r.status === 'pending') && (
+                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 animate-pulse" />
+                        )}
+                    </button>
+
                     <button
                         onClick={handleOpenSettings}
                         className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
@@ -444,8 +562,14 @@ export default function MyPage() {
                 </div>
             </div>
 
+            {/* Notification Bell */}
+            <div className="absolute top-10 right-20 mr-12 sm:mr-0 z-10">
+                {/* Adjusted position to be near other icons, actually let's put it IN the flex container above */}
+            </div>
+
+
             {/* Profile Header (Read Only / Quick View) */}
-            < div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-6" >
+            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
                 {/* ... Profile Info ... */}
                 <div className="flex items-center gap-4 mb-6">
                     <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative">
@@ -462,7 +586,7 @@ export default function MyPage() {
                             {user.nickname}
                         </h2>
                         <div className="flex gap-2 text-sm text-slate-400 mt-1">
-                            <span>{user.age} years • {user.gender}</span>
+                            <span>{user.age} years ??{user.gender}</span>
                         </div>
                     </div>
                 </div>
@@ -483,17 +607,17 @@ export default function MyPage() {
 
                                 return (
                                     <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
-                                        {(has ? '✔ ' : '') + t[cat as GoalCategory] + seqLabel}
+                                        {(has ? '??' : '') + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel}
                                     </option>
                                 );
                             })}
                         </select>
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                     </div>
-                </div>
+                </div >
 
                 {/* Dynamic Form Area */}
-                <div className="bg-black/20 rounded-2xl p-5 border border-white/5">
+                < div className="bg-black/20 rounded-2xl p-5 border border-white/5" >
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
                             {t[selectedCategory as GoalCategory]} {t.plan}
@@ -564,34 +688,46 @@ export default function MyPage() {
                                 </div>
                             )}
 
-                            {selectedCategory === 'learning' && (
+                            {selectedCategory === 'growth' && (
                                 <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.subject || ''} onChange={e => updateGoal('subject', e.target.value, true)} placeholder={t.subject} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
                                     <div className="grid grid-cols-2 gap-3">
                                         <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
                                         <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
                                     </div>
                                 </div>
                             )}
-                            {/* (Other categories similar structure - maintained implicitly by preserving logic if I copy paste fully, but here I'm replacing, so I must include all) */}
-                            {selectedCategory === 'achievement' && (
+
+                            {selectedCategory === 'career' && (
                                 <div className="space-y-3">
                                     <input type="text" disabled={!isEditing} value={currentGoal.details.project_name || ''} onChange={e => updateGoal('project_name', e.target.value, true)} placeholder={t.projectName} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <textarea disabled={!isEditing} value={currentGoal.details.milestones || ''} onChange={e => updateGoal('milestones', e.target.value, true)} placeholder={t.milestones} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none" />
+                                    <textarea disabled={!isEditing} value={currentGoal.details.kpi || ''} onChange={e => updateGoal('kpi', e.target.value, true)} placeholder={t.kpi} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none" />
                                 </div>
                             )}
-                            {selectedCategory === 'self_esteem' && (
+
+                            {selectedCategory === 'mindset' && (
                                 <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.current_state || ''} onChange={e => updateGoal('current_state', e.target.value, true)} placeholder={t.currentState} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.desired_state || ''} onChange={e => updateGoal('desired_state', e.target.value, true)} placeholder={t.desiredState} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.affirmation || ''} onChange={e => updateGoal('affirmation', e.target.value, true)} placeholder={t.affirmation} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
                                 </div>
                             )}
-                            {selectedCategory === 'other' && (
-                                <textarea disabled={!isEditing} value={currentGoal.details.description || ''} onChange={e => updateGoal('description', e.target.value, true)} placeholder={t.description} className="w-full h-24 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none" />
+
+                            {selectedCategory === 'social' && (
+                                <div className="space-y-3">
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialPeople} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.activity_type || ''} onChange={e => updateGoal('activity_type', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                </div>
+                            )}
+
+                            {selectedCategory === 'vitality' && (
+                                <div className="space-y-3">
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.hobby || ''} onChange={e => updateGoal('hobby', e.target.value, true)} placeholder={t.vitalityHobby} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    <input type="text" disabled={!isEditing} value={currentGoal.details.routine || ''} onChange={e => updateGoal('routine', e.target.value, true)} placeholder={t.vitalityRoutine} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                </div>
                             )}
                         </div>
                     </div>
-                </div>
+                </div >
             </div >
 
             {isEditing && (
@@ -627,7 +763,8 @@ export default function MyPage() {
                         </button>
                     )}
                 </div>
-            )}
+            )
+            }
 
             {/* SETTINGS MODAL */}
             <AnimatePresence>
@@ -828,9 +965,123 @@ export default function MyPage() {
                 )}
             </AnimatePresence>
 
+            {/* Requests Modal */}
+            <AnimatePresence>
+                {showRequestsModal && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+                        onClick={() => setShowRequestsModal(false)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="bg-slate-900 border border-white/10 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5">
+                                <h3 className="font-bold text-white flex items-center gap-2">
+                                    <Bell size={18} className="text-yellow-400" />
+                                    Access Requests
+                                </h3>
+                                <button onClick={() => setShowRequestsModal(false)} className="text-slate-400 hover:text-white">
+                                    <X size={20} />
+                                </button>
+                            </div>
+
+                            <div className="p-5 max-h-[60vh] overflow-y-auto space-y-6">
+                                {/* Pending Requests Section */}
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                                        {t.pending}
+                                    </h4>
+                                    {incomingRequests.filter(r => r.status === 'pending').length === 0 ? (
+                                        <p className="text-xs text-slate-600 text-center py-2">{t.noPendingRequests}</p>
+                                    ) : (
+                                        incomingRequests.filter(r => r.status === 'pending').map(req => (
+                                            <div key={req.id} className="p-4 bg-white/5 rounded-2xl border border-white/5">
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white">
+                                                            {req.requester?.nickname || t.unknownUser}
+                                                        </p>
+                                                        <p className="text-xs text-slate-400 mt-0.5">
+                                                            {t.wantsToViewHistory.replace('{category}', t[req.goal?.category as keyof typeof t] || req.goal?.category)}
+                                                            {req.goal?.seq && req.goal?.seq > 1 && <span className="text-primary ml-1">#{req.goal.seq}</span>}
+                                                        </p>
+                                                    </div>
+                                                    <span className="text-[10px] text-slate-500">
+                                                        {new Date(req.created_at).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button
+                                                        onClick={() => handleApproveRequest(req.id)}
+                                                        disabled={approvingIds.has(req.id)}
+                                                        className={`flex-1 text-xs font-bold py-2 rounded-xl transition-colors ${approvingIds.has(req.id)
+                                                            ? "bg-green-500 text-white cursor-default"
+                                                            : "bg-primary text-black hover:bg-primary/90"
+                                                            }`}
+                                                    >
+                                                        {approvingIds.has(req.id) ? t.approved : t.approve}
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleRejectRequest(req.id)}
+                                                        className="flex-1 bg-white/5 text-slate-400 text-xs font-bold py-2 rounded-xl hover:bg-white/10 transition-colors"
+                                                    >
+                                                        {t.reject}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+
+                                {/* Active (Approved) Access Section */}
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                        {t.activeAccess}
+                                    </h4>
+                                    {incomingRequests.filter(r => r.status === 'approved').length === 0 ? (
+                                        <p className="text-xs text-slate-600 text-center py-2">{t.noActiveAccess}</p>
+                                    ) : (
+                                        incomingRequests.filter(r => r.status === 'approved').map(req => (
+                                            <div key={req.id} className="p-4 bg-white/5 rounded-2xl border border-white/5 opacity-80">
+                                                <div className="flex justify-between items-center mb-2">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white">
+                                                            {req.requester?.nickname || t.unknownUser}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400">
+                                                            {t[req.goal?.category as keyof typeof t] || req.goal?.category}
+                                                            {req.goal?.seq && req.goal?.seq > 1 && <span className="ml-1">#{req.goal.seq}</span>}
+                                                        </p>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => handleRejectRequest(req.id)}
+                                                        className="text-xs text-red-400 hover:text-red-300 px-3 py-1.5 bg-red-500/10 rounded-lg transition-colors border border-red-500/20"
+                                                    >
+                                                        {t.revoke}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <AnimatePresence>
                 {isSubManagerOpen && <SubscriptionManager onClose={() => setIsSubManagerOpen(false)} />}
             </AnimatePresence>
-        </div >
+        </div>
     );
 }

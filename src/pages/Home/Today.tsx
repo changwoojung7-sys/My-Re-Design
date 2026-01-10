@@ -330,7 +330,7 @@ export default function Today() {
             {/* Header Area (Fixed) */}
             <div className="px-5 shrink-0">
                 {/* Apps Title */}
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex justify-between items-center mb-2">
                     <div>
                         <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
                             {t.missions}
@@ -369,11 +369,15 @@ export default function Today() {
                             onChange={(e) => setSelectedGoalId(e.target.value)}
                             className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"
                         >
-                            {userGoals.map(g => (
-                                <option key={g.id} value={g.id} className="bg-slate-800 text-white">
-                                    {g.target_text ? `[${g.category.toUpperCase()}] ${g.target_text}` : g.category.toUpperCase()}
-                                </option>
-                            ))}
+                            {userGoals.map(g => {
+                                const enLabel = g.category.charAt(0).toUpperCase() + g.category.slice(1);
+                                const koLabel = t[g.category as keyof typeof t] || g.category;
+                                return (
+                                    <option key={g.id} value={g.id} className="bg-slate-800 text-white">
+                                        {`✔ [${enLabel}] ${koLabel}`} {g.target_text ? `- ${g.target_text}` : ''}
+                                    </option>
+                                );
+                            })}
                         </select>
                         <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">▼</div>
                     </div>
