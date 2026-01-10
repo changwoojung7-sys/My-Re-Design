@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Image as ImageIcon, CheckCircle } from 'lucide-react';
+import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
 
@@ -14,6 +14,7 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
     const [missions, setMissions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [stats, setStats] = useState<{ likes: number, comments: any[] }>({ likes: 0, comments: [] });
 
     useEffect(() => {
         fetchMissionHistory();
@@ -35,15 +36,28 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
         // If missions have seq, match it.
         if (goal.seq) {
             query = query.eq('seq', goal.seq);
-        } else {
-            // Legacy fallback (optional): Filter by date
-            // const start = new Date(goal.created_at);
-            // const end = new Date(start); end.setMonth(end.getMonth() + goal.duration_months);
-            // query = query.gte('date', ...).lte('date', ...)
         }
 
         const { data } = await query;
         if (data) setMissions(data);
+
+        // Fetch Social Stats
+        const { count: likesCount } = await supabase
+            .from('goal_likes')
+            .select('*', { count: 'exact', head: true })
+            .eq('goal_id', goal.id);
+
+        const { data: commentsData } = await supabase
+            .from('goal_comments')
+            .select('*, profiles:user_id(nickname, profile_image_url)')
+            .eq('goal_id', goal.id)
+            .order('created_at', { ascending: false });
+
+        setStats({
+            likes: likesCount || 0,
+            comments: commentsData || []
+        });
+
         setLoading(false);
     };
 
@@ -75,18 +89,51 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
             <div className="flex-1 overflow-y-auto p-6 pb-20 custom-scrollbar">
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
-                        <CheckCircle size={28} className="text-accent mb-2" />
-                        <span className="text-2xl font-bold text-white">{totalVerified}</span>
-                        <span className="text-xs text-slate-400 uppercase font-bold">Missions Complete</span>
+                <div className="grid grid-cols-4 gap-3 mb-8">
+                    <div className="col-span-2 bg-gradient-to-br from-slate-800 to-slate-900 border border-white/10 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-lg">
+                        <CheckCircle size={24} className="text-accent mb-1" />
+                        <span className="text-xl font-bold text-white">{totalVerified}</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider">Completed</span>
                     </div>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-5 flex flex-col items-center justify-center text-center">
-                        <ImageIcon size={28} className="text-pink-400 mb-2" />
-                        <span className="text-2xl font-bold text-white">{photoMissions.length}</span>
-                        <span className="text-xs text-slate-400 uppercase font-bold">Memories Captured</span>
+
+                    <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                        <Heart size={20} className="text-pink-500 mb-1" fill={stats.likes > 0 ? "currentColor" : "none"} />
+                        <span className="text-lg font-bold text-white">{stats.likes}</span>
+                        <span className="text-[10px] text-slate-400">Likes</span>
+                    </div>
+
+                    <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center text-center">
+                        <MessageCircle size={20} className="text-blue-400 mb-1" />
+                        <span className="text-lg font-bold text-white">{stats.comments.length}</span>
+                        <span className="text-[10px] text-slate-400">Comments</span>
                     </div>
                 </div>
+
+                {/* Recent Comments Preview (if any) */}
+                {stats.comments.length > 0 && (
+                    <div className="mb-8">
+                        <h3 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                            <MessageCircle size={14} /> Recent Cheering
+                        </h3>
+                        <div className="space-y-3">
+                            {stats.comments.slice(0, 2).map((comment: any) => (
+                                <div key={comment.id} className="bg-white/5 rounded-xl p-3 flex gap-3 border border-white/5">
+                                    <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden shrink-0">
+                                        {comment.profiles?.profile_image_url ? (
+                                            <img src={comment.profiles.profile_image_url} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={14} className="text-slate-300" />
+                                        )}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-bold text-white mb-0.5">{comment.profiles?.nickname || 'Unknown'}</p>
+                                        <p className="text-xs text-slate-300 line-clamp-2">{comment.content}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Timeline Feed */}
                 <div className="mt-2 space-y-6">
