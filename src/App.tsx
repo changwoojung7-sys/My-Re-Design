@@ -6,6 +6,7 @@ import Login from './pages/Auth/Login';
 import Onboarding from './pages/Onboarding/Onboarding';
 import Today from './pages/Home/Today';
 import Dashboard from './pages/Dashboard/Dashboard';
+import History from './pages/History/History';
 import Friends from './pages/Social/Friends';
 import MyPage from './pages/MyPage/MyPage';
 import BottomNav from './components/layout/BottomNav';
@@ -31,6 +32,7 @@ function Layout() {
         <Route path="/" element={user ? <MyPage /> : <Navigate to="/login" replace />} />
         <Route path="/today" element={<Today />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/history" element={<History />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/mypage" element={<MyPage />} />
 

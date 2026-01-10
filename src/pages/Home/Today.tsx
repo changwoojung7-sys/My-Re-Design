@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
+import Paywall from './Paywall';
+import PaywallWarning from './PaywallWarning';
 
 export default function Today() {
     const { user, missions, setMissions } = useStore();
@@ -57,7 +59,14 @@ export default function Today() {
 
     const initData = async () => {
         setLoading(true);
-        const { data: goals } = await supabase.from('user_goals').select('*').eq('user_id', user!.id);
+        setLoading(true);
+        // Order by seq desc to get the latest challenge first
+        const { data: goals } = await supabase
+            .from('user_goals')
+            .select('*')
+            .eq('user_id', user!.id)
+            .order('seq', { ascending: false });
+
         if (goals && goals.length > 0) {
             setUserGoals(goals);
             setSelectedGoalId(goals[0].id);
@@ -257,8 +266,59 @@ export default function Today() {
     const isPastEmpty = missions.length === 0 && draftMissions.length === 0 && selectedDate < formatLocalYMD(new Date());
     const activeList = isPreview ? draftMissions : missions;
 
+    // --- Monetization Check ---
+    // --- Monetization Check ---
+    const currentDayNum = getSelectedDayNum();
+    const isPaywallActive = currentDayNum > 4 && user?.subscription_tier !== 'premium';
+    const [paywallStep, setPaywallStep] = useState<'none' | 'warning' | 'payment'>('none');
+
+    // Reset step when selection changes
+    useEffect(() => {
+        if (isPaywallActive) {
+            setPaywallStep('warning');
+        } else {
+            setPaywallStep('none');
+        }
+    }, [selectedGoalId, isPaywallActive]);
+
+    const handlePaywallCancel = () => {
+        // Find a goal that is NOT in paywall (Day <= 4)
+        const safeGoal = userGoals.find(g => {
+            const start = new Date(g.created_at);
+            start.setHours(0, 0, 0, 0);
+            const current = new Date(); // roughly today
+            const diffMs = current.getTime() - start.getTime();
+            const day = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+            return day <= 4;
+        });
+
+        if (safeGoal) {
+            setSelectedGoalId(safeGoal.id);
+        } else {
+            // No safe goal? Simply close warning but component remains PaywallActive.
+            // But we don't want to block them forever if they just want to see the screen locked?
+            // User said: "Show mission screen as is"
+            // To do that, we set step to 'none'.
+            // But wait, if step is 'none' AND isPaywallActive is true, logic below might need adjustment to not auto-trigger?
+            // Ah, useEffect above auto-sets it.
+            // If we want to show screen "locked" but viewable, we might need a separate 'dismissed' state.
+            // But 'isPaywallActive' usually implies BLOCKED.
+            // Let's assume switching goal is primary. If fails, maybe go to Dashboard?
+            window.location.href = '/dashboard';
+        }
+    };
+
     return (
-        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-20">
+        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-20 relative">
+            {isPaywallActive && paywallStep === 'warning' && (
+                <PaywallWarning
+                    onConfirm={() => setPaywallStep('payment')}
+                    onCancel={handlePaywallCancel}
+                />
+            )}
+            {isPaywallActive && paywallStep === 'payment' && (
+                <Paywall onClose={handlePaywallCancel} />
+            )}
             <input
                 type="file"
                 ref={fileInputRef}
@@ -271,9 +331,17 @@ export default function Today() {
             <div className="px-5 shrink-0">
                 {/* Apps Title */}
                 <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                        {t.missions}
-                    </h1>
+                    <div>
+                        <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
+                            {t.missions}
+                        </h1>
+                        {/* Sequence Badge */}
+                        {selectedGoal?.seq && selectedGoal.seq > 1 && (
+                            <span className="text-[10px] font-bold bg-white/10 text-accent px-2 py-0.5 rounded-full mt-1 inline-block">
+                                Challenge #{selectedGoal.seq}
+                            </span>
+                        )}
+                    </div>
                     <div className="bg-white/5 p-2 rounded-full">
                         <ListTodo size={20} className="text-accent" />
                     </div>

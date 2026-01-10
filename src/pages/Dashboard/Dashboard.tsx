@@ -242,7 +242,8 @@ export default function Dashboard() {
                     >
                         {goals.map(g => (
                             <option key={g.id} value={g.id} className="bg-slate-800 text-white">
-                                {g.target_text ? `[${g.category.toUpperCase()}] ${g.target_text}` : g.category.toUpperCase()}
+                                {t[g.category as keyof typeof t]} {g.target_text ? `- ${g.target_text}` : ''}
+                                {g.seq && g.seq > 1 ? ` (${t.challengeCount.replace('{n}', g.seq)})` : ''}
                             </option>
                         ))}
                     </select>

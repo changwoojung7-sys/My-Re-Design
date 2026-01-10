@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight } from 'lucide-react';
+import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+
+import SubscriptionManager from './SubscriptionManager';
 
 type GoalCategory = 'health' | 'learning' | 'achievement' | 'self_esteem' | 'other';
 
@@ -14,6 +16,7 @@ interface UserGoal {
     duration_months: number;
     details: any;
     created_at?: string;
+    seq?: number;
 }
 
 import { useLanguage } from '../../lib/i18n';
@@ -27,6 +30,7 @@ export default function MyPage() {
 
     // Settings Modal State
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isSubManagerOpen, setIsSubManagerOpen] = useState(false);
     const [settingsData, setSettingsData] = useState({
         loginId: '',
         nickname: '',
@@ -48,11 +52,11 @@ export default function MyPage() {
     // UI State
     const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('health');
     const [goals, setGoals] = useState<Record<GoalCategory, UserGoal>>({
-        health: { category: 'health', target_text: '', duration_months: 1, details: { height: '', weight: '' } },
-        learning: { category: 'learning', target_text: '', duration_months: 3, details: { subject: '', current_level: '', target_level: '' } },
-        achievement: { category: 'achievement', target_text: '', duration_months: 6, details: { project_name: '', milestones: '' } },
-        self_esteem: { category: 'self_esteem', target_text: '', duration_months: 1, details: { current_state: '', desired_state: '', daily_focus: '' } },
-        other: { category: 'other', target_text: '', duration_months: 1, details: { description: '' } }
+        health: { category: 'health', target_text: '', duration_months: 1, details: { height: '', weight: '' }, seq: 1 },
+        learning: { category: 'learning', target_text: '', duration_months: 3, details: { subject: '', current_level: '', target_level: '' }, seq: 1 },
+        achievement: { category: 'achievement', target_text: '', duration_months: 6, details: { project_name: '', milestones: '' }, seq: 1 },
+        self_esteem: { category: 'self_esteem', target_text: '', duration_months: 1, details: { current_state: '', desired_state: '', daily_focus: '' }, seq: 1 },
+        other: { category: 'other', target_text: '', duration_months: 1, details: { description: '' }, seq: 1 }
     });
 
     useEffect(() => {
@@ -63,6 +67,8 @@ export default function MyPage() {
 
     const fetchUserGoals = async () => {
         if (!user) return;
+        // Fetch all, we need to sort client side or use a clever query
+        // Simple approach: Fetch all, then find max seq per category
         const { data } = await supabase
             .from('user_goals')
             .select('*')
@@ -70,9 +76,18 @@ export default function MyPage() {
 
         if (data) {
             const newGoals = { ...goals };
+            const maxSeqMap: Record<string, number> = {};
+
+            // 1. Find max seq for each category
             data.forEach((g: any) => {
-                if (g.category && newGoals[g.category as GoalCategory]) {
-                    newGoals[g.category as GoalCategory] = g;
+                const cat = g.category;
+                const seq = g.seq || 1;
+                if (!maxSeqMap[cat] || seq > maxSeqMap[cat]) {
+                    maxSeqMap[cat] = seq;
+                    // For now, load the LATEST sequential goal into the slot
+                    if (newGoals[cat as GoalCategory]) {
+                        newGoals[cat as GoalCategory] = g;
+                    }
                 }
             });
             setGoals(newGoals);
@@ -166,6 +181,49 @@ export default function MyPage() {
         }
     };
 
+
+
+    const handleProfileImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !user) return;
+
+        setLoading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            // Use user.id as root folder to comply with likely RLS policy (auth.uid() = folder[1])
+            const fileName = `${user.id}/avatar_${Date.now()}.${fileExt}`;
+
+            // Upload to 'mission-proofs' bucket (re-using existing bucket to avoid creation steps)
+            const { error: uploadError } = await supabase.storage
+                .from('mission-proofs')
+                .upload(fileName, file);
+
+            if (uploadError) throw uploadError;
+
+            const { data: { publicUrl } } = supabase.storage
+                .from('mission-proofs')
+                .getPublicUrl(fileName);
+
+            // Update DB immediately
+            const { error: dbError } = await supabase
+                .from('profiles')
+                .update({ profile_image_url: publicUrl })
+                .eq('id', user.id);
+
+            if (dbError) throw dbError;
+
+            // Update Local State
+            setUser({ ...user, profile_image_url: publicUrl });
+            alert('Profile image updated!');
+
+        } catch (error) {
+            console.error('Error uploading avatar:', error);
+            alert('Failed to upload profile image.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handlePasswordUpdate = async () => {
         if (!passwordData.current || !passwordData.new || !passwordData.confirm) {
             alert('Please fill in all password fields.');
@@ -223,30 +281,56 @@ export default function MyPage() {
         navigate('/login');
     };
 
-    const handleSaveMainGoal = async () => {
+    const isGoalExpired = () => {
+        if (!currentGoal.created_at) return false;
+        const start = new Date(currentGoal.created_at);
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + currentGoal.duration_months);
+        return new Date() > end;
+    };
+
+    const handleSaveMainGoal = async (isNewChallenge = false) => {
         if (!user) return;
         setLoading(true);
         try {
-            // Upsert Current Category Goal
-            const currentGoal = goals[selectedCategory];
-            const goalData = {
+            // Logic:
+            // 1. If isNewChallenge=true, we insert a NEW row with seq = current.seq + 1
+            // 2. If isNewChallenge=false, we upsert/update the CURRENT row (same ID or specific seq)
+
+            const current = goals[selectedCategory];
+            const nextSeq = (current.seq || 1) + (isNewChallenge ? 1 : 0);
+
+            // Prepare Data
+            const goalData: any = {
                 user_id: user.id,
                 category: selectedCategory,
-                target_text: currentGoal.target_text,
-                duration_months: currentGoal.duration_months,
-                details: currentGoal.details,
+                target_text: current.target_text,
+                duration_months: current.duration_months,
+                details: current.details,
+                seq: nextSeq,
                 updated_at: new Date()
             };
 
+            // If it's an EDIT of an existing goal, keep the ID (upsert)
+            // If it's a NEW challenge, we DON'T send ID, so it auto-generates
+            if (!isNewChallenge && current.id) {
+                goalData.id = current.id;
+            }
+
             const { error: goalError } = await supabase
                 .from('user_goals')
-                .upsert(goalData, { onConflict: 'user_id,category' });
+                .upsert(goalData, { onConflict: 'id' }); // Use ID for upserting specific row
+
+            // Note: If we just insert, onConflict might be tricky if we had a unique constraint on (user_id, category).
+            // But we changed logic to allow multiple. So simple INSERT is fine for new challenge.
+            // Wait, supabase upsert without onConflict usually works if primary key is present.
+            // If isNewChallenge is true, 'id' is undefined, so it inserts.
 
             if (goalError) throw goalError;
 
             await fetchUserGoals();
             setIsEditing(false);
-            alert('Design saved successfully!');
+            alert(isNewChallenge ? 'Next challenge started!' : 'Design saved successfully!');
         } catch (error) {
             console.error('Error saving goal:', error);
             alert('Failed to save goal!');
@@ -339,6 +423,13 @@ export default function MyPage() {
                 </h1>
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={() => setIsSubManagerOpen(true)}
+                        className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2 px-3"
+                    >
+                        <CreditCard size={20} className="text-accent" />
+                        <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
+                    </button>
+                    <button
                         onClick={handleOpenSettings}
                         className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
                     >
@@ -355,9 +446,16 @@ export default function MyPage() {
 
             {/* Profile Header (Read Only / Quick View) */}
             < div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-6" >
+                {/* ... Profile Info ... */}
                 <div className="flex items-center gap-4 mb-6">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl font-bold text-white shadow-lg shadow-primary/20">
-                        {user.nickname?.charAt(0).toUpperCase()}
+                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative">
+                        <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
+                            {user.profile_image_url ? (
+                                <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
+                            ) : (
+                                <span className="text-2xl font-bold text-white shadow-lg">{user.nickname?.charAt(0).toUpperCase()}</span>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -378,11 +476,17 @@ export default function MyPage() {
                             onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
                             className="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary font-bold capitalize"
                         >
-                            {Object.keys(goals).map(cat => (
-                                <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
-                                    {(hasGoal(cat as GoalCategory) ? '✔ ' : '') + t[cat as GoalCategory]}
-                                </option>
-                            ))}
+                            {Object.keys(goals).map(cat => {
+                                const g = goals[cat as GoalCategory];
+                                const has = hasGoal(cat as GoalCategory);
+                                const seqLabel = (has && g.seq && g.seq > 1) ? ` (${t.challengeCount.replace('{n}', String(g.seq))})` : '';
+
+                                return (
+                                    <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
+                                        {(has ? '✔ ' : '') + t[cat as GoalCategory] + seqLabel}
+                                    </option>
+                                );
+                            })}
                         </select>
                         <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                     </div>
@@ -391,7 +495,12 @@ export default function MyPage() {
                 {/* Dynamic Form Area */}
                 <div className="bg-black/20 rounded-2xl p-5 border border-white/5">
                     <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold capitalize text-primary">{t[selectedCategory as GoalCategory]} {t.plan}</h3>
+                        <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
+                            {t[selectedCategory as GoalCategory]} {t.plan}
+                            {currentGoal.seq && currentGoal.seq > 1 && (
+                                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white">#{currentGoal.seq}</span>
+                            )}
+                        </h3>
                         <div className="flex items-center gap-2">
                             {currentGoal.created_at && (
                                 <span className="text-[10px] text-slate-500">
@@ -487,14 +596,25 @@ export default function MyPage() {
 
             {isEditing && (
                 <div className="space-y-4 mb-10">
-                    <button
-                        onClick={handleSaveMainGoal}
-                        disabled={loading}
-                        className="w-full bg-primary text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-                    >
-                        <Save size={20} />
-                        {loading ? t.saving : t.saveDesign}
-                    </button>
+                    {isGoalExpired() ? (
+                        <button
+                            onClick={() => handleSaveMainGoal(true)}
+                            disabled={loading}
+                            className="w-full bg-accent text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-accent/90 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Sparkles size={20} />
+                            Start Challenge #{(currentGoal.seq || 1) + 1}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => handleSaveMainGoal(false)}
+                            disabled={loading}
+                            className="w-full bg-primary text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                        >
+                            <Save size={20} />
+                            {loading ? t.saving : t.saveDesign}
+                        </button>
+                    )}
 
                     {currentGoal.id && (
                         <button
@@ -528,9 +648,33 @@ export default function MyPage() {
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                     <Settings size={20} className="text-primary" /> {t.accountSettings}
                                 </h2>
-                                <button onClick={() => setIsSettingsOpen(false)} className="bg-white/10 p-2 rounded-full hover:bg-white/20">
-                                    <X size={20} className="text-white" />
+                                <button onClick={() => setIsSettingsOpen(false)} className="bg-white/10 p-2 rounded-full text-white hover:bg-white/20">
+                                    <X size={20} />
                                 </button>
+                            </div>
+
+
+                            {/* Profile Image Upload */}
+                            <div className="flex flex-col items-center mb-6">
+                                <div className="relative w-24 h-24 rounded-full bg-slate-800 border-2 border-white/10 mb-3 group cursor-pointer overflow-hidden">
+                                    {user?.profile_image_url ? (
+                                        <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-slate-500">
+                                            <span className="text-3xl font-bold text-slate-700">{user?.nickname?.charAt(0).toUpperCase()}</span>
+                                        </div>
+                                    )}
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Camera size={24} className="text-white" />
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="absolute inset-0 opacity-0 cursor-pointer"
+                                        onChange={handleProfileImageUpload}
+                                    />
+                                </div>
+                                <p className="text-xs text-slate-500">Tap to change profile photo</p>
                             </div>
 
                             <div className="space-y-5">
@@ -682,6 +826,10 @@ export default function MyPage() {
                         </motion.div>
                     </motion.div>
                 )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+                {isSubManagerOpen && <SubscriptionManager onClose={() => setIsSubManagerOpen(false)} />}
             </AnimatePresence>
         </div >
     );

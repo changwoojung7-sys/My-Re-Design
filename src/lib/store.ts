@@ -12,6 +12,11 @@ interface User {
     goal_achievement?: string;
     goal_self_esteem?: string;
     goal_other?: string;
+    // Subscription
+    subscription_tier?: 'free' | 'premium';
+    subscription_end_date?: string;
+    // Profile Image
+    profile_image_url?: string;
     // Keeping legacy for compatibility if needed, but prefer top-level
     routine_dna?: any;
 }

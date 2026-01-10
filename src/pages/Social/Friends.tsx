@@ -103,6 +103,7 @@ export default function Friends() {
                         uniqueKey: p.id,
                         id: p.id,
                         name: p.nickname || p.email?.split('@')[0] || 'Unknown',
+                        profileImageUrl: p.profile_image_url, // Added
                         userGoal: null,
                         hasGoal: false,
                         targetText: "Ready to start...",
@@ -136,6 +137,7 @@ export default function Friends() {
                             uniqueKey: `${p.id}-${goal.id}`,
                             id: p.id,
                             name: p.nickname || p.email?.split('@')[0] || 'Unknown',
+                            profileImageUrl: p.profile_image_url, // Added
                             userGoal: goal,
                             hasGoal: true,
                             targetText: goal.target_text ? `[${goal.category.toUpperCase()}] ${goal.target_text}` : goal.category,
@@ -390,8 +392,14 @@ export default function Friends() {
                         <div key={friend.uniqueKey} className="p-5 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors shadow-sm">
                             <div className="flex justify-between items-start mb-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-primary/20 shrink-0">
-                                        {friend.name.charAt(0).toUpperCase()}
+                                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 p-0.5 shadow-lg shadow-primary/20 shrink-0 relative">
+                                        <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
+                                            {friend.profileImageUrl ? (
+                                                <img src={friend.profileImageUrl} alt={friend.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span className="font-bold text-lg text-white">{friend.name.charAt(0).toUpperCase()}</span>
+                                            )}
+                                        </div>
                                     </div>
                                     <div>
                                         <h3 className="font-bold text-white text-lg leading-tight">{friend.name}</h3>
@@ -421,26 +429,41 @@ export default function Friends() {
                                     )}
 
                                     <div className="flex-1">
-                                        <div className="flex justify-between items-end mb-1">
-                                            <div className="flex items-center gap-2">
-                                                <Trophy size={14} className="text-primary" />
-                                                <span className="text-xs font-medium text-slate-300">{friend.verifiedCount} Missions</span>
+                                        <div className="flex justify-between items-start mb-2">
+                                            {/* Left: Stats & Goal */}
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <Trophy size={14} className="text-primary" />
+                                                    <span className="text-xs font-medium text-slate-300">{friend.verifiedCount} Missions</span>
+                                                </div>
+                                                <p className="text-sm text-slate-300">
+                                                    <span className="text-primary font-bold">
+                                                        {t[friend.goalCategory as keyof typeof t] || friend.goalCategory}
+                                                    </span>
+                                                    {friend.goalTarget ? ` - ${friend.goalTarget}` : ''}
+                                                    {friend.seq && friend.seq > 1 && (
+                                                        <span className="text-[10px] text-accent ml-1 font-bold">
+                                                            ({t.challengeCount.replace('{n}', friend.seq)})
+                                                        </span>
+                                                    )}
+                                                </p>
                                             </div>
+
+                                            {/* Right: Rate */}
                                             <div className="text-right">
                                                 <span className="text-[10px] text-slate-400 block">Success Rate</span>
                                                 <span className="text-sm font-bold text-white">{friend.completionRate}%</span>
                                             </div>
-
                                         </div>
 
                                         {/* Progress Bar */}
-                                        <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
+                                        <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden mb-2">
                                             <div
                                                 className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000"
                                                 style={{ width: `${friend.completionRate}%` }}
                                             />
                                         </div>
-                                        <div className="flex justify-between mt-1">
+                                        <div className="flex justify-between items-center">
                                             <span className="text-[10px] text-slate-500 flex items-center gap-1">
                                                 🗓️ Progress
                                             </span>

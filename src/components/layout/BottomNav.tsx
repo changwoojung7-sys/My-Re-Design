@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart2, Users, User } from 'lucide-react';
+import { Home, BarChart2, Users, User, History } from 'lucide-react';
 import clsx from 'clsx';
 
 export default function BottomNav() {
@@ -10,6 +10,7 @@ export default function BottomNav() {
         { icon: User, label: 'My Loop', href: '/' },
         { icon: Home, label: 'Mission', href: '/today' },
         { icon: BarChart2, label: 'Growth', href: '/dashboard' },
+        { icon: History, label: 'History', href: '/history' },
         { icon: Users, label: 'Friends', href: '/friends' },
     ];
 
