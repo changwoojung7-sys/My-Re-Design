@@ -519,46 +519,52 @@ export default function MyPage() {
 
     return (
         <div className="w-full h-full p-6 pt-6 pb-24 overflow-y-auto relative">
-            <div className="flex justify-between items-start mb-1">
-                <div className="flex flex-col">
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <div className="flex flex-col items-start mb-2">
+                {/* Title Row with Icons */}
+                <div className="flex items-center gap-4 w-full">
+                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent shrink-0">
                         My Re Design
                     </h1>
-                    <p className="text-xs font-medium text-slate-400 mt-0.5 whitespace-nowrap">{t.myLoopSubtitle}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">{t.sharePrompt}</p>
+
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setIsSubManagerOpen(true)}
+                            className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2 px-3"
+                        >
+                            <CreditCard size={20} className="text-accent" />
+                            <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
+                        </button>
+
+                        {/* Notification Bell */}
+                        <button
+                            onClick={() => setShowRequestsModal(true)}
+                            className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors relative"
+                        >
+                            <Bell size={20} />
+                            {incomingRequests.some(r => r.status === 'pending') && (
+                                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 animate-pulse" />
+                            )}
+                        </button>
+
+                        <button
+                            onClick={handleOpenSettings}
+                            className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
+                        >
+                            <Settings size={20} />
+                        </button>
+                        <button
+                            onClick={handleLogout}
+                            className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"
+                        >
+                            <LogOut size={20} />
+                        </button>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setIsSubManagerOpen(true)}
-                        className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2 px-3"
-                    >
-                        <CreditCard size={20} className="text-accent" />
-                        <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
-                    </button>
 
-                    {/* Notification Bell */}
-                    <button
-                        onClick={() => setShowRequestsModal(true)}
-                        className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors relative"
-                    >
-                        <Bell size={20} />
-                        {incomingRequests.some(r => r.status === 'pending') && (
-                            <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 animate-pulse" />
-                        )}
-                    </button>
-
-                    <button
-                        onClick={handleOpenSettings}
-                        className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
-                    >
-                        <Settings size={20} />
-                    </button>
-                    <button
-                        onClick={handleLogout}
-                        className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"
-                    >
-                        <LogOut size={20} />
-                    </button>
+                {/* Subtitles below */}
+                <div className="mt-1">
+                    <p className="text-xs font-medium text-slate-400 whitespace-nowrap">{t.myLoopSubtitle}</p>
+                    <p className="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">{t.sharePrompt}</p>
                 </div>
             </div>
 
