@@ -70,7 +70,6 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
 
     // Stats
     const totalVerified = missions.length;
-    const photoMissions = missions.filter(m => m.image_url);
 
     return (
         <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col animate-in fade-in duration-200">
