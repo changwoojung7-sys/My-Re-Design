@@ -592,7 +592,7 @@ export default function MyPage() {
                             {user.nickname}
                         </h2>
                         <div className="flex gap-2 text-sm text-slate-400 mt-1">
-                            <span>{user.age} years ??{user.gender}</span>
+                            <span>{user.age} years · {user.gender}</span>
                         </div>
                     </div>
                 </div>
@@ -613,7 +613,7 @@ export default function MyPage() {
 
                                 return (
                                     <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
-                                        {(has ? '??' : '') + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel}
+                                        {(has ? '✔ ' : '') + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel}
                                     </option>
                                 );
                             })}
