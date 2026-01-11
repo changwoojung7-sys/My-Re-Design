@@ -377,8 +377,9 @@ export default function Today() {
                 {/* Apps Title */}
                 <div className="flex justify-between items-center mb-2">
                     <div>
-                        <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                            {t.missions}
+                        <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
+                            <ListTodo size={24} className="text-accent" />
+                            Mission
                         </h1>
                         {/* Sequence Badge */}
                         {selectedGoal?.seq && selectedGoal.seq > 1 && (
@@ -386,9 +387,6 @@ export default function Today() {
                                 Challenge #{selectedGoal.seq}
                             </span>
                         )}
-                    </div>
-                    <div className="bg-white/5 p-2 rounded-full">
-                        <ListTodo size={20} className="text-accent" />
                     </div>
                 </div>
 
@@ -433,9 +431,9 @@ export default function Today() {
 
             {/* Streak/Goal Info */}
             {selectedGoal && (
-                <div className="mb-6 shrink-0 grid grid-cols-2 gap-3 px-5">
-                    <div className="relative bg-white/5 rounded-2xl p-3 border border-white/5 flex items-center justify-center gap-3 overflow-hidden">
-                        <div className="absolute inset-0 opacity-0">
+                <div className="mb-4 mt-3 shrink-0 grid grid-cols-2 gap-2.5 px-5">
+                    <div className="relative bg-white/5 rounded-xl px-3 border border-white/5 flex flex-row items-center justify-center gap-2 overflow-hidden h-12">
+                        <div className="absolute inset-0 opacity-0 z-10">
                             <select
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
@@ -446,26 +444,19 @@ export default function Today() {
                                 ))}
                             </select>
                         </div>
-                        <div className="p-1.5 bg-primary/20 rounded-full text-primary pointer-events-none"><Flame size={18} /></div>
-                        <div className="text-left pointer-events-none">
-                            <span className="block text-[10px] text-slate-400 uppercase font-bold">{t.inProgress}</span>
-                            <div className="flex items-center gap-1">
-                                <span className="block text-sm font-bold text-white">Day {getSelectedDayNum()}</span>
-                                <span className="text-[10px] text-slate-500">▼</span>
-                            </div>
+                        <div className="text-primary pointer-events-none shrink-0"><Flame size={22} /></div>
+                        <div className="text-left pointer-events-none flex items-center gap-2 min-w-0">
+                            <span className="text-sm text-slate-400 font-bold whitespace-nowrap">{t.inProgress}</span>
+                            <span className="text-lg font-bold text-white whitespace-nowrap">Day {getSelectedDayNum()}</span>
                         </div>
                     </div>
-                    <div className="bg-white/5 rounded-2xl p-3 border border-white/5 flex items-center justify-center gap-3">
-                        <div className="p-1.5 bg-accent/20 rounded-full text-accent"><CheckCircle size={18} /></div>
-                        <div className="flex-1">
-                            <h2 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent mb-1">
+                    <div className="bg-white/5 rounded-xl px-3 border border-white/5 flex flex-row items-center justify-center gap-2 h-12">
+                        <div className="text-accent shrink-0"><CheckCircle size={22} /></div>
+                        <div className="text-left flex items-center gap-2 min-w-0">
+                            <h2 className="text-sm font-bold text-slate-400 whitespace-nowrap">
                                 {t.missionOverview}
                             </h2>
-                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                                <span>{t.day} {getSelectedDayNum()} / {selectedGoal?.duration_months} {selectedGoal?.duration_months > 1 ? t.months : t.month}</span>
-                                <span>•</span>
-                                <span>{missions.filter(m => m.is_completed).length}/{missions.length} {t.complete}</span>
-                            </div>
+                            <span className="text-lg font-bold text-white whitespace-nowrap">{missions.filter(m => m.is_completed).length}/{missions.length}</span>
                         </div>
                     </div>
                 </div>
@@ -509,7 +500,7 @@ export default function Today() {
             )}
 
             {/* Mission List (Scrollable) */}
-            <div className="space-y-4 flex-1 overflow-y-auto min-h-0 px-5 pb-4 custom-scrollbar">
+            <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 custom-scrollbar overscroll-y-contain">
                 {loading ? (
                     <div className="text-center py-10 animate-pulse mt-10">
                         <Sparkles className="mx-auto mb-3 text-primary" size={28} />

@@ -224,12 +224,10 @@ export default function Dashboard() {
         <div className="w-full max-w-md mx-auto h-[calc(100dvh-5rem)] overflow-y-auto pb-24 no-scrollbar pt-6 px-5">
             {/* Header */}
             <div className="flex justify-between items-center mb-2">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">
-                    {t.growth}
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
+                    <TrendingUp size={24} className="text-accent" />
+                    Growth
                 </h1>
-                <div className="bg-white/5 p-2 rounded-full">
-                    <TrendingUp size={20} className="text-accent" />
-                </div>
             </div>
             {/* Header: Goal Selector */}
             <div className="mb-6">

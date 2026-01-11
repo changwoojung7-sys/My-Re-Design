@@ -372,7 +372,10 @@ export default function Friends() {
     return (
         <div className="w-full flex-1 min-h-0 flex flex-col p-6 pt-10 pb-20">
             <div className="flex justify-between items-center mb-2 shrink-0">
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent">Friends</h1>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
+                    <Users size={24} className="text-accent" />
+                    Friends
+                </h1>
                 <div className="bg-white/5 px-4 py-2 rounded-full flex items-center gap-2 border border-white/5">
                     <Users size={14} className="text-accent" />
                     <span className="text-xs font-bold text-white shadow-sm">{friends.length}</span>
