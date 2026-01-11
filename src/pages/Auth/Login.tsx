@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useStore } from '../../lib/store';
 import { useNavigate } from 'react-router-dom';
@@ -8,100 +8,176 @@ import { useLanguage } from '../../lib/i18n';
 
 export default function Login() {
     const { t } = useLanguage();
-    const [authMethod, setAuthMethod] = useState<'email' | 'phone'>('email');
-    const [isSignUp, setIsSignUp] = useState(false);
-    const [loading, setLoading] = useState(false);
-
-    // Form States
+    // Unified Form State
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
 
-    // Optional Fields for Signup
-    const [optionalPhone, setOptionalPhone] = useState('');
-    const [optionalEmail, setOptionalEmail] = useState('');
+    // Login Mode State
+    const [loginIdentifier, setLoginIdentifier] = useState(''); // Email or Phone for Login
+
+    const [isSignUp, setIsSignUp] = useState(false);
+    const [loading, setLoading] = useState(false);
 
     const { setUser } = useStore();
     const navigate = useNavigate();
 
-    const handleAuth = async (e: React.FormEvent) => {
+    const [verifyCode, setVerifyCode] = useState('');
+    const [showVerify, setShowVerify] = useState(false);
+
+    // Reset forms when switching modes
+    useEffect(() => {
+        setEmail('');
+        setPhone('');
+        setPassword('');
+        setLoginIdentifier('');
+        setVerifyCode('');
+        setShowVerify(false);
+    }, [isSignUp]);
+
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
 
         try {
-            let authEmail = '';
-            let metaData: any = {};
+            // Strict Email Login
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: loginIdentifier,
+                password,
+            });
 
-            // 1. Prepare Credentials
-            if (authMethod === 'email') {
-                authEmail = email;
-                if (isSignUp && optionalPhone) {
-                    metaData.phone_number = optionalPhone.replace(/-/g, '');
-                }
-            } else {
-                const cleanPhone = phone.replace(/-/g, '');
-                if (!cleanPhone) throw new Error("Phone number is required");
-                authEmail = `${cleanPhone}@phone.coreloop.com`;
-
-                // Store phone in metadata for easy access later
-                metaData.phone_number = cleanPhone;
-                if (isSignUp && optionalEmail) {
-                    metaData.real_email = optionalEmail;
-                }
+            if (error) throw error;
+            if (data.user) {
+                await handleLoginSuccess(data.user);
             }
 
-            let error;
-            if (isSignUp) {
-                // --- Sign Up ---
-                const { error: signUpError } = await supabase.auth.signUp({
-                    email: authEmail,
-                    password,
-                    options: { data: metaData }
-                });
-                if (!signUpError) alert('Account created! Please sign in if not auto-redirected.');
-                error = signUpError;
-            } else {
-                // --- Sign In ---
-                const { data, error: signInError } = await supabase.auth.signInWithPassword({
-                    email: authEmail,
-                    password,
-                });
-
-                if (data.user) {
-                    // Fetch Profile Data
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('*')
-                        .eq('id', data.user.id)
-                        .single();
-
-                    setUser({
-                        id: data.user.id,
-                        email: data.user.email!,
-                        nickname: profile?.nickname || (authMethod === 'email' ? email.split('@')[0] : phone),
-                        // Map flat columns
-                        age: profile?.age,
-                        gender: profile?.gender,
-                        goal_health: profile?.goal_health,
-                        goal_growth: profile?.goal_growth,
-                        goal_career: profile?.goal_career,
-                        goal_mindset: profile?.goal_mindset,
-                        goal_social: profile?.goal_social,
-                        goal_vitality: profile?.goal_vitality,
-                        custom_free_trial_days: profile?.custom_free_trial_days,
-                    });
-                    navigate('/');
-                }
-                error = signInError;
-            }
-
-            if (error) alert(error.message);
         } catch (err: any) {
             console.error(err);
-            alert(err.message || 'Authentication failed');
+            alert(err.message || 'Login failed');
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleSignUp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            // A. If already showing verify, treat submit as Verify Action
+            if (showVerify) {
+                await handleVerifySignUp();
+                return;
+            }
+
+            // 1. Check Duplicates First
+            // Format Phone
+            let formattedPhone = phone.replace(/[^0-9]/g, '');
+            if (formattedPhone.startsWith('010')) {
+                formattedPhone = '+82' + formattedPhone.substring(1);
+            }
+
+            const { data: checks, error: checkError } = await supabase.rpc('check_duplicate_user', {
+                email_input: email,
+                phone_input: formattedPhone
+            });
+
+            if (checkError) throw checkError;
+            if (checks) {
+                // Handle Zombie Accounts (Deleted but left in Auth)
+                if (checks.email_is_zombie || checks.phone_is_zombie) {
+                    console.log("Zombie account detected. Cleaning up...");
+                    const { error: cleanError } = await supabase.rpc('clean_zombie_user', {
+                        target_email: checks.email_is_zombie ? email : null,
+                        target_phone: checks.phone_is_zombie ? formattedPhone : null
+                    });
+                    if (cleanError) console.error("Failed to clean zombie:", cleanError);
+                } else {
+                    // Real Duplicates
+                    if (checks.email_exists) throw new Error("Email already registered.");
+                    if (checks.phone_exists) throw new Error("Phone number already registered.");
+                }
+            }
+
+            // 2. Sign Up (Email Verify)
+            const { data, error } = await supabase.auth.signUp({
+                email,
+                password,
+                options: {
+                    data: {
+                        phone: formattedPhone, // Save to metadata
+                    }
+                }
+            });
+
+            if (error) throw error;
+
+            // 3. Switch to Verify Mode
+            alert("Signup successful! Verification code sent to your email.");
+            setShowVerify(true);
+
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || 'Signup failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifySignUp = async () => {
+        try {
+            const { data, error } = await supabase.auth.verifyOtp({
+                email,
+                token: verifyCode,
+                type: 'signup'
+            });
+
+            if (error) throw error;
+
+            alert("Verification successful!");
+            if (data.user) {
+                await handleLoginSuccess(data.user);
+            }
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || "Verification failed");
+            // Don't modify loading here as it's handled in wrapper
+            throw err;
+        }
+    };
+
+    const handleLoginSuccess = async (authUser: any) => {
+        // Fetch Profile Data
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
+
+        // Determine nickname (profile > metadata > truncated email/phone)
+        let nickname = profile?.nickname;
+        if (!nickname) {
+            if (authUser.phone) nickname = authUser.phone.slice(-4);
+            else if (authUser.email) nickname = authUser.email.split('@')[0];
+            else nickname = 'User';
+        }
+
+        setUser({
+            id: authUser.id,
+            email: authUser.email || authUser.phone || '',
+            nickname: nickname,
+            // Map flat columns
+            age: profile?.age,
+            gender: profile?.gender,
+            goal_health: profile?.goal_health,
+            goal_growth: profile?.goal_growth,
+            goal_career: profile?.goal_career,
+            goal_mindset: profile?.goal_mindset,
+            goal_social: profile?.goal_social,
+            goal_vitality: profile?.goal_vitality,
+            custom_free_trial_days: profile?.custom_free_trial_days,
+        });
+        navigate('/');
     };
 
     return (
@@ -118,98 +194,135 @@ export default function Login() {
 
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-2xl">
 
-                    {/* Method Tabs */}
-                    <div className="flex bg-black/20 rounded-xl p-1 mb-6">
-                        <button
-                            onClick={() => setAuthMethod('phone')}
-                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${authMethod === 'phone' ? 'bg-white/10 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
-                        >
-                            <Phone size={16} /> {t.phone}
-                        </button>
-                        <button
-                            onClick={() => setAuthMethod('email')}
-                            className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 ${authMethod === 'email' ? 'bg-white/10 text-white shadow' : 'text-slate-500 hover:text-slate-300'}`}
-                        >
-                            <Mail size={16} /> {t.email}
-                        </button>
-                    </div>
+                    <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
 
-                    <form onSubmit={handleAuth} className="space-y-4">
-
-                        {/* Main Input based on Method */}
-                        <div>
-                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{authMethod === 'email' ? t.email : t.phone}</label>
-                            {authMethod === 'phone' ? (
-                                <input
-                                    type="tel"
-                                    placeholder="010-1234-5678"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors font-mono"
-                                    required
-                                />
-                            ) : (
-                                <input
-                                    type="email"
-                                    placeholder="user@example.com"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
-                                    required
-                                />
-                            )}
-                        </div>
-
-                        <div>
-                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.password}</label>
-                            <div className="relative">
-                                <input
-                                    type="password"
-                                    placeholder="••••••••"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
-                                    required
-                                />
-                                <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
+                        {/* Validation Note */}
+                        {isSignUp && !showVerify && (
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 mb-4">
+                                <p className="text-xs text-blue-200 text-center">
+                                    Email verification is required for signup.
+                                </p>
                             </div>
-                        </div>
-
-                        {/* Optional Fields (Only for Sign Up) */}
-                        {isSignUp && (
-                            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="pt-2 overflow-hidden">
-                                <div className="p-3 bg-white/5 rounded-xl border border-white/5">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-xs font-bold text-accent">Optional</span>
-                                        <span className="text-[10px] text-slate-500">Backup Info</span>
-                                    </div>
-                                    {authMethod === 'phone' ? (
-                                        <input
-                                            type="email"
-                                            placeholder="Recovery Email (Optional)"
-                                            value={optionalEmail}
-                                            onChange={(e) => setOptionalEmail(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent"
-                                        />
-                                    ) : (
-                                        <input
-                                            type="tel"
-                                            placeholder="Phone Number (Optional)"
-                                            value={optionalPhone}
-                                            onChange={(e) => setOptionalPhone(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent"
-                                        />
-                                    )}
-                                </div>
-                            </motion.div>
                         )}
+
+                        {isSignUp ? (
+                            showVerify ? (
+                                // Verify Step UI
+                                <div className="space-y-4">
+                                    <div className="text-center mb-4">
+                                        <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-2 text-primary">
+                                            <Mail size={24} />
+                                        </div>
+                                        <h3 className="text-white font-bold text-lg">{t.verifyIdentity}</h3>
+                                        <p className="text-sm text-slate-400">Enter the code sent to {email}</p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.verifyCode}</label>
+                                        <div className="relative">
+                                            <input
+                                                type="text"
+                                                placeholder="123456"
+                                                value={verifyCode}
+                                                onChange={(e) => setVerifyCode(e.target.value)}
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors text-center text-xl tracking-widest"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                // Sign Up Form UI
+                                <>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.email}</label>
+                                        <div className="relative">
+                                            <input
+                                                type="email"
+                                                placeholder="user@email.com"
+                                                value={email}
+                                                onChange={(e) => setEmail(e.target.value)}
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                required
+                                            />
+                                            <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.phone}</label>
+                                        <div className="relative">
+                                            <input
+                                                type="tel"
+                                                placeholder="010-1234-5678"
+                                                value={phone}
+                                                onChange={(e) => setPhone(e.target.value)}
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                required
+                                            />
+                                            <Phone className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                        </div>
+                                    </div>
+                                    {/* Password Field */}
+                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
+                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.password}</label>
+                                        <div className="relative">
+                                            <input
+                                                type="password"
+                                                placeholder="••••••••"
+                                                value={password}
+                                                onChange={(e) => setPassword(e.target.value)}
+                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
+                                                required
+                                            />
+                                            <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
+                                        </div>
+                                    </motion.div>
+                                </>
+                            )
+                        ) : (
+                            /* Login Mode: Single Identifier (EMAIL ONLY) */
+                            // ... (Existing Login UI, reusing to ensure we don't break it)
+                            <div>
+                                <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.email}</label>
+                                <div className="relative">
+                                    <input
+                                        type="email"
+                                        placeholder="user@email.com"
+                                        value={loginIdentifier}
+                                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                        required
+                                    />
+                                    <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                </div>
+                                {/* Password Field (Login) */}
+                                <div className="mt-4">
+                                    <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.password}</label>
+                                    <div className="relative">
+                                        <input
+                                            type="password"
+                                            placeholder="••••••••"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
+                                            required
+                                        />
+                                        <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
 
                         <button
                             type="submit"
                             disabled={loading}
                             className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
                         >
-                            {loading ? (t.generating || 'Processing...') : (isSignUp ? t.createAccount : t.login)}
+                            {loading ? (t.generating || 'Processing...') : (
+                                isSignUp
+                                    ? (showVerify ? t.verifyAuth : t.createAccount)
+                                    : t.login
+                            )}
                             {!loading && <ArrowRight size={18} />}
                         </button>
                     </form>

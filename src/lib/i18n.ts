@@ -48,6 +48,13 @@ export const translations = {
         complete: "Complete",
         verify: "Verify",
         inProgress: "In Progress",
+        emptyStateTitle: "Start your mission!",
+        emptyStateDesc: "Small achievements today lead to changes tomorrow.\nShall we start right now?",
+        createGoal: "Go to Set Goals",
+        newMissionProposal: "New Mission Proposal",
+        reviewCarefully: "Review carefully before accepting",
+        confirmAndStart: "Confirm & Start",
+        changeMissions: "Change Missions ({n} left)",
 
         // Growth (Dashboard)
         // growth: "Growth", // Duplicated
@@ -137,6 +144,14 @@ export const translations = {
         createAccount: "Create a new account",
         guestLogin: "Enter as Guest (MVP Demo)",
 
+        // OTP / Auth
+        codeSent: "Verification code sent!",
+        verifyCode: "Verification Code",
+        sendCode: "Send Verification Code",
+        verifyAuth: "Verify & Login",
+        verifyIdentity: "Verify Identity",
+        verificationRequired: "For your security, please verify your identity to proceed.",
+
         // Account Settings
         accountSettings: "Account Settings",
         emailAuth: "Email Authentication",
@@ -173,6 +188,38 @@ export const translations = {
         unknownUser: "Unknown User",
         unknownCategory: "Unknown",
         historyAccessLog: "History Access Log",
+
+        // Account Deletion
+        deleteAccount: "Delete Account",
+        deleteAccountConfirm1: "Are you sure you want to delete your account?",
+        deleteAccountConfirm2: "This action is irreversible. All data will be deleted (Friends, Goals, Missions).\n\nOnly your subscription/payment history and email will be archived for administrative purposes.\n\nProceed?",
+        accountDeleted: "Account deleted. Goodbye.",
+        deleteAccountFailed: "Failed to delete account: {error}",
+
+        // Alerts & Confirmations
+        alertApproveFail: "Failed to approve.",
+        alertSettingsSavedPhoneExcluded: "Settings saved, but phone number could not be linked because it is already used by another account.",
+        alertSettingsUpdated: "Settings updated!",
+        alertSettingsFail: "Failed to update settings.",
+        alertProfileImgUpdated: "Profile image updated!",
+        alertProfileImgFail: "Failed to upload profile image.",
+        alertFillPassword: "Please fill in all password fields.",
+        alertPasswordMismatch: "New passwords do not match.",
+        alertPasswordLength: "Password must be at least 6 characters.",
+        alertPasswordIncorrect: "Current password is incorrect.",
+        alertPasswordUpdated: "Password updated successfully!",
+        alertPasswordUpdateFail: "Failed to update password.",
+        alertNoEmail: "No email found for verification.",
+        alertCodeSent: "Verification code sent to your email!",
+        alertNextChallenge: "Next challenge started!",
+        alertDesignSaved: "Design saved successfully!",
+        alertSaveGoalFail: "Failed to save goal!",
+        confirmDeletePlan: "Are you sure you want to delete this plan?",
+        confirmDeletePlanWarning: "WARNING: This will permanently delete all your progress, daily missions, and social interactions for this goal. \n\nThis action cannot be undone. Do you really want to proceed?",
+        alertPlanDeleted: "Plan deleted successfully.",
+        alertDeletePlanFail: "Failed to delete plan: {error}",
+
+
     },
     ko: {
         // My Page
@@ -219,6 +266,13 @@ export const translations = {
         complete: "완료",
         verify: "인증하기",
         inProgress: "진행 중",
+        emptyStateTitle: "미션을 시작해보세요!",
+        emptyStateDesc: "오늘의 작은 성취가 내일의 변화를 만듭니다.\n지금 바로 시작해볼까요?",
+        createGoal: "목표 설정하러 가기",
+        newMissionProposal: "새 미션 제안",
+        reviewCarefully: "수락하기 전에 꼼꼼히 확인하세요",
+        confirmAndStart: "확인 및 시작",
+        changeMissions: "미션 변경 ({n}회 남음)",
 
         // Growth (Dashboard)
         // growth: "성장", // Duplicated
@@ -308,6 +362,14 @@ export const translations = {
         createAccount: "새 계정 만들기",
         guestLogin: "게스트로 입장 (MVP 데모)",
 
+        // OTP / Auth
+        codeSent: "인증번호가 발송되었습니다!",
+        verifyCode: "인증번호",
+        sendCode: "인증번호 발송",
+        verifyAuth: "확인 및 로그인",
+        verifyIdentity: "본인 인증",
+        verificationRequired: "보안을 위해 본인 인증이 필요합니다.",
+
         // Account Settings
         accountSettings: "계정 설정",
         emailAuth: "이메일 인증",
@@ -344,6 +406,38 @@ export const translations = {
         unknownUser: "알 수 없는 사용자",
         unknownCategory: "알 수 없음",
         historyAccessLog: "히스토리 접근 로그",
+
+        // Account Deletion
+        deleteAccount: "회원 탈퇴",
+        deleteAccountConfirm1: "정말로 계정을 삭제하시겠습니까?",
+        deleteAccountConfirm2: "이 작업은 되돌릴 수 없습니다. 친구, 목표, 미션 등 모든 데이터가 삭제됩니다.\n\n구독 및 결제 내역과 이메일 정보만 관리 목적으로 보관됩니다.\n\n진행하시겠습니까?",
+        accountDeleted: "계정이 삭제되었습니다. 이용해 주셔서 감사합니다.",
+        deleteAccountFailed: "계정 삭제 실패: {error}",
+
+        // Alerts & Confirmations
+        alertApproveFail: "승인에 실패했습니다.",
+        alertSettingsSavedPhoneExcluded: "설정은 저장되었으나, 이미 다른 계정에서 사용 중인 번호라 연동되지 않았습니다.",
+        alertSettingsUpdated: "설정이 업데이트되었습니다!",
+        alertSettingsFail: "설정 업데이트에 실패했습니다.",
+        alertProfileImgUpdated: "프로필 이미지가 변경되었습니다!",
+        alertProfileImgFail: "프로필 이미지 업로드 실패.",
+        alertFillPassword: "모든 비밀번호 필드를 입력해주세요.",
+        alertPasswordMismatch: "새 비밀번호가 일치하지 않습니다.",
+        alertPasswordLength: "비밀번호는 6자 이상이어야 합니다.",
+        alertPasswordIncorrect: "현재 비밀번호가 올바르지 않습니다.",
+        alertPasswordUpdated: "비밀번호가 변경되었습니다!",
+        alertPasswordUpdateFail: "비밀번호 변경 실패.",
+        alertNoEmail: "인증할 이메일을 찾을 수 없습니다.",
+        alertCodeSent: "이메일로 인증 코드가 발송되었습니다!",
+        alertNextChallenge: "다음 챌린지가 시작되었습니다!",
+        alertDesignSaved: "설계가 저장되었습니다!",
+        alertSaveGoalFail: "목표 저장 실패!",
+        confirmDeletePlan: "이 계획을 삭제하시겠습니까?",
+        confirmDeletePlanWarning: "경고: 이 계획과 관련된 모든 진행 상황, 미션, 좋아요/댓글 기록이 영구적으로 삭제됩니다. 복구할 수 없습니다.\n\n계속하시겠습니까?",
+        alertPlanDeleted: "계획이 삭제되었습니다.",
+        alertDeletePlanFail: "계획 삭제 실패: {error}",
+
+
     }
 };
 

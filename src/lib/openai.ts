@@ -16,7 +16,7 @@ export interface MissionData {
     verification_type?: string;
 }
 
-export async function generateMissions(userProfile: any, language: 'en' | 'ko' = 'en'): Promise<MissionData[]> {
+export async function generateMissions(userProfile: any, language: 'en' | 'ko' = 'en', excludedMissions: string[] = []): Promise<MissionData[]> {
     if (!apiKey || apiKey.includes('YOUR_OPENAI')) {
         console.warn("No OpenAI Key found, using Mock Data");
         return MOCK_MISSIONS;
@@ -52,14 +52,20 @@ export async function generateMissions(userProfile: any, language: 'en' | 'ko' =
     - The missions must be relevant to the specific goal details.
     - Doable in < 15 mins.
     - Output the content in ${language === 'ko' ? 'Korean' : 'English'}.
+
+    EXCLUSION RULES (IMPORTANT):
+    - Do NOT generate missions that are identical or very similar to the following recent missions:
+    ${excludedMissions.length > 0 ? excludedMissions.map(m => `- ${m}`).join('\n') : "(No exclusions)"}
+    - Note: This exclusion applies strictly to categories: Vitality, Social, Mindset.
+    - For Health, Growth, Career categories, you MAY repeat tasks if they are essential (e.g. "Do 10 squats"), but try to vary slightly if possible.
     
     Category Specific Guidelines:
-    1. health: Focus on physical vitality, diet, sleep, or small exercises (e.g. squats, water, stretching).
-    2. growth: Focus on learning, reading, or practicing a skill (e.g. read 1 page, practice 10 mins).
-    3. mindset: Focus on mental health, gratitude, or affirmation (e.g. write gratitude, meditate 1 min).
-    4. career: Focus on work efficiency, planning, or financial check (e.g. organize desk, check expenses).
-    5. social: Focus on connection and relationships (e.g. send a nice text, compliment someone, family time).
-    6. vitality: Focus on hobbies, recharging, or cleaning (e.g. listen to music, clean one drawer).
+    1. health: Focus on physical vitality, diet, sleep, or small exercises (e.g. squats, water, stretching). Repeats allowed.
+    2. growth: Focus on learning, reading, or practicing a skill (e.g. read 1 page, practice 10 mins). Repeats allowed.
+    3. mindset: Focus on mental health, gratitude, or affirmation. AVOID REPEATS from exclusion list.
+    4. career: Focus on work efficiency, planning, or financial check. Repeats allowed.
+    5. social: Focus on connection and relationships. AVOID REPEATS from exclusion list.
+    6. vitality: Focus on hobbies, recharging, or cleaning. AVOID REPEATS from exclusion list.
 
     Output Format (JSON Array):
     [

@@ -1,9 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { generateMissions } from '../../lib/openai';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo } from 'lucide-react';
+import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
 import Paywall from './Paywall';
@@ -12,6 +13,7 @@ import PaywallWarning from './PaywallWarning';
 export default function Today() {
     const { user, missions, setMissions } = useStore();
     const { language, t } = useLanguage();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
 
     // Upload/Verify State
@@ -108,8 +110,29 @@ export default function Today() {
     };
 
     const generateDraftPlan = async () => {
-        // Generate via AI
-        const newMissions = await generateMissions(user, language);
+        // 1. Fetch recent missions for exclusion logic
+        let exclusionList: string[] = [];
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sevenDaysStr = formatLocalYMD(sevenDaysAgo);
+
+        const { data: recentMissions } = await supabase
+            .from('missions')
+            .select('category, content')
+            .eq('user_id', user!.id)
+            .gte('date', sevenDaysStr);
+
+        if (recentMissions) {
+            // Filter: Only exclude if NOT in (health, growth, career)
+            // Meaning: Vitality, Social, Mindset should avoid repeats.
+            const exceptions = ['health', 'growth', 'career'];
+            exclusionList = recentMissions
+                .filter(m => !exceptions.includes(m.category.toLowerCase()))
+                .map(m => m.content);
+        }
+
+        // Generate via AI with exclusions
+        const newMissions = await generateMissions(user, language, exclusionList);
 
         // Filter for CURRENT selected category
         const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());
@@ -455,15 +478,15 @@ export default function Today() {
                         <div className="flex items-center gap-3">
                             <Sparkles size={20} className="text-primary animate-pulse" />
                             <div>
-                                <p className="text-sm font-bold text-white">New Mission Proposal</p>
-                                <p className="text-[10px] text-slate-400">Review carefully before accepting</p>
+                                <p className="text-sm font-bold text-white">{t.newMissionProposal}</p>
+                                <p className="text-[10px] text-slate-400">{t.reviewCarefully}</p>
                             </div>
                         </div>
                         <button
                             onClick={confirmPlan}
-                            className="bg-primary text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                            className="bg-primary text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20 z-10"
                         >
-                            Confirm & Start
+                            {t.confirmAndStart}
                         </button>
                     </div>
 
@@ -471,9 +494,9 @@ export default function Today() {
                         <button
                             onClick={handleRefresh}
                             disabled={refreshCount >= 3 || loading}
-                            className="text-[10px] font-medium text-slate-400 hover:text-white transition-colors flex items-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-primary/20 border border-primary/30 text-xs font-bold text-primary hover:bg-primary/30 hover:text-white hover:border-primary/50 transition-all flex items-center gap-2 px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed z-10 shadow-sm"
                         >
-                            Change Missions ({3 - refreshCount} left) ↻
+                            {t.changeMissions?.replace('{n}', (3 - refreshCount).toString())} ↻
                         </button>
                     </div>
                 </div>
@@ -631,6 +654,38 @@ export default function Today() {
                             );
                         })}
                     </AnimatePresence>
+                )}
+
+                {/* Empty State (Cheering Message) */}
+                {!loading && !isPreview && !isPastEmpty && activeList.length === 0 && (
+                    <div className="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-10 animate-in fade-in slide-in-from-bottom-4">
+                        <div className="w-24 h-24 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-primary/10 relative">
+                            <Sparkles size={40} className="text-primary animate-pulse" />
+                            <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_10s_linear_infinite]" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white mb-3">
+                            {userGoals.length === 0 ? t.emptyStateTitle : t.readyToStart}
+                        </h3>
+                        <p className="text-slate-400 mb-8 leading-relaxed whitespace-pre-wrap">
+                            {userGoals.length === 0 ? t.emptyStateDesc : "Press the button to generate your daily missions!"}
+                        </p>
+
+                        {userGoals.length === 0 ? (
+                            <button
+                                onClick={() => navigate('/mypage')}
+                                className="bg-white text-black font-bold px-8 py-4 rounded-2xl hover:bg-slate-200 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                            >
+                                {t.createGoal} <ArrowRight size={18} />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={handleRefresh}
+                                className="bg-primary text-black font-bold px-8 py-4 rounded-2xl hover:bg-primary/90 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                            >
+                                {t.generateNewMissions} <Sparkles size={18} />
+                            </button>
+                        )}
+                    </div>
                 )}
 
                 {/* Loop Closed Celebration */}

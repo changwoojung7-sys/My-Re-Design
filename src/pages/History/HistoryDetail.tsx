@@ -28,8 +28,10 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
 
         // Calculate Date Range
         const startDate = new Date(goal.created_at);
+        startDate.setDate(startDate.getDate() - 1); // Buffer for timezone diffs (UTC vs Local)
+
         const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + goal.duration_months);
+        endDate.setMonth(endDate.getMonth() + goal.duration_months + 1); // Add extra month buffer just in case
 
         let query = supabase.from('missions')
             .select('*')
@@ -37,13 +39,11 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
             .eq('category', goal.category)
             .eq('is_completed', true)
             .gte('date', startDate.toISOString().split('T')[0]) // Start Date
-            .lt('date', endDate.toISOString().split('T')[0])   // End Date (Exclusive)
             .order('date', { ascending: true });
 
-        // Optional: If missions happen to have seq, use it too
-        if (goal.seq) {
-            // query = query.eq('seq', goal.seq); // Commented out for now as mission seq might not be reliable
-        }
+        // Removed .lt(endDate) constraint to prevent hiding recent missions if duration calc is off. 
+        // We mainly care that it started AFTER the goal was created.
+        // And if there's a newer goal (higher seq), we might want to cap it, but for now showing all is safer.
 
         const { data } = await query;
         if (data) setMissions(data);
@@ -170,17 +170,33 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
                                         {m.content}
                                     </p>
 
-                                    {/* Image Proof */}
+                                    {/* Media Proof */}
                                     {m.image_url && (
-                                        <div
-                                            className="rounded-xl overflow-hidden border border-white/10 cursor-pointer mb-3"
-                                            onClick={() => setSelectedImage(m.image_url)}
-                                        >
-                                            <img
-                                                src={m.image_url}
-                                                alt="Proof"
-                                                className="w-full h-auto object-cover max-h-64"
-                                            />
+                                        <div className="mb-3">
+                                            {m.proof_type === 'video' ? (
+                                                <video
+                                                    src={m.image_url}
+                                                    controls
+                                                    className="w-full h-auto object-cover max-h-64 rounded-xl border border-white/10"
+                                                />
+                                            ) : m.proof_type === 'audio' ? (
+                                                <audio
+                                                    src={m.image_url}
+                                                    controls
+                                                    className="w-full mt-2"
+                                                />
+                                            ) : (
+                                                <div
+                                                    className="rounded-xl overflow-hidden border border-white/10 cursor-pointer"
+                                                    onClick={() => setSelectedImage(m.image_url)}
+                                                >
+                                                    <img
+                                                        src={m.image_url}
+                                                        alt="Proof"
+                                                        className="w-full h-auto object-cover max-h-64"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     )}
 

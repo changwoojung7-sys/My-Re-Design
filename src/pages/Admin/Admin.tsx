@@ -14,6 +14,8 @@ export default function Admin() {
     // Admin Data State
     const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
     const [users, setUsers] = useState<any[]>([]);
+    const [deletedUsers, setDeletedUsers] = useState<any[]>([]);
+    const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -55,6 +57,16 @@ export default function Admin() {
         const { data: subs } = await supabase
             .from('subscriptions')
             .select('user_id, status, type, target_id, start_date, end_date');
+
+        // Fetch Deleted Users
+        const { data: deleted } = await supabase
+            .from('deleted_users')
+            .select('*')
+            .order('deleted_at', { ascending: false });
+
+        if (deleted) {
+            setDeletedUsers(deleted);
+        }
 
         if (profiles) {
             const enriched = profiles.map(p => {
@@ -122,6 +134,12 @@ export default function Admin() {
     const filteredUsers = users.filter(u =>
         (u.nickname && u.nickname.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+
+    const filteredDeletedUsers = deletedUsers.filter(u =>
+        (u.nickname && u.nickname.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.email && u.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.original_user_id && u.original_user_id.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     // Helper to format date YYYY.MM.DD
@@ -211,7 +229,23 @@ export default function Admin() {
                 {/* User List */}
                 <div className="flex-1 overflow-hidden flex flex-col p-6">
                     <div className="flex justify-between items-center mb-4 shrink-0">
-                        <h2 className="text-lg font-bold">User Management</h2>
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-lg font-bold">User Management</h2>
+                            <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                                <button
+                                    onClick={() => setViewMode('active')}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'active' ? 'bg-primary text-black' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Active
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('deleted')}
+                                    className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${viewMode === 'deleted' ? 'bg-red-500 text-white' : 'text-slate-400 hover:text-white'}`}
+                                >
+                                    Deleted
+                                </button>
+                            </div>
+                        </div>
                         <div className="relative">
                             <Search className="absolute left-3 top-2.5 text-slate-400" size={16} />
                             <input
@@ -226,93 +260,163 @@ export default function Admin() {
 
                     <div className="bg-slate-900 rounded-2xl border border-white/5 flex-1 overflow-hidden flex flex-col">
                         <div className="overflow-y-auto flex-1">
-                            <table className="w-full text-left text-sm whitespace-nowrap">
-                                <thead className="bg-slate-900/90 backdrop-blur-md text-slate-400 sticky top-0 z-10 border-b border-white/5">
-                                    <tr>
-                                        <th className="p-4 font-medium w-64">User</th>
-                                        <th className="p-4 font-medium w-[400px]">Subscription Details</th>
-                                        <th className="p-4 font-medium w-32">Free Limit</th>
-                                        <th className="p-4 font-medium w-32">Joined</th>
-                                        <th className="p-4 font-medium w-24">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-white/5">
-                                    {loading ? (
-                                        <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading...</td></tr>
-                                    ) : filteredUsers.map(user => (
-                                        <tr key={user.id || 'unknown'} className="hover:bg-white/5 transition-colors">
-                                            <td className="p-4 align-middle">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                                                        <User size={14} className="text-slate-500" />
+                            {viewMode === 'active' ? (
+                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead className="bg-slate-900/90 backdrop-blur-md text-slate-400 sticky top-0 z-10 border-b border-white/5">
+                                        <tr>
+                                            <th className="p-4 font-medium w-64">User</th>
+                                            <th className="p-4 font-medium w-[400px]">Subscription Details</th>
+                                            <th className="p-4 font-medium w-32">Free Limit</th>
+                                            <th className="p-4 font-medium w-32">Joined</th>
+                                            <th className="p-4 font-medium w-24">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {loading ? (
+                                            <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading...</td></tr>
+                                        ) : filteredUsers.map(user => (
+                                            <tr key={user.id || 'unknown'} className="hover:bg-white/5 transition-colors">
+                                                <td className="p-4 align-middle">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
+                                                            <User size={14} className="text-slate-500" />
+                                                        </div>
+                                                        <div className="overflow-hidden">
+                                                            <div className="font-bold text-sm truncate">{user.nickname || 'Guest'}</div>
+                                                            <div className="text-[10px] text-slate-500 truncate">{user.email || 'No Email'}</div>
+                                                        </div>
                                                     </div>
-                                                    <div className="overflow-hidden">
-                                                        <div className="font-bold text-sm truncate">{user.nickname || 'Guest'}</div>
-                                                        <div className="text-[10px] text-slate-500 truncate">{user.email || 'No Email'}</div>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="p-4 align-middle">
-                                                {user.subscriptions && user.subscriptions.length > 0 ? (
-                                                    <div className="flex flex-col gap-1">
-                                                        {user.subscriptions.map((sub: any, idx: number) => (
-                                                            <div key={idx} className="flex flex-col gap-0.5 text-xs mb-1 last:mb-0">
-                                                                <div className="flex items-center gap-2">
-                                                                    {sub.type === 'all' ? (
-                                                                        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">
-                                                                            <Check size={8} /> ALL
+                                                </td>
+                                                <td className="p-4 align-middle">
+                                                    {user.subscriptions && user.subscriptions.length > 0 ? (
+                                                        <div className="flex flex-col gap-1">
+                                                            {user.subscriptions.map((sub: any, idx: number) => (
+                                                                <div key={idx} className="flex flex-col gap-0.5 text-xs mb-1 last:mb-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        {sub.type === 'all' ? (
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded border border-purple-500/30">
+                                                                                <Check size={8} /> ALL
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
+                                                                                <Check size={8} /> {sub.target_id}
+                                                                            </span>
+                                                                        )}
+                                                                        <span className="text-slate-300 font-medium whitespace-nowrap">
+                                                                            {getDuration(sub.start_date, sub.end_date)}
                                                                         </span>
-                                                                    ) : (
-                                                                        <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/30 uppercase">
-                                                                            <Check size={8} /> {sub.target_id}
-                                                                        </span>
-                                                                    )}
-                                                                    <span className="text-slate-300 font-medium whitespace-nowrap">
-                                                                        {getDuration(sub.start_date, sub.end_date)}
+                                                                    </div>
+                                                                    <span className="text-[10px] text-slate-500 font-mono">
+                                                                        {formatDate(sub.start_date)} ~ {formatDate(sub.end_date)}
                                                                     </span>
                                                                 </div>
-                                                                <span className="text-[10px] text-slate-500 font-mono">
-                                                                    {formatDate(sub.start_date)} ~ {formatDate(sub.end_date)}
-                                                                </span>
-                                                            </div>
-                                                        ))}
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1 text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">
+                                                            Free
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="p-4 align-middle">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`font-mono text-sm ${user.custom_free_trial_days ? 'text-accent font-bold' : 'text-slate-500'}`}>
+                                                            {user.custom_free_trial_days || globalPaywallDay} Days
+                                                        </span>
+                                                        {user.custom_free_trial_days && <span className="text-[10px] text-accent font-bold px-1.5 py-0.5 bg-accent/10 rounded">Custom</span>}
                                                     </div>
-                                                ) : (
-                                                    <span className="inline-flex items-center gap-1 text-[10px] bg-slate-800 text-slate-500 px-2 py-0.5 rounded-full">
-                                                        Free
-                                                    </span>
-                                                )}
-                                            </td>
-                                            <td className="p-4 align-middle">
-                                                <div className="flex items-center gap-2">
-                                                    <span className={`font-mono text-sm ${user.custom_free_trial_days ? 'text-accent font-bold' : 'text-slate-500'}`}>
-                                                        {user.custom_free_trial_days || globalPaywallDay} Days
-                                                    </span>
-                                                    {user.custom_free_trial_days && <span className="text-[10px] text-accent font-bold px-1.5 py-0.5 bg-accent/10 rounded">Custom</span>}
-                                                </div>
-                                            </td>
-                                            <td className="p-4 align-middle text-slate-500 text-xs">
-                                                {new Date(user.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td className="p-4 align-middle">
-                                                <button
-                                                    onClick={() => openUserDetail(user)}
-                                                    className="text-primary hover:text-white font-bold text-[10px] px-2.5 py-1 bg-primary/10 rounded-md border border-primary/20 hover:bg-primary/20 transition-all whitespace-nowrap"
-                                                >
-                                                    MANAGE
-                                                </button>
-                                            </td>
+                                                </td>
+                                                <td className="p-4 align-middle text-slate-500 text-xs">
+                                                    {new Date(user.created_at).toLocaleDateString()}
+                                                </td>
+                                                <td className="p-4 align-middle">
+                                                    <button
+                                                        onClick={() => openUserDetail(user)}
+                                                        className="text-primary hover:text-white font-bold text-[10px] px-2.5 py-1 bg-primary/10 rounded-md border border-primary/20 hover:bg-primary/20 transition-all whitespace-nowrap"
+                                                    >
+                                                        MANAGE
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <table className="w-full text-left text-sm whitespace-nowrap">
+                                    <thead className="bg-slate-900/90 backdrop-blur-md text-slate-400 sticky top-0 z-10 border-b border-white/5">
+                                        <tr>
+                                            <th className="p-4 font-medium w-64">Deleted User</th>
+                                            <th className="p-4 font-medium w-48">Deleted Date</th>
+                                            <th className="p-4 font-medium">Backup Data (Subs/Payments)</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/5">
+                                        {loading ? (
+                                            <tr><td colSpan={3} className="p-8 text-center text-slate-500">Loading...</td></tr>
+                                        ) : filteredDeletedUsers.map((user: any) => (
+                                            <tr key={user.id} className="hover:bg-red-500/5 transition-colors">
+                                                <td className="p-4 align-top">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-red-900/20 flex items-center justify-center shrink-0">
+                                                            <User size={14} className="text-red-500" />
+                                                        </div>
+                                                        <div className="overflow-hidden">
+                                                            <div className="font-bold text-sm text-slate-300 truncate">{user.nickname || 'Unknown'}</div>
+                                                            <div className="text-[10px] text-slate-500 truncate">{user.email}</div>
+                                                            <div className="text-[10px] text-slate-600 font-mono mt-0.5">{user.original_user_id}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="p-4 align-top text-slate-500 text-xs">
+                                                    {new Date(user.deleted_at).toLocaleString()}
+                                                </td>
+                                                <td className="p-4 align-top">
+                                                    <div className="space-y-4">
+                                                        {/* Subscriptions */}
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Subscriptions</p>
+                                                            {user.subscription_history && user.subscription_history.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {user.subscription_history.map((sub: any, i: number) => (
+                                                                        <div key={i} className="text-[10px] bg-white/5 px-2 py-1 rounded border border-white/5">
+                                                                            <span className="text-purple-300 font-bold">{sub.type === 'all' ? 'ALL' : sub.target_id}</span>
+                                                                            <span className="text-slate-500 mx-1">|</span>
+                                                                            <span className="text-slate-400">{formatDate(sub.start_date)}~{formatDate(sub.end_date)}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : <span className="text-[10px] text-slate-600">None</span>}
+                                                        </div>
+
+                                                        {/* Payments */}
+                                                        <div>
+                                                            <p className="text-[10px] font-bold text-slate-500 uppercase mb-1">Payments</p>
+                                                            {user.payment_history && user.payment_history.length > 0 ? (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {user.payment_history.map((pay: any, i: number) => (
+                                                                        <div key={i} className="text-[10px] bg-white/5 px-2 py-1 rounded border border-white/5">
+                                                                            <span className="text-emerald-300 font-bold">${pay.amount}</span>
+                                                                            <span className="text-slate-500 mx-1">|</span>
+                                                                            <span className="text-slate-400">{pay.plan_type}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            ) : <span className="text-[10px] text-slate-600">None</span>}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                         </div>
                     </div>
                 </div>
 
-                {/* User Detail Panel (Right Side Modal/Panel) */}
+                {/* User Detail Panel (Right Side Modal/Panel) - Only for Active */}
                 <AnimatePresence>
-                    {selectedUser && (
+                    {selectedUser && viewMode === 'active' && (
                         <motion.div
                             initial={{ x: '100%' }}
                             animate={{ x: 0 }}

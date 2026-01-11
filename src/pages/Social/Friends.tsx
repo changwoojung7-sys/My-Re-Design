@@ -200,7 +200,9 @@ export default function Friends() {
             if (searchQuery.includes('@')) {
                 query = query.eq('email', searchQuery);
             } else {
-                query = query.eq('phone_number', searchQuery.replace(/-/g, ''));
+                const cleanPhone = searchQuery.replace(/[^0-9]/g, '');
+                // Search in phone_number column OR match the phone-based email formats
+                query = query.or(`phone_number.eq.${cleanPhone},email.eq.${cleanPhone}@myredesign.com,email.eq.${cleanPhone}@phone.coreloop.com`);
             }
 
             const { data } = await query.maybeSingle();

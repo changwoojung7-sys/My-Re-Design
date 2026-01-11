@@ -70,6 +70,22 @@ export default function MyPage() {
     const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
     const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
 
+    // Account Deletion Verification State
+    const [showDeleteVerify, setShowDeleteVerify] = useState(false);
+    const [verifyCodeInput, setVerifyCodeInput] = useState('');
+    const [verifyTimer, setVerifyTimer] = useState(0);
+    const [verifyLoading, setVerifyLoading] = useState(false);
+
+
+    // Verification Timer
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (verifyTimer > 0) {
+            interval = setInterval(() => setVerifyTimer(t => t - 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [verifyTimer]);
+
     useEffect(() => {
         // Fetch Subscriptions & Paywall Settings
         const fetchData = async () => {
@@ -183,7 +199,7 @@ export default function MyPage() {
 
         if (error) {
             console.error(error);
-            alert("Failed to approve.");
+            alert(t.alertApproveFail);
             setApprovingIds(prev => {
                 const next = new Set(prev);
                 next.delete(id);
@@ -252,7 +268,7 @@ export default function MyPage() {
         const { data: { user: authUser } } = await supabase.auth.getUser();
 
         if (authUser) {
-            const isPhone = authUser.email?.endsWith('@phone.coreloop.com') || false;
+            const isPhone = authUser.email?.endsWith('@phone.coreloop.com') || authUser.email?.endsWith('@myredesign.com') || false;
             let loginId = authUser.email || '';
 
             if (isPhone) {
@@ -324,10 +340,42 @@ export default function MyPage() {
             });
 
             setIsSettingsOpen(false);
-            alert('Settings updated!');
-        } catch (err) {
+            alert(t.alertSettingsUpdated);
+        } catch (err: any) {
             console.error(err);
-            alert('Failed to update settings.');
+
+            // Handle Unique Constraint Violation (Duplicate Phone Number)
+            if (err.code === '23505' && err.message?.includes('profiles_phone_number_key')) {
+                try {
+                    // Retry updating WITHOUT phone_number
+                    const { error: retryError } = await supabase
+                        .from('profiles')
+                        .update({
+                            nickname: settingsData.nickname,
+                            age: settingsData.age,
+                            gender: settingsData.gender,
+                            updated_at: new Date()
+                        })
+                        .eq('id', user.id);
+
+                    if (retryError) throw retryError;
+
+                    // Update Local Store (partial)
+                    setUser({
+                        ...user,
+                        nickname: settingsData.nickname,
+                        age: settingsData.age,
+                        gender: settingsData.gender
+                    });
+
+                    setIsSettingsOpen(false);
+                    alert("Settings saved, but phone number could not be linked because it is already used by another account.");
+                } catch (retryErr) {
+                    alert("Failed to update settings. Please try again.");
+                }
+            } else {
+                alert(t.alertSettingsFail);
+            }
         } finally {
             setLoading(false);
         }
@@ -366,11 +414,11 @@ export default function MyPage() {
 
             // Update Local State
             setUser({ ...user, profile_image_url: publicUrl });
-            alert('Profile image updated!');
+            alert(t.alertProfileImgUpdated);
 
         } catch (error) {
             console.error('Error uploading avatar:', error);
-            alert('Failed to upload profile image.');
+            alert(t.alertProfileImgFail);
         } finally {
             setLoading(false);
         }
@@ -378,15 +426,15 @@ export default function MyPage() {
 
     const handlePasswordUpdate = async () => {
         if (!passwordData.current || !passwordData.new || !passwordData.confirm) {
-            alert('Please fill in all password fields.');
+            alert(t.alertFillPassword);
             return;
         }
         if (passwordData.new !== passwordData.confirm) {
-            alert('New passwords do not match.');
+            alert(t.alertPasswordMismatch);
             return;
         }
         if (passwordData.new.length < 6) {
-            alert('Password must be at least 6 characters.');
+            alert(t.alertPasswordLength);
             return;
         }
 
@@ -402,7 +450,7 @@ export default function MyPage() {
             });
 
             if (signInError) {
-                alert('Current password is incorrect.');
+                alert(t.alertPasswordIncorrect);
                 setLoading(false);
                 return;
             }
@@ -414,15 +462,89 @@ export default function MyPage() {
 
             if (updateError) throw updateError;
 
-            alert('Password updated successfully!');
+            alert(t.alertPasswordUpdated);
             setPasswordData({ current: '', new: '', confirm: '' });
             setIsPasswordExpanded(false);
 
         } catch (error: any) {
             console.error('Password update error:', error);
-            alert(error.message || 'Failed to update password.');
+            alert(t.alertPasswordUpdateFail || error.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // --- Account Deletion Verification Handlers ---
+    const handleSendDeleteVerification = async () => {
+        if (!user || !user.email) {
+            alert(t.alertNoEmail);
+            setShowDeleteVerify(false);
+            return;
+        }
+        setVerifyLoading(true);
+        try {
+            // Confirm we have a valid user session
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (!authUser) throw new Error("No authenticated user found.");
+
+            // Force Email Verification
+            // Note: If user is logged in via Phone, they might not have a confirmed email?
+            // But requirement says "Email is mandatory". So we assume user.email is valid.
+            const { error } = await supabase.auth.signInWithOtp({
+                email: user.email
+            });
+
+            if (error) throw error;
+
+            setVerifyTimer(60);
+            alert(t.alertCodeSent);
+            // Note: If Supabase prevents duplicate OTPs or 'Sign in with OTP' while logged in?
+            // Usually it works and just sends a code/link.
+            // If it sends a Magic Link, this UI (entering code) might be confusing unless we configured "Send Code".
+            // We assume Project Config is set to Send Code for Email OTP.
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message);
+            setShowDeleteVerify(false); // Reset on error
+        } finally {
+            setVerifyLoading(false);
+        }
+    };
+
+    const handleVerifyAndDelete = async () => {
+        if (!verifyCodeInput) return;
+        setVerifyLoading(true);
+
+        try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (!authUser) throw new Error("No user.");
+
+            // Verify OTP (Email)
+            const { error: verifyError } = await supabase.auth.verifyOtp({
+                email: user?.email!, // We checked user.email existence in send step
+                token: verifyCodeInput,
+                type: 'email'
+            });
+
+            if (verifyError) throw verifyError;
+
+            // If success, proceed to delete
+            const confirmFinal = window.confirm(t.deleteAccountConfirm2 || "Are you sure? This is irreversible.");
+            if (!confirmFinal) return;
+
+            // Call RPC
+            const { error: rpcError } = await supabase.rpc('delete_account');
+            if (rpcError) throw rpcError;
+
+            alert(t.accountDeleted);
+            await supabase.auth.signOut();
+            window.location.href = '/login';
+
+        } catch (err: any) {
+            console.error(err);
+            alert(t.deleteAccountFailed?.replace('{error}', err.message) || err.message);
+        } finally {
+            setVerifyLoading(false);
         }
     };
 
@@ -482,10 +604,10 @@ export default function MyPage() {
 
             await fetchUserGoals();
             setIsEditing(false);
-            alert(isNewChallenge ? 'Next challenge started!' : 'Design saved successfully!');
+            alert(isNewChallenge ? t.alertNextChallenge : t.alertDesignSaved);
         } catch (error) {
             console.error('Error saving goal:', error);
-            alert('Failed to save goal!');
+            alert(t.alertSaveGoalFail);
         } finally {
             setLoading(false);
         }
@@ -513,10 +635,10 @@ export default function MyPage() {
         if (!currentGoal.id) return;
 
         // 1. Strong Confirmation
-        const isConfirmed = window.confirm("Are you sure you want to delete this plan?");
+        const isConfirmed = window.confirm(t.confirmDeletePlan);
         if (!isConfirmed) return;
 
-        const isDoubleConfirmed = window.confirm("WARNING: This will permanently delete all your progress, daily missions, and social interactions (likes/comments) for this goal. \n\nThis action cannot be undone. Do you really want to proceed?");
+        const isDoubleConfirmed = window.confirm(t.confirmDeletePlanWarning);
         if (!isDoubleConfirmed) return;
 
         setLoading(true);
@@ -542,7 +664,7 @@ export default function MyPage() {
                 // We don't stop execution here, as the main goal is gone.
             }
 
-            alert("Plan deleted successfully.");
+            alert(t.alertPlanDeleted);
 
             // 4. Reset Local State
             setGoals(prev => ({
@@ -561,7 +683,7 @@ export default function MyPage() {
 
         } catch (error: any) {
             console.error("Delete Error:", error);
-            alert(`Failed to delete plan: ${error.message}`);
+            alert(t.alertDeletePlanFail?.replace('{error}', error.message) || error.message);
         } finally {
             setLoading(false);
         }
@@ -641,8 +763,10 @@ export default function MyPage() {
                         <h2 className="text-xl font-bold text-white flex items-center gap-2">
                             {user.nickname}
                         </h2>
-                        <div className="flex gap-2 text-sm text-slate-400 mt-1">
-                            <span>{user.age} years · {user.gender}</span>
+                        {/* Account Display */}
+                        <div className="flex flex-col text-sm text-slate-400 mt-1">
+                            <span>{user.email}</span>
+                            <span className="text-xs text-slate-500 mt-0.5">{user.age} years · {user.gender}</span>
                         </div>
                     </div>
                 </div>
@@ -1034,7 +1158,69 @@ export default function MyPage() {
                                                 </div>
                                             </motion.div>
                                         )}
+
                                     </AnimatePresence>
+                                </div>
+
+                                <div className="h-px bg-white/10 my-4" />
+
+                                {/* Dang Zone (Delete Account) */}
+                                <div className="pt-2">
+                                    {!showDeleteVerify ? (
+                                        <button
+                                            onClick={() => {
+                                                setShowDeleteVerify(true);
+                                                handleSendDeleteVerification();
+                                            }}
+                                            className="w-full flex items-center justify-between p-4 bg-red-500/10 rounded-xl border border-red-500/10 hover:bg-red-500/20 transition-colors text-red-500"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <Trash2 size={20} />
+                                                <span className="font-bold">{t.deleteAccount}</span>
+                                            </div>
+                                        </button>
+                                    ) : (
+                                        <motion.div
+                                            initial={{ opacity: 0, height: 0 }}
+                                            animate={{ opacity: 1, height: 'auto' }}
+                                            className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 space-y-3"
+                                        >
+                                            <div className="flex justify-between items-center text-red-500 mb-2">
+                                                <span className="text-sm font-bold flex items-center gap-2">
+                                                    <Lock size={14} />
+                                                    {t.verifyIdentity}
+                                                </span>
+                                                <button onClick={() => setShowDeleteVerify(false)} className="bg-red-500/10 p-1 rounded-full hover:bg-red-500/20"><X size={14} /></button>
+                                            </div>
+
+                                            <p className="text-xs text-slate-400">
+                                                {t.verificationRequired}
+                                            </p>
+
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={verifyCodeInput}
+                                                    onChange={(e) => setVerifyCodeInput(e.target.value)}
+                                                    placeholder={t.verifyCode}
+                                                    className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 text-center tracking-widest"
+                                                    maxLength={6}
+                                                />
+                                                <button
+                                                    onClick={handleVerifyAndDelete}
+                                                    disabled={verifyLoading || verifyCodeInput.length < 6}
+                                                    className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 disabled:opacity-50"
+                                                >
+                                                    {verifyLoading ? "..." : t.verifyAuth}
+                                                </button>
+                                            </div>
+                                            {verifyTimer > 0 && (
+                                                <p className="text-xs text-center text-slate-500">
+                                                    Resend in {verifyTimer}s
+                                                </p>
+                                            )}
+                                        </motion.div>
+                                    )}
                                 </div>
 
                             </div>
@@ -1063,7 +1249,7 @@ export default function MyPage() {
                             <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5">
                                 <h3 className="font-bold text-white flex items-center gap-2">
                                     <Bell size={18} className="text-yellow-400" />
-                                    Access Requests
+                                    {t.accessRequests}
                                 </h3>
                                 <button onClick={() => setShowRequestsModal(false)} className="text-slate-400 hover:text-white">
                                     <X size={20} />
@@ -1160,6 +1346,6 @@ export default function MyPage() {
             <AnimatePresence>
                 {isSubManagerOpen && <SubscriptionManager onClose={() => setIsSubManagerOpen(false)} initialCategory={selectedCategory} />}
             </AnimatePresence>
-        </div>
+        </div >
     );
 }
