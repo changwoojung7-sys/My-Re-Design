@@ -370,7 +370,7 @@ export default function Friends() {
     };
 
     return (
-        <div className="w-full flex-1 min-h-0 flex flex-col p-6 pt-10 pb-20">
+        <div className="w-full flex-1 min-h-0 flex flex-col px-5 pt-6 pb-20">
             <div className="flex justify-between items-center mb-2 shrink-0">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
                     <Users size={24} className="text-accent" />
@@ -436,7 +436,7 @@ export default function Friends() {
             </div>
 
             {/* Friend List */}
-            <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 custom-scrollbar">
+            <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 no-scrollbar">
                 {friends.length === 0 ? (
                     <div className="text-center py-10 opacity-50">
                         <p className="text-sm">No friends yet.</p>

@@ -89,11 +89,11 @@ export default function History() {
     };
 
     return (
-        <div className="w-full flex-1 min-h-0 flex flex-col pt-10 pb-24 px-6 relative overflow-hidden bg-background">
+        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-24 px-5 relative overflow-hidden bg-background">
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">
-                    <HistoryIcon size={28} className="text-primary" />
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">
+                    <HistoryIcon size={24} className="text-primary" />
                     History
                 </h1>
             </div>
@@ -126,7 +126,7 @@ export default function History() {
             </div>
 
             {/* Timeline List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-1">
                 {historyGoals.length === 0 ? (
                     <div className="text-center py-20 opacity-50">
                         <HistoryIcon size={48} className="mx-auto mb-4 text-slate-600" />

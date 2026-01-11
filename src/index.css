@@ -3,11 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --background: #0f172a; /* Slate 900 */
-  --foreground: #f8fafc; /* Slate 50 */
-  --primary: #8b5cf6; /* Violet 500 */
-  --secondary: #64748b; /* Slate 500 */
-  --accent: #ec4899; /* Pink 500 */
+  --background: #0f172a;
+  /* Slate 900 */
+  --foreground: #f8fafc;
+  /* Slate 50 */
+  --primary: #8b5cf6;
+  /* Violet 500 */
+  --secondary: #64748b;
+  /* Slate 500 */
+  --accent: #ec4899;
+  /* Pink 500 */
 }
 
 body {
@@ -18,7 +23,51 @@ body {
 
 /* Premium Animations */
 @keyframes explode {
-  0% { transform: scale(0); opacity: 0; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(1); opacity: 0; }
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* Custom Scrollbar Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+/* Admin Table Scroll: Vertical Hidden, Horizontal Visible */
+.admin-table-scroll::-webkit-scrollbar {
+  width: 0px;
+  /* Vertical hidden */
+  height: 6px;
+  /* Horizontal visible */
+}
+
+.admin-table-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.admin-table-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.admin-table-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }

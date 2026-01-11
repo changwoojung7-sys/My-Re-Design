@@ -500,7 +500,7 @@ export default function Today() {
             )}
 
             {/* Mission List (Scrollable) */}
-            <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 custom-scrollbar overscroll-y-contain">
+            <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 no-scrollbar overscroll-y-contain">
                 {loading ? (
                     <div className="text-center py-10 animate-pulse mt-10">
                         <Sparkles className="mx-auto mb-3 text-primary" size={28} />

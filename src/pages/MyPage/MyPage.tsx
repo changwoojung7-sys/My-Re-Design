@@ -690,8 +690,8 @@ export default function MyPage() {
     };
 
     return (
-        <div className="w-full h-full p-6 pt-6 pb-24 overflow-y-auto relative">
-            <div className="flex flex-col items-start mb-2">
+        <div className="w-full h-full flex flex-col p-6 pt-6 pb-24 relative overflow-hidden">
+            <div className="flex flex-col items-start mb-2 shrink-0">
                 {/* Title Row with Icons */}
                 <div className="flex items-center justify-between gap-4 w-full">
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent shrink-0">
@@ -738,229 +738,230 @@ export default function MyPage() {
                 {/* Adjusted position to be near other icons, actually let's put it IN the flex container above */}
             </div>
 
-
-            {/* Profile Header (Read Only / Quick View) */}
-            <div className="relative bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
-                <button
-                    onClick={() => setIsSubManagerOpen(true)}
-                    className="absolute top-6 right-6 p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2"
-                >
-                    <CreditCard size={20} className="text-accent" />
-                    <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
-                </button>
-                {/* ... Profile Info ... */}
-                <div className="flex items-center gap-4 mb-6">
-                    <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative">
-                        <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
-                            {user.profile_image_url ? (
-                                <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="text-2xl font-bold text-white shadow-lg">{user.nickname?.charAt(0).toUpperCase()}</span>
-                            )}
+            <div className="flex-1 overflow-y-auto no-scrollbar relative min-h-0">
+                {/* Profile Header (Read Only / Quick View) */}
+                <div className="relative bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
+                    <button
+                        onClick={() => setIsSubManagerOpen(true)}
+                        className="absolute top-6 right-6 p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2"
+                    >
+                        <CreditCard size={20} className="text-accent" />
+                        <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
+                    </button>
+                    {/* ... Profile Info ... */}
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative">
+                            <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
+                                {user.profile_image_url ? (
+                                    <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="text-2xl font-bold text-white shadow-lg">{user.nickname?.charAt(0).toUpperCase()}</span>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                    <div>
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            {user.nickname}
-                        </h2>
-                        {/* Account Display */}
-                        <div className="flex flex-col text-sm text-slate-400 mt-1">
-                            <span>{user.email}</span>
-                            <span className="text-xs text-slate-500 mt-0.5">{user.age} years · {user.gender}</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Category Selector */}
-                <div className="relative mb-6 z-10">
-                    <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">{t.focusArea}</label>
-                    <div className="relative">
-                        <select
-                            value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
-                            className="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary font-bold capitalize"
-                        >
-                            {Object.keys(goals).map(cat => {
-                                const g = goals[cat as GoalCategory];
-                                const has = hasGoal(cat as GoalCategory);
-                                const seqLabel = (has && g.seq && g.seq > 1) ? ` (${t.challengeCount.replace('{n}', String(g.seq))})` : '';
-
-                                return (
-                                    <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
-                                        {(has ? '✔ ' : '') + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel}
-                                    </option>
-                                );
-                            })}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                    </div>
-                </div >
-
-                {/* Dynamic Form Area */}
-                <div className="bg-black/20 rounded-2xl p-5 border border-white/5 relative overflow-hidden">
-                    {/* Lock Overlay */}
-                    {!isCategoryUnlocked(selectedCategory) && (
-                        <div className="absolute inset-0 z-20 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
-                            <Lock size={48} className="text-slate-500 mb-4" />
-                            <h3 className="text-xl font-bold text-white mb-2">{t[selectedCategory as GoalCategory]} {t.locked}</h3>
-                            <p className="text-sm text-slate-400 mb-6 max-w-xs">{t.subscribeToUnlock || "Subscribe to unlock this mission category and start your journey."}</p>
-                            <button
-                                onClick={() => setIsSubManagerOpen(true)}
-                                className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2"
-                            >
-                                <Sparkles size={18} />
-                                {t.unlockNow || "Unlock Now"}
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
-                            {t[selectedCategory as GoalCategory]} {t.plan}
-                            {currentGoal.seq && currentGoal.seq > 1 && (
-                                <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white">#{currentGoal.seq}</span>
-                            )}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                            {currentGoal.created_at && (
-                                <span className="text-[10px] text-slate-500">
-                                    {t.started}: {new Date(currentGoal.created_at).toLocaleDateString()}
-                                </span>
-                            )}
-                            <button
-                                onClick={() => setIsEditing(!isEditing)}
-                                className={`text-xs px-2 py-1 rounded-lg transition-colors font-bold ${isEditing ? 'bg-primary text-black' : 'text-primary hover:bg-primary/10'}`}
-                            >
-                                {isEditing ? t.editing : t.viewOnly}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        {/* Main Goal Input */}
                         <div>
-                            <label className="text-xs text-slate-400 block mb-1">{t.mainGoal}</label>
-                            <input
-                                type="text"
-                                disabled={!isEditing}
-                                value={currentGoal.target_text}
-                                onChange={e => updateGoal('target_text', e.target.value)}
-                                placeholder={t.whatToAchieve}
-                                className="w-full bg-white/5 rounded-lg px-3 py-3 text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all"
-                            />
+                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                {user.nickname}
+                            </h2>
+                            {/* Account Display */}
+                            <div className="flex flex-col text-sm text-slate-400 mt-1">
+                                <span>{user.email}</span>
+                                <span className="text-xs text-slate-500 mt-0.5">{user.age} years · {user.gender}</span>
+                            </div>
                         </div>
+                    </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <div>
-                                    <label className="text-xs text-slate-400 block mb-1">{t.duration}</label>
-                                    <select
-                                        disabled={!isEditing}
-                                        value={currentGoal.duration_months}
-                                        onChange={e => updateGoal('duration_months', Number(e.target.value))}
-                                        className="w-full bg-white/5 rounded-lg px-3 py-3 text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
-                                    >
-                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                            <option key={m} value={m} className="bg-slate-800 text-white">{m} {m > 1 ? t.months : t.month}</option>
-                                        ))}
-                                    </select>
-                                </div>
+                    {/* Category Selector */}
+                    <div className="relative mb-6 z-10">
+                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">{t.focusArea}</label>
+                        <div className="relative">
+                            <select
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
+                                className="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary font-bold capitalize"
+                            >
+                                {Object.keys(goals).map(cat => {
+                                    const g = goals[cat as GoalCategory];
+                                    const has = hasGoal(cat as GoalCategory);
+                                    const seqLabel = (has && g.seq && g.seq > 1) ? ` (${t.challengeCount.replace('{n}', String(g.seq))})` : '';
+
+                                    return (
+                                        <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
+                                            {(has ? '✔ ' : '') + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                        </div>
+                    </div >
+
+                    {/* Dynamic Form Area */}
+                    <div className="bg-black/20 rounded-2xl p-5 border border-white/5 relative overflow-hidden">
+                        {/* Lock Overlay */}
+                        {!isCategoryUnlocked(selectedCategory) && (
+                            <div className="absolute inset-0 z-20 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+                                <Lock size={48} className="text-slate-500 mb-4" />
+                                <h3 className="text-xl font-bold text-white mb-2">{t[selectedCategory as GoalCategory]} {t.locked}</h3>
+                                <p className="text-sm text-slate-400 mb-6 max-w-xs">{t.subscribeToUnlock || "Subscribe to unlock this mission category and start your journey."}</p>
+                                <button
+                                    onClick={() => setIsSubManagerOpen(true)}
+                                    className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2"
+                                >
+                                    <Sparkles size={18} />
+                                    {t.unlockNow || "Unlock Now"}
+                                </button>
+                            </div>
+                        )}
+
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
+                                {t[selectedCategory as GoalCategory]} {t.plan}
+                                {currentGoal.seq && currentGoal.seq > 1 && (
+                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white">#{currentGoal.seq}</span>
+                                )}
+                            </h3>
+                            <div className="flex items-center gap-2">
+                                {currentGoal.created_at && (
+                                    <span className="text-[10px] text-slate-500">
+                                        {t.started}: {new Date(currentGoal.created_at).toLocaleDateString()}
+                                    </span>
+                                )}
+                                <button
+                                    onClick={() => setIsEditing(!isEditing)}
+                                    className={`text-xs px-2 py-1 rounded-lg transition-colors font-bold ${isEditing ? 'bg-primary text-black' : 'text-primary hover:bg-primary/10'}`}
+                                >
+                                    {isEditing ? t.editing : t.viewOnly}
+                                </button>
                             </div>
                         </div>
 
-                        {/* Details Section */}
-                        <div className="pt-4 border-t border-white/5 space-y-4">
-                            {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
-                            {selectedCategory === 'health' && (
-                                <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-4">
+                            {/* Main Goal Input */}
+                            <div>
+                                <label className="text-xs text-slate-400 block mb-1">{t.mainGoal}</label>
+                                <input
+                                    type="text"
+                                    disabled={!isEditing}
+                                    value={currentGoal.target_text}
+                                    onChange={e => updateGoal('target_text', e.target.value)}
+                                    placeholder={t.whatToAchieve}
+                                    className="w-full bg-white/5 rounded-lg px-3 py-3 text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
                                     <div>
-                                        <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
-                                        <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
-                                        <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    </div>
-                                </div>
-                            )}
-
-                            {selectedCategory === 'growth' && (
-                                <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <label className="text-xs text-slate-400 block mb-1">{t.duration}</label>
+                                        <select
+                                            disabled={!isEditing}
+                                            value={currentGoal.duration_months}
+                                            onChange={e => updateGoal('duration_months', Number(e.target.value))}
+                                            className="w-full bg-white/5 rounded-lg px-3 py-3 text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
+                                        >
+                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                <option key={m} value={m} className="bg-slate-800 text-white">{m} {m > 1 ? t.months : t.month}</option>
+                                            ))}
+                                        </select>
                                     </div>
                                 </div>
-                            )}
+                            </div>
 
-                            {selectedCategory === 'career' && (
-                                <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.project_name || ''} onChange={e => updateGoal('project_name', e.target.value, true)} placeholder={t.projectName} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <textarea disabled={!isEditing} value={currentGoal.details.kpi || ''} onChange={e => updateGoal('kpi', e.target.value, true)} placeholder={t.kpi} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none" />
-                                </div>
-                            )}
+                            {/* Details Section */}
+                            <div className="pt-4 border-t border-white/5 space-y-4">
+                                {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
+                                {selectedCategory === 'health' && (
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
+                                            <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
+                                            <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        </div>
+                                    </div>
+                                )}
 
-                            {selectedCategory === 'mindset' && (
-                                <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.affirmation || ''} onChange={e => updateGoal('affirmation', e.target.value, true)} placeholder={t.affirmation} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                </div>
-                            )}
+                                {selectedCategory === 'growth' && (
+                                    <div className="space-y-3">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        </div>
+                                    </div>
+                                )}
 
-                            {selectedCategory === 'social' && (
-                                <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialPeople} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.activity_type || ''} onChange={e => updateGoal('activity_type', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                </div>
-                            )}
+                                {selectedCategory === 'career' && (
+                                    <div className="space-y-3">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.project_name || ''} onChange={e => updateGoal('project_name', e.target.value, true)} placeholder={t.projectName} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <textarea disabled={!isEditing} value={currentGoal.details.kpi || ''} onChange={e => updateGoal('kpi', e.target.value, true)} placeholder={t.kpi} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none" />
+                                    </div>
+                                )}
 
-                            {selectedCategory === 'vitality' && (
-                                <div className="space-y-3">
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.hobby || ''} onChange={e => updateGoal('hobby', e.target.value, true)} placeholder={t.vitalityHobby} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                    <input type="text" disabled={!isEditing} value={currentGoal.details.routine || ''} onChange={e => updateGoal('routine', e.target.value, true)} placeholder={t.vitalityRoutine} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                </div>
-                            )}
+                                {selectedCategory === 'mindset' && (
+                                    <div className="space-y-3">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.affirmation || ''} onChange={e => updateGoal('affirmation', e.target.value, true)} placeholder={t.affirmation} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    </div>
+                                )}
+
+                                {selectedCategory === 'social' && (
+                                    <div className="space-y-3">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialPeople} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.activity_type || ''} onChange={e => updateGoal('activity_type', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    </div>
+                                )}
+
+                                {selectedCategory === 'vitality' && (
+                                    <div className="space-y-3">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.hobby || ''} onChange={e => updateGoal('hobby', e.target.value, true)} placeholder={t.vitalityHobby} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.routine || ''} onChange={e => updateGoal('routine', e.target.value, true)} placeholder={t.vitalityRoutine} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    </div >
                 </div >
-            </div >
 
-            {isEditing && (
-                <div className="space-y-4 mb-10">
-                    {isGoalExpired() ? (
-                        <button
-                            onClick={() => handleSaveMainGoal(true)}
-                            disabled={loading}
-                            className="w-full bg-accent text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-accent/90 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Sparkles size={20} />
-                            Start Challenge #{(currentGoal.seq || 1) + 1}
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => handleSaveMainGoal(false)}
-                            disabled={loading}
-                            className="w-full bg-primary text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Save size={20} />
-                            {loading ? t.saving : t.saveDesign}
-                        </button>
-                    )}
+                {isEditing && (
+                    <div className="space-y-4 mb-10">
+                        {isGoalExpired() ? (
+                            <button
+                                onClick={() => handleSaveMainGoal(true)}
+                                disabled={loading}
+                                className="w-full bg-accent text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-accent/90 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Sparkles size={20} />
+                                Start Challenge #{(currentGoal.seq || 1) + 1}
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => handleSaveMainGoal(false)}
+                                disabled={loading}
+                                className="w-full bg-primary text-black font-bold py-4 rounded-2xl shadow-lg hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Save size={20} />
+                                {loading ? t.saving : t.saveDesign}
+                            </button>
+                        )}
 
-                    {currentGoal.id && (
-                        <button
-                            onClick={handleDeleteGoal}
-                            disabled={loading}
-                            className="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
-                        >
-                            <Trash2 size={20} />
-                            {t.deletePlan}
-                        </button>
-                    )}
-                </div>
-            )
-            }
+                        {currentGoal.id && (
+                            <button
+                                onClick={handleDeleteGoal}
+                                disabled={loading}
+                                className="w-full bg-red-500/10 text-red-500 font-bold py-3 rounded-2xl hover:bg-red-500/20 transition-all flex items-center justify-center gap-2"
+                            >
+                                <Trash2 size={20} />
+                                {t.deletePlan}
+                            </button>
+                        )}
+                    </div>
+                )
+                }
+            </div>
 
             {/* SETTINGS MODAL */}
             <AnimatePresence>

@@ -221,16 +221,17 @@ export default function Dashboard() {
 
 
     return (
-        <div className="w-full max-w-md mx-auto h-[calc(100dvh-5rem)] overflow-y-auto pb-24 no-scrollbar pt-6 px-5">
+        <div className="w-full max-w-md mx-auto h-[calc(100dvh-5rem)] flex flex-col pt-6 px-5">
             {/* Header */}
-            <div className="flex justify-between items-center mb-2">
+            <div className="flex justify-between items-center mb-2 shrink-0">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
                     <TrendingUp size={24} className="text-accent" />
                     Growth
                 </h1>
             </div>
+
             {/* Header: Goal Selector */}
-            <div className="mb-6">
+            <div className="mb-2 shrink-0">
                 <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wider">{t.analysisTarget}</label>
                 <div className="relative">
                     <select
@@ -268,122 +269,131 @@ export default function Dashboard() {
                 )}
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-3 gap-3 mb-6">
-                <div className="bg-white/5 rounded-2xl p-4 flex flex-col items-center justify-center border border-white/5">
-                    <Target className="text-primary mb-2" size={24} />
-                    <span className="text-xl font-bold text-white">{missions.length}</span>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">{t.totalMissions}</span>
-                </div>
-                <div className="bg-white/5 rounded-2xl p-4 flex flex-col items-center justify-center border border-white/5">
-                    <Trophy className="text-yellow-500 mb-2" size={24} />
-                    <span className="text-xl font-bold text-white">
-                        {missions.length > 0 ? Math.round((missions.filter(m => m.is_completed).length / missions.length) * 100) : 0}%
-                    </span>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">{t.successRate}</span>
-                </div>
-                <div className="bg-white/5 rounded-2xl p-4 flex flex-col items-center justify-center border border-white/5">
-                    <Flame className="text-orange-500 mb-2" size={24} />
-                    <span className="text-xl font-bold text-white">{calculateStreak(missions)}</span>
-                    <span className="text-[10px] text-slate-400 uppercase font-bold">{t.currentStreak}</span>
-                </div>
-            </div>
-
-            {/* Chart Section */}
-            <div className="bg-slate-900/50 p-6 rounded-3xl border border-white/5 mb-6 shadow-xl relative overflow-hidden">
-                <div className="flex justify-between items-center mb-6 relative z-10">
-                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                        <Target size={16} className="text-primary" />
-                        {t.performanceTrend}
-                    </h3>
-                    <div className="flex bg-black/40 rounded-lg p-0.5">
-                        <button
-                            onClick={() => setChartMode('week')}
-                            className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'week' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
-                        >
-                            {t.week}
-                        </button>
-                        <button
-                            onClick={() => setChartMode('month')}
-                            className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'month' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
-                        >
-                            {t.month_label}
-                        </button>
-                        <button
-                            onClick={() => setChartMode('overall')}
-                            className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'overall' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
-                        >
-                            {t.overall}
-                        </button>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 min-h-0 pt-2">
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                    <div className="bg-white/5 rounded-2xl py-3 px-3 flex items-center justify-center gap-3 border border-white/5 shadow-sm">
+                        <Target className="text-primary shrink-0" size={20} />
+                        <div className="flex flex-col items-start min-w-[30px]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">{t.totalMissions}</span>
+                            <span className="text-lg font-bold text-white leading-none">{missions.length}</span>
+                        </div>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl py-3 px-3 flex items-center justify-center gap-3 border border-white/5 shadow-sm">
+                        <Trophy className="text-yellow-500 shrink-0" size={20} />
+                        <div className="flex flex-col items-start min-w-[30px]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">{t.successRate}</span>
+                            <span className="text-lg font-bold text-white leading-none">
+                                {missions.length > 0 ? Math.round((missions.filter(m => m.is_completed).length / missions.length) * 100) : 0}%
+                            </span>
+                        </div>
+                    </div>
+                    <div className="bg-white/5 rounded-2xl py-3 px-3 flex items-center justify-center gap-3 border border-white/5 shadow-sm">
+                        <Flame className="text-orange-500 shrink-0" size={20} />
+                        <div className="flex flex-col items-start min-w-[30px]">
+                            <span className="text-[10px] text-slate-400 uppercase font-bold mb-0.5">{t.currentStreak}</span>
+                            <span className="text-lg font-bold text-white leading-none">{calculateStreak(missions)}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Graph */}
-                <div className="h-40 flex items-end justify-between gap-2 relative z-10 pl-2">
-                    {/* Y-Axis Guidelines */}
-                    <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-                        <div className="border-t border-dashed border-white w-full"></div>
-                        <div className="border-t border-dashed border-white w-full"></div>
-                        <div className="border-t border-dashed border-white w-full"></div>
+                {/* Chart Section */}
+                <div className="bg-slate-900/50 p-4 rounded-3xl border border-white/5 mb-4 shadow-xl relative overflow-hidden">
+                    <div className="flex justify-between items-center mb-4 relative z-10">
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                            <Target size={16} className="text-primary" />
+                            {t.performanceTrend}
+                        </h3>
+                        <div className="flex bg-black/40 rounded-lg p-0.5">
+                            <button
+                                onClick={() => setChartMode('week')}
+                                className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'week' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
+                            >
+                                {t.week}
+                            </button>
+                            <button
+                                onClick={() => setChartMode('month')}
+                                className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'month' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
+                            >
+                                {t.month_label}
+                            </button>
+                            <button
+                                onClick={() => setChartMode('overall')}
+                                className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'overall' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
+                            >
+                                {t.overall}
+                            </button>
+                        </div>
                     </div>
 
-                    {chartData.map((d, i) => (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
-                            <div className="w-full relative flex items-end justify-center h-full">
-                                <div
-                                    className={`w-full max-w-[24px] rounded-t-lg transition-all duration-500 ease-out group-hover:brightness-110 ${d.value > 0
-                                        ? 'bg-gradient-to-t from-violet-600 to-indigo-500 shadow-[0_0_10px_rgba(139,92,246,0.3)]'
-                                        : 'bg-white/5'
-                                        }`}
-                                    style={{ height: `${d.value || 5}%` }}
-                                >
-                                    {/* Tooltip */}
-                                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-black text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none shadow-lg">
-                                        {Math.round(d.value)}%
+                    {/* Graph */}
+                    <div className="h-32 flex items-end justify-between gap-2 relative z-10 pl-2">
+                        {/* Y-Axis Guidelines */}
+                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
+                            <div className="border-t border-dashed border-white w-full"></div>
+                            <div className="border-t border-dashed border-white w-full"></div>
+                            <div className="border-t border-dashed border-white w-full"></div>
+                        </div>
+
+                        {chartData.map((d, i) => (
+                            <div key={i} className="flex-1 flex flex-col items-center gap-2 group h-full justify-end">
+                                <div className="w-full relative flex items-end justify-center h-full">
+                                    <div
+                                        className={`w-full max-w-[24px] rounded-t-lg transition-all duration-500 ease-out group-hover:brightness-110 ${d.value > 0
+                                            ? 'bg-gradient-to-t from-violet-600 to-indigo-500 shadow-[0_0_10px_rgba(139,92,246,0.3)]'
+                                            : 'bg-white/5'
+                                            }`}
+                                        style={{ height: `${d.value || 5}%` }}
+                                    >
+                                        {/* Tooltip */}
+                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-white text-black text-[10px] font-bold px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20 pointer-events-none shadow-lg">
+                                            {Math.round(d.value)}%
+                                        </div>
                                     </div>
                                 </div>
+                                <span className="text-[10px] text-slate-500 font-bold uppercase">{d.label}</span>
                             </div>
-                            <span className="text-[10px] text-slate-500 font-bold uppercase">{d.label}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
-
-            {/* AI Coach Insight */}
-            <div className="relative p-[1px] rounded-3xl bg-gradient-to-br from-green-400/50 via-emerald-500/20 to-transparent">
-                <div className="bg-slate-900 rounded-[23px] p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 blur-[50px] rounded-full pointer-events-none"></div>
-
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
-                            <Sparkles size={20} />
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-white text-lg">AI Coach Insight</h3>
-                            <p className="text-[10px] text-slate-400">Personalized Analysis</p>
-                        </div>
+                        ))}
                     </div>
+                </div>
 
-                    {coachLoading ? (
-                        <div className="space-y-2 animate-pulse">
-                            <div className="h-4 bg-white/5 rounded w-3/4"></div>
-                            <div className="h-4 bg-white/5 rounded w-1/2"></div>
-                        </div>
-                    ) : coaching ? (
-                        <div className="space-y-4">
-                            <p className="text-sm text-slate-200 leading-relaxed font-light">
-                                "{coaching.insight}"
-                            </p>
-                            <div className="pt-4 border-t border-white/5">
-                                <p className="text-sm font-bold text-green-400 flex items-center gap-2">
-                                    <Trophy size={14} />
-                                    {coaching.encouragement}
-                                </p>
+                {/* AI Coach Insight */}
+                <div className="relative p-[1px] rounded-3xl bg-gradient-to-br from-green-400/50 via-emerald-500/20 to-transparent">
+                    <div className="bg-slate-900 rounded-[23px] p-4 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-green-500/10 blur-[50px] rounded-full pointer-events-none"></div>
+
+                        <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center text-green-400">
+                                <Sparkles size={16} />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-white text-base">AI Coach Insight</h3>
+                                <p className="text-[10px] text-slate-400">Personalized Analysis</p>
                             </div>
                         </div>
-                    ) : (
-                        <p className="text-sm text-slate-400 italic">Select a goal to get AI coaching.</p>
-                    )}
+
+                        {coachLoading ? (
+                            <div className="space-y-2 animate-pulse">
+                                <div className="h-4 bg-white/5 rounded w-3/4"></div>
+                                <div className="h-4 bg-white/5 rounded w-1/2"></div>
+                            </div>
+                        ) : coaching ? (
+                            <div className="space-y-3">
+                                <p className="text-xs text-slate-200 leading-relaxed font-light">
+                                    "{coaching.insight}"
+                                </p>
+                                <div className="pt-3 border-t border-white/5">
+                                    <p className="text-xs font-bold text-green-400 flex items-center gap-2">
+                                        <Trophy size={12} />
+                                        {coaching.encouragement}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-400 italic">Select a goal to get AI coaching.</p>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
