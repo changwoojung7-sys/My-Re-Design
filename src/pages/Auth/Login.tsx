@@ -100,7 +100,7 @@ export default function Login() {
             }
 
             // 2. Sign Up (Email Verify)
-            const { data, error } = await supabase.auth.signUp({
+            const { error } = await supabase.auth.signUp({
                 email,
                 password,
                 options: {
