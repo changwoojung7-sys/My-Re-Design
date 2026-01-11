@@ -269,7 +269,29 @@ export default function Today() {
     // --- Monetization Check ---
     // --- Monetization Check ---
     const currentDayNum = getSelectedDayNum();
-    const isPaywallActive = currentDayNum > 4 && user?.subscription_tier !== 'premium';
+    const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
+    const [userCustomLimit, setUserCustomLimit] = useState<number | null>(null);
+
+    useEffect(() => {
+        const fetchSettings = async () => {
+            // 1. Fetch Global Setting
+            const { data: adminData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
+            if (adminData?.value) setGlobalPaywallDay(parseInt(adminData.value));
+
+            // 2. Fetch User Specific Setting (Fresh)
+            if (user) {
+                const { data: profileData } = await supabase.from('profiles').select('custom_free_trial_days').eq('id', user.id).single();
+                if (profileData) setUserCustomLimit(profileData.custom_free_trial_days);
+            }
+        };
+        fetchSettings();
+    }, [user]);
+
+    // Priority: User Custom > Global Default
+    // Logic: Free Limit is X days. So if Day > X, it is paid.
+    // Example: Limit 10. Day 10 is free. Day 11 is paid.
+    const paywallLimit = userCustomLimit ?? globalPaywallDay;
+    const isPaywallActive = currentDayNum > paywallLimit && user?.subscription_tier !== 'premium';
     const [paywallStep, setPaywallStep] = useState<'none' | 'warning' | 'payment'>('none');
 
     // Reset step when selection changes
@@ -289,7 +311,7 @@ export default function Today() {
             const current = new Date(); // roughly today
             const diffMs = current.getTime() - start.getTime();
             const day = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
-            return day <= 4;
+            return day < paywallLimit;
         });
 
         if (safeGoal) {

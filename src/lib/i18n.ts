@@ -93,6 +93,24 @@ export const translations = {
         terms: "Terms",
         privacy: "Privacy",
         challengeCount: "Challenge {n}",
+        locked: "Locked",
+        subscribeToUnlock: "Subscribe to unlock this mission category and start your journey.",
+        unlockNow: "Unlock Now",
+        missionPlan: "Mission Plan",
+        allAccessPlan: "All Access Plan",
+        currentStatusFor: "Current Status for",
+        unlockedPremium: "Unlocked Premium",
+        missionSubscribed: "Mission Subscribed",
+        freeRestricted: "Free Restricted",
+        expires: "Expires",
+        unlocksMissionOnly: "Unlocks premium features only for {category} missions.",
+        unlocksAllAccess: "Unlocks premium features for ALL categories and future updates.",
+        noPaymentHistory: "No payment history found.",
+        subscribeConfirm: "Subscribe to {target} for {months} months at {price}?",
+        subscriptionSuccessful: "Subscription successful!",
+        subscriptionFailed: "Failed to subscribe: {error}",
+
+
 
         // Date Helpers
         day: "Day",
@@ -246,6 +264,24 @@ export const translations = {
         terms: "이용약관",
         privacy: "개인정보처리방침",
         challengeCount: "{n}차 도전",
+        locked: "잠김",
+        subscribeToUnlock: "이 카테고리의 미션을 시작하려면 구독이 필요합니다.",
+        unlockNow: "지금 잠금 해제",
+        missionPlan: "미션 플랜",
+        allAccessPlan: "전체 이용 플랜",
+        currentStatusFor: "현재 상태:",
+        unlockedPremium: "프리미엄 (해금됨)",
+        missionSubscribed: "미션별 구독중",
+        freeRestricted: "무료 (제한됨)",
+        expires: "만료일",
+        unlocksMissionOnly: "오직 {category} 미션의 프리미엄 기능을 해금합니다.",
+        unlocksAllAccess: "모든 카테고리와 향후 업데이트의 프리미엄 기능을 해금합니다.",
+        noPaymentHistory: "결제 내역이 없습니다.",
+        subscribeConfirm: "{target}을(를) {months}개월 동안 {price}에 구독하시겠습니까?",
+        subscriptionSuccessful: "구독이 완료되었습니다!",
+        subscriptionFailed: "구독 실패: {error}",
+
+
 
         // Date Helpers
         day: "일차",

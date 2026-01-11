@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import History from './pages/History/History';
 import Friends from './pages/Social/Friends';
 import MyPage from './pages/MyPage/MyPage';
+import Admin from './pages/Admin/Admin';
 import BottomNav from './components/layout/BottomNav';
 
 function Layout() {
@@ -35,6 +36,9 @@ function Layout() {
         <Route path="/history" element={<History />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/mypage" element={<MyPage />} />
+
+        {/* Admin Route */}
+        <Route path="/admin" element={<Admin />} />
 
         {/* Fallback */}
         <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />

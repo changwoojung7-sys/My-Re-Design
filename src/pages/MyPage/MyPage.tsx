@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import SubscriptionManager from './SubscriptionManager';
 
-type GoalCategory = 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
+export type GoalCategory = 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
 
 interface UserGoal {
     id?: string;
@@ -65,12 +65,62 @@ export default function MyPage() {
     const [showRequestsModal, setShowRequestsModal] = useState(false);
     const [approvingIds, setApprovingIds] = useState<Set<string>>(new Set());
 
+    // Subscription State
+    // Paywall States
+    const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
+    const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
+
     useEffect(() => {
+        // Fetch Subscriptions & Paywall Settings
+        const fetchData = async () => {
+            if (!user) return;
+
+            // 1. Subscriptions
+            const { data: subs } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('status', 'active')
+                .gte('end_date', new Date().toISOString());
+
+            if (subs) setActiveSubscriptions(subs);
+
+            // 2. Global Paywall Setting
+            const { data: adminData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
+            if (adminData?.value) setGlobalPaywallDay(parseInt(adminData.value));
+        };
+
         if (user) {
             fetchUserGoals();
             fetchIncomingRequests();
+            fetchData();
         }
-    }, [user]);
+    }, [user, isSubManagerOpen]); // Re-fetch when sub manager closes
+
+    // Helper to check if a category is unlocked
+    const isCategoryUnlocked = (category: string) => {
+        // 1. Check if user has explicit subscription
+        const hasAllAccess = activeSubscriptions.some(s => s.type === 'all');
+        const hasMissionAccess = activeSubscriptions.some(s => s.type === 'mission' && s.target_id === category);
+        if (hasAllAccess || hasMissionAccess) return true;
+
+        // 2. Check Free Trial Logic (Day Count)
+        const g = goals[category as GoalCategory];
+        if (!g.created_at) return true; // Not started yet -> Unlocked (can edit)
+
+        const start = new Date(g.created_at);
+        const now = new Date();
+        const diffMs = now.getTime() - start.getTime();
+        const dayCount = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
+
+        // Priority: User Custom > Global Default
+        // If limit is 10, Day 10 is free. Day 11 is locked.
+        // So Locked if Day > Limit.
+        const limit = user?.custom_free_trial_days ?? globalPaywallDay;
+
+        return dayCount <= limit;
+    };
+
 
     const fetchIncomingRequests = async () => {
         if (!user) return;
@@ -521,19 +571,12 @@ export default function MyPage() {
         <div className="w-full h-full p-6 pt-6 pb-24 overflow-y-auto relative">
             <div className="flex flex-col items-start mb-2">
                 {/* Title Row with Icons */}
-                <div className="flex items-center gap-4 w-full">
+                <div className="flex items-center justify-between gap-4 w-full">
                     <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent shrink-0">
                         My Re Design
                     </h1>
 
-                    <div className="flex items-center gap-2">
-                        <button
-                            onClick={() => setIsSubManagerOpen(true)}
-                            className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2 px-3"
-                        >
-                            <CreditCard size={20} className="text-accent" />
-                            <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
-                        </button>
+                    <div className="flex items-center gap-2 mr-6">
 
                         {/* Notification Bell */}
                         <button
@@ -575,7 +618,14 @@ export default function MyPage() {
 
 
             {/* Profile Header (Read Only / Quick View) */}
-            <div className="bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
+            <div className="relative bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
+                <button
+                    onClick={() => setIsSubManagerOpen(true)}
+                    className="absolute top-6 right-6 p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2"
+                >
+                    <CreditCard size={20} className="text-accent" />
+                    <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
+                </button>
                 {/* ... Profile Info ... */}
                 <div className="flex items-center gap-4 mb-6">
                     <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative">
@@ -623,7 +673,23 @@ export default function MyPage() {
                 </div >
 
                 {/* Dynamic Form Area */}
-                < div className="bg-black/20 rounded-2xl p-5 border border-white/5" >
+                <div className="bg-black/20 rounded-2xl p-5 border border-white/5 relative overflow-hidden">
+                    {/* Lock Overlay */}
+                    {!isCategoryUnlocked(selectedCategory) && (
+                        <div className="absolute inset-0 z-20 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+                            <Lock size={48} className="text-slate-500 mb-4" />
+                            <h3 className="text-xl font-bold text-white mb-2">{t[selectedCategory as GoalCategory]} {t.locked}</h3>
+                            <p className="text-sm text-slate-400 mb-6 max-w-xs">{t.subscribeToUnlock || "Subscribe to unlock this mission category and start your journey."}</p>
+                            <button
+                                onClick={() => setIsSubManagerOpen(true)}
+                                className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2"
+                            >
+                                <Sparkles size={18} />
+                                {t.unlockNow || "Unlock Now"}
+                            </button>
+                        </div>
+                    )}
+
                     <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
                             {t[selectedCategory as GoalCategory]} {t.plan}
@@ -774,6 +840,12 @@ export default function MyPage() {
 
             {/* SETTINGS MODAL */}
             <AnimatePresence>
+                {isSubManagerOpen && (
+                    <SubscriptionManager
+                        onClose={() => setIsSubManagerOpen(false)}
+                        initialCategory={selectedCategory}
+                    />
+                )}
                 {isSettingsOpen && (
                     <motion.div
                         initial={{ opacity: 0 }}
@@ -1086,7 +1158,7 @@ export default function MyPage() {
             </AnimatePresence>
 
             <AnimatePresence>
-                {isSubManagerOpen && <SubscriptionManager onClose={() => setIsSubManagerOpen(false)} />}
+                {isSubManagerOpen && <SubscriptionManager onClose={() => setIsSubManagerOpen(false)} initialCategory={selectedCategory} />}
             </AnimatePresence>
         </div>
     );

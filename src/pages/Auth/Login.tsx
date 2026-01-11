@@ -88,6 +88,7 @@ export default function Login() {
                         goal_mindset: profile?.goal_mindset,
                         goal_social: profile?.goal_social,
                         goal_vitality: profile?.goal_vitality,
+                        custom_free_trial_days: profile?.custom_free_trial_days,
                     });
                     navigate('/');
                 }
