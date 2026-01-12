@@ -11,10 +11,19 @@ import Friends from './pages/Social/Friends';
 import MyPage from './pages/MyPage/MyPage';
 import Admin from './pages/Admin/Admin';
 import BottomNav from './components/layout/BottomNav';
+import SupportModal from './components/layout/SupportModal';
+import { useState } from 'react';
 
 function Layout() {
   const { user } = useStore();
   const location = useLocation();
+  const [isSupportOpen, setIsSupportOpen] = useState(false);
+  const [supportView, setSupportView] = useState<'main' | 'terms' | 'privacy' | 'refund'>('main');
+
+  const openSupport = (view: 'main' | 'terms' | 'privacy' | 'refund' = 'main') => {
+    setSupportView(view);
+    setIsSupportOpen(true);
+  };
 
   // Hide nav on login, onboarding
   const hideNavScopes = ['/login', '/onboarding'];
@@ -44,7 +53,18 @@ function Layout() {
         <Route path="*" element={<Navigate to={user ? "/" : "/login"} replace />} />
       </Routes>
 
-      {showNav && <BottomNav />}
+      {showNav && (
+        <div className="absolute bottom-0 w-full z-50 flex flex-col shadow-[0_-5px_20px_rgba(0,0,0,0.5)]">
+          <BottomNav onOpenSupport={openSupport} />
+        </div>
+      )}
+
+      {/* Global Support Modal */}
+      <SupportModal
+        isOpen={isSupportOpen}
+        onClose={() => setIsSupportOpen(false)}
+        initialView={supportView}
+      />
     </div>
   );
 }

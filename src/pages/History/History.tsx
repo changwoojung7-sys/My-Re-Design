@@ -89,7 +89,7 @@ export default function History() {
     };
 
     return (
-        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-24 px-5 relative overflow-hidden bg-background">
+        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-32 px-5 relative overflow-hidden bg-background">
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent flex items-center gap-2">

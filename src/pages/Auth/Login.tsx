@@ -1,17 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useStore } from '../../lib/store';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Mail, Phone, Lock, ArrowRight } from 'lucide-react';
+import { Mail, Phone, Lock, ArrowRight, User } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 
 export default function Login() {
     const { t } = useLanguage();
     // Unified Form State
     const [email, setEmail] = useState('');
+    const [fullName, setFullName] = useState('');
+    const [nickname, setNickname] = useState('');
     const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
+
+    const emailRef = useRef<HTMLInputElement>(null);
 
     // Login Mode State
     const [loginIdentifier, setLoginIdentifier] = useState(''); // Email or Phone for Login
@@ -30,9 +34,15 @@ export default function Login() {
         setEmail('');
         setPhone('');
         setPassword('');
+        setFullName('');
+        setNickname('');
         setLoginIdentifier('');
         setVerifyCode('');
         setShowVerify(false);
+
+        if (isSignUp) {
+            setTimeout(() => emailRef.current?.focus(), 100);
+        }
     }, [isSignUp]);
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -70,9 +80,14 @@ export default function Login() {
                 return;
             }
 
-            // 1. Check Duplicates First
+            // 1. Check Duplicates & Validation First
+            if (!fullName.trim()) throw new Error("Name is required.");
+            if (!phone.trim()) throw new Error("Phone number is required.");
+
             // Format Phone
             let formattedPhone = phone.replace(/[^0-9]/g, '');
+            if (formattedPhone.length < 10) throw new Error("Please enter a valid phone number.");
+
             if (formattedPhone.startsWith('010')) {
                 formattedPhone = '+82' + formattedPhone.substring(1);
             }
@@ -106,6 +121,9 @@ export default function Login() {
                 options: {
                     data: {
                         phone: formattedPhone, // Save to metadata
+                        full_name: fullName,
+                        nickname: nickname || fullName, // Default nickname to name if empty
+                        phone_number: formattedPhone, // Redundant but safe
                     }
                 }
             });
@@ -176,6 +194,7 @@ export default function Login() {
             goal_social: profile?.goal_social,
             goal_vitality: profile?.goal_vitality,
             custom_free_trial_days: profile?.custom_free_trial_days,
+            full_name: profile?.full_name,
         });
         navigate('/');
     };
@@ -237,6 +256,7 @@ export default function Login() {
                                         <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.email}</label>
                                         <div className="relative">
                                             <input
+                                                ref={emailRef}
                                                 type="email"
                                                 placeholder="user@email.com"
                                                 value={email}
@@ -247,18 +267,49 @@ export default function Login() {
                                             <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
                                         </div>
                                     </div>
+
+                                    <div className="flex gap-3">
+                                        <div className="flex-1">
+                                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.fullName} <span className="text-red-500">*</span></label>
+                                            <div className="relative">
+                                                <input
+                                                    type="text"
+                                                    placeholder={t.namePlaceholder}
+                                                    value={fullName}
+                                                    onChange={(e) => setFullName(e.target.value)}
+                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                    required
+                                                />
+                                                <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            </div>
+                                        </div>
+                                        <div className="flex-[1.2]">
+                                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.phone} <span className="text-red-500">*</span></label>
+                                            <div className="relative">
+                                                <input
+                                                    type="tel"
+                                                    placeholder="010-1234-5678"
+                                                    value={phone}
+                                                    onChange={(e) => setPhone(e.target.value)}
+                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                    required
+                                                />
+                                                <Phone className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     <div>
-                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.phone}</label>
+                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.nickname} <span className="text-[10px] text-slate-600 lowercase ml-1">(optional)</span></label>
                                         <div className="relative">
                                             <input
-                                                type="tel"
-                                                placeholder="010-1234-5678"
-                                                value={phone}
-                                                onChange={(e) => setPhone(e.target.value)}
+                                                type="text"
+                                                placeholder={t.nickname}
+                                                value={nickname}
+                                                onChange={(e) => setNickname(e.target.value)}
                                                 className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
-                                                required
                                             />
-                                            <Phone className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
                                         </div>
                                     </div>
                                     {/* Password Field */}

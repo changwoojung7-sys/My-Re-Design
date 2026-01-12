@@ -1,43 +1,66 @@
-import { Link, useLocation } from 'react-router-dom';
-import { Home, BarChart2, Users, User, History } from 'lucide-react';
-import clsx from 'clsx';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Home, Calendar, Trophy, Users, ArrowUpRight } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-export default function BottomNav() {
+interface BottomNavProps {
+    onOpenSupport: (view?: 'main' | 'terms' | 'privacy' | 'refund') => void;
+}
+
+export default function BottomNav({ onOpenSupport }: BottomNavProps) {
+    const navigate = useNavigate();
     const location = useLocation();
-    const path = location.pathname;
 
     const navItems = [
-        { icon: User, label: 'My Loop', href: '/' },
-        { icon: Home, label: 'Mission', href: '/today' },
-        { icon: BarChart2, label: 'Growth', href: '/dashboard' },
-        { icon: History, label: 'History', href: '/history' },
-        { icon: Users, label: 'Friends', href: '/friends' },
+        { path: '/', label: 'My Loop', icon: Home },
+        { path: '/today', label: 'Today', icon: Calendar },
+        { path: '/dashboard', label: 'Growth', icon: ArrowUpRight },
+        { path: '/history', label: 'History', icon: Trophy },
+        { path: '/friends', label: 'Friends', icon: Users },
     ];
 
     return (
-        <div className="absolute bottom-0 w-full bg-slate-900/80 backdrop-blur-md border-t border-white/5 pb-6 pt-2">
-            <div className="flex justify-around items-center">
+        <div className="w-full bg-slate-900/90 backdrop-blur-md border-t border-white/5 pb-1 pt-2 relative flex flex-col items-center">
+            {/* Tab Navigation */}
+            <div className="w-full flex justify-around items-center mb-0.5">
                 {navItems.map((item) => {
-                    const isActive = path === item.href;
+                    const isActive = location.pathname === item.path;
+                    const Icon = item.icon;
+
                     return (
-                        <Link
-                            key={item.href}
-                            to={item.href}
-                            className="flex flex-col items-center gap-1 p-3 relative"
+                        <button
+                            key={item.path}
+                            onClick={() => navigate(item.path)}
+                            className="relative flex flex-col items-center justify-center p-2 w-14"
                         >
-                            {isActive && (
-                                <div className="absolute -top-2 w-8 h-1 bg-primary rounded-full shadow-[0_0_10px_theme(colors.primary)]" />
-                            )}
-                            <item.icon
-                                size={24}
-                                className={clsx("transition-colors", isActive ? "text-white" : "text-slate-500")}
-                            />
-                            <span className={clsx("text-[10px] font-medium transition-colors", isActive ? "text-white" : "text-slate-500")}>
+                            <div className={`relative p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-primary/20 text-primary scale-110' : 'text-slate-400 hover:text-slate-200'}`}>
+                                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                                {isActive && (
+                                    <motion.div
+                                        layoutId="nav-glow"
+                                        className="absolute inset-0 bg-primary/20 blur-lg rounded-full"
+                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                    />
+                                )}
+                            </div>
+                            <span className={`text-[9px] mt-0.5 font-medium transition-colors ${isActive ? 'text-primary' : 'text-slate-500'}`}>
                                 {item.label}
                             </span>
-                        </Link>
+                        </button>
                     );
                 })}
+            </div>
+
+            {/* Business Info / Support Links (Compact) */}
+            <div className="w-full flex items-center justify-center gap-2 text-[9px] text-slate-600 pb-1">
+                <button onClick={() => onOpenSupport('main')} className="hover:text-slate-400 transition-colors">
+                    문의하기
+                </button>
+                <span className="text-slate-800">|</span>
+                <div className="flex gap-2">
+                    <button onClick={() => onOpenSupport('terms')} className="hover:text-slate-400 transition-colors">이용약관</button>
+                    <button onClick={() => onOpenSupport('privacy')} className="hover:text-slate-400 transition-colors">개인정보처리방침</button>
+                    <button onClick={() => onOpenSupport('refund')} className="hover:text-slate-400 transition-colors">환불정책</button>
+                </div>
             </div>
         </div>
     );

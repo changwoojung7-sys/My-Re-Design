@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell } from 'lucide-react';
+import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell, Globe } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import SubscriptionManager from './SubscriptionManager';
@@ -21,9 +21,19 @@ interface UserGoal {
 
 import { useLanguage } from '../../lib/i18n';
 
+
+const INITIAL_GOALS: Record<GoalCategory, UserGoal> = {
+    health: { category: 'health', target_text: '', duration_months: 1, details: { height: '', weight: '' }, seq: 1 },
+    growth: { category: 'growth', target_text: '', duration_months: 3, details: { topic: '', current_level: '', target_level: '' }, seq: 1 },
+    mindset: { category: 'mindset', target_text: '', duration_months: 1, details: { current_mood: '', affirmation: '' }, seq: 1 },
+    career: { category: 'career', target_text: '', duration_months: 6, details: { project_name: '', kpi: '' }, seq: 1 },
+    social: { category: 'social', target_text: '', duration_months: 1, details: { people: '', activity_type: '' }, seq: 1 },
+    vitality: { category: 'vitality', target_text: '', duration_months: 1, details: { hobby: '', routine: '' }, seq: 1 }
+};
+
 export default function MyPage() {
     const { user, setUser, setMissions } = useStore();
-    const { t } = useLanguage();
+    const { t, language, setLanguage } = useLanguage();
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -33,6 +43,7 @@ export default function MyPage() {
     const [isSubManagerOpen, setIsSubManagerOpen] = useState(false);
     const [settingsData, setSettingsData] = useState({
         loginId: '',
+        fullName: '',
         nickname: '',
         age: 25,
         gender: 'female',
@@ -51,14 +62,7 @@ export default function MyPage() {
 
     // UI State
     const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('health');
-    const [goals, setGoals] = useState<Record<GoalCategory, UserGoal>>({
-        health: { category: 'health', target_text: '', duration_months: 1, details: { height: '', weight: '' }, seq: 1 },
-        growth: { category: 'growth', target_text: '', duration_months: 3, details: { topic: '', current_level: '', target_level: '' }, seq: 1 },
-        mindset: { category: 'mindset', target_text: '', duration_months: 1, details: { current_mood: '', affirmation: '' }, seq: 1 },
-        career: { category: 'career', target_text: '', duration_months: 6, details: { project_name: '', kpi: '' }, seq: 1 },
-        social: { category: 'social', target_text: '', duration_months: 1, details: { people: '', activity_type: '' }, seq: 1 },
-        vitality: { category: 'vitality', target_text: '', duration_months: 1, details: { hobby: '', routine: '' }, seq: 1 }
-    });
+    const [goals, setGoals] = useState<Record<GoalCategory, UserGoal>>(JSON.parse(JSON.stringify(INITIAL_GOALS)));
 
     // Request Approval State
     const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
@@ -104,6 +108,23 @@ export default function MyPage() {
             // 2. Global Paywall Setting
             const { data: adminData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
             if (adminData?.value) setGlobalPaywallDay(parseInt(adminData.value));
+
+            // 3. Sync Profile Data (Standardize across devices)
+            const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (profileData) {
+                // Merge DB profile data into local user store
+                // Preserve email from auth if not present in profile (usually profile doesn't have email)
+                setUser({
+                    ...user,
+                    ...profileData,
+                    email: user.email // Ensure email is not lost/overwritten if profile doesn't have it
+                });
+            }
         };
 
         if (user) {
@@ -243,7 +264,7 @@ export default function MyPage() {
             .eq('user_id', user.id);
 
         if (data) {
-            const newGoals = { ...goals };
+            const newGoals = JSON.parse(JSON.stringify(INITIAL_GOALS));
             const maxSeqMap: Record<string, number> = {};
 
             // 1. Find max seq for each category
@@ -282,6 +303,7 @@ export default function MyPage() {
 
             setSettingsData({
                 loginId,
+                fullName: user?.full_name || '',
                 nickname: user?.nickname || '',
                 age: user?.age || 25,
                 gender: user?.gender || 'female',
@@ -305,6 +327,7 @@ export default function MyPage() {
             const { error: profileError } = await supabase
                 .from('profiles')
                 .update({
+                    full_name: settingsData.fullName,
                     nickname: settingsData.nickname,
                     age: settingsData.age,
                     gender: settingsData.gender,
@@ -334,6 +357,7 @@ export default function MyPage() {
             // 3. Update Local Store
             setUser({
                 ...user,
+                full_name: settingsData.fullName,
                 nickname: settingsData.nickname,
                 age: settingsData.age,
                 gender: settingsData.gender
@@ -363,6 +387,7 @@ export default function MyPage() {
                     // Update Local Store (partial)
                     setUser({
                         ...user,
+                        full_name: settingsData.fullName,
                         nickname: settingsData.nickname,
                         age: settingsData.age,
                         gender: settingsData.gender
@@ -699,7 +724,7 @@ export default function MyPage() {
     };
 
     return (
-        <div className="w-full h-full flex flex-col p-6 pt-6 pb-24 relative overflow-hidden">
+        <div className="w-full h-full flex flex-col p-6 pt-6 pb-32 relative overflow-hidden">
             <div className="flex flex-col items-start mb-2 shrink-0">
                 {/* Title Row with Icons */}
                 <div className="flex items-center justify-between gap-4 w-full">
@@ -902,12 +927,12 @@ export default function MyPage() {
                                 {selectedCategory === 'health' && (
                                     <div className="space-y-3">
                                         <div>
-                                            <label className="text-xs text-slate-400 block mb-1">현재 상태 / 구체적 목표</label>
+                                            <label className="text-xs text-slate-400 block mb-1">{t.currentStatusGoal}</label>
                                             <textarea
                                                 disabled={!isEditing}
                                                 value={currentGoal.details.current_status || ''}
                                                 onChange={e => updateGoal('current_status', e.target.value, true)}
-                                                placeholder="예: 무릎이 조금 안 좋아요, 주 3회 러닝 가능해요, 풀코스 완주가 목표예요..."
+                                                placeholder={t.healthPlaceholder}
                                                 className="w-full h-20 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none"
                                             />
                                         </div>
@@ -1038,7 +1063,7 @@ export default function MyPage() {
                             initial={{ scale: 0.9, y: 20 }}
                             animate={{ scale: 1, y: 0 }}
                             exit={{ scale: 0.9, y: 20 }}
-                            className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl my-auto"
+                            className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl my-auto max-h-[85vh] flex flex-col"
                         >
                             <div className="flex justify-between items-center mb-6">
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1050,236 +1075,275 @@ export default function MyPage() {
                             </div>
 
 
-                            {/* Profile Image Upload */}
-                            <div className="flex flex-col items-center mb-6">
-                                <div className="relative w-24 h-24 rounded-full bg-slate-800 border-2 border-white/10 mb-3 group cursor-pointer overflow-hidden">
-                                    {user?.profile_image_url ? (
-                                        <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center text-slate-500">
-                                            <span className="text-3xl font-bold text-slate-700">{user?.nickname?.charAt(0).toUpperCase()}</span>
-                                        </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <Camera size={24} className="text-white" />
-                                    </div>
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="absolute inset-0 opacity-0 cursor-pointer"
-                                        onChange={handleProfileImageUpload}
-                                    />
+                            {/* Profile Image & Language Selector Row */}
+                            <div className="flex items-center mb-1 relative">
+                                {/* Left: Language Selector */}
+                                <div className="absolute left-0 top-0 flex flex-col items-start pt-2 z-10">
+                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-2">
+                                        <Globe size={14} /> {t.language || "Language"}
+                                    </label>
+                                    <select
+                                        value={language}
+                                        onChange={(e) => setLanguage(e.target.value as any)}
+                                        className="w-28 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary appearance-none cursor-pointer hover:bg-white/10 transition-colors"
+                                    >
+                                        <option value="ko" className="bg-slate-800">한국어</option>
+                                        <option value="en" className="bg-slate-800">English</option>
+                                        <option value="ja" className="bg-slate-800">日本語</option>
+                                        <option value="zh" className="bg-slate-800">中文</option>
+                                        <option value="es" className="bg-slate-800">Español</option>
+                                        <option value="fr" className="bg-slate-800">Français</option>
+                                        <option value="de" className="bg-slate-800">Deutsch</option>
+                                        <option value="ru" className="bg-slate-800">Русский</option>
+                                    </select>
                                 </div>
-                                <p className="text-xs text-slate-500">Tap to change profile photo</p>
+
+                                {/* Center: Profile Image */}
+                                <div className="w-full flex justify-center">
+                                    <div className="flex flex-col items-center">
+                                        <div className="relative w-24 h-24 rounded-full bg-slate-800 border-2 border-white/10 group cursor-pointer overflow-hidden shadow-2xl shadow-black/50">
+                                            {user?.profile_image_url ? (
+                                                <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-slate-500">
+                                                    <span className="text-3xl font-bold text-slate-700">{user?.nickname?.charAt(0).toUpperCase()}</span>
+                                                </div>
+                                            )}
+                                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <Camera size={24} className="text-white" />
+                                            </div>
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="absolute inset-0 opacity-0 cursor-pointer"
+                                                onChange={handleProfileImageUpload}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 mt-2 font-medium">Change Photo</p>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="space-y-5">
-                                {/* Login Info */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2">{t.loginId}</label>
-                                    <div className="flex items-center gap-3 bg-black/40 p-4 rounded-xl border border-white/5">
-                                        {settingsData.isPhoneAuth ? <Phone size={20} className="text-slate-400" /> : <Mail size={20} className="text-slate-400" />}
+                            {/* Scrollable Content Area */}
+                            <div className="flex-1 overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                                <div className="space-y-4 pt-4 pb-20">
+                                    {/* Login Info */}
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.loginId}</label>
+                                        <div className="flex items-center gap-3 bg-black/40 p-3 rounded-xl border border-white/5">
+                                            {settingsData.isPhoneAuth ? <Phone size={16} className="text-slate-400" /> : <Mail size={16} className="text-slate-400" />}
+                                            <div>
+                                                <p className="font-mono text-sm text-white font-bold">{settingsData.loginId}</p>
+                                                <p className="text-[10px] text-slate-500">{settingsData.isPhoneAuth ? (t.phone + ' ' + t.verify) : t.emailAuth}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Personal Info (Compact Grid) */}
+                                    <div className="grid grid-cols-2 gap-3">
                                         <div>
-                                            <p className="font-mono text-lg text-white font-bold">{settingsData.loginId}</p>
-                                            <p className="text-[10px] text-slate-500">{settingsData.isPhoneAuth ? (t.phone + ' ' + t.verify) : t.emailAuth}</p>
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.fullName}</label>
+                                            <input
+                                                type="text"
+                                                value={settingsData.fullName}
+                                                onChange={e => setSettingsData({ ...settingsData, fullName: e.target.value })}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.nickname}</label>
+                                            <input
+                                                type="text"
+                                                value={settingsData.nickname}
+                                                onChange={e => setSettingsData({ ...settingsData, nickname: e.target.value })}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.age}</label>
+                                            <input
+                                                type="number"
+                                                value={settingsData.age}
+                                                onChange={e => setSettingsData({ ...settingsData, age: Number(e.target.value) })}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.gender}</label>
+                                            <select
+                                                value={settingsData.gender}
+                                                onChange={e => setSettingsData({ ...settingsData, gender: e.target.value })}
+                                                className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary appearance-none"
+                                            >
+                                                <option value="male" className="bg-slate-800">Male</option>
+                                                <option value="female" className="bg-slate-800">Female</option>
+                                            </select>
                                         </div>
                                     </div>
-                                </div>
 
-                                {/* Personal Info */}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="col-span-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.nickname}</label>
-                                        <input
-                                            type="text"
-                                            value={settingsData.nickname}
-                                            onChange={e => setSettingsData({ ...settingsData, nickname: e.target.value })}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                                        />
-                                    </div>
+                                    {/* Backup Contact */}
                                     <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.age}</label>
-                                        <input
-                                            type="number"
-                                            value={settingsData.age}
-                                            onChange={e => setSettingsData({ ...settingsData, age: Number(e.target.value) })}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary"
-                                        />
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">
+                                            {settingsData.isPhoneAuth ? t.backupEmail : t.backupPhone}
+                                        </label>
+                                        <div className="relative">
+                                            {settingsData.isPhoneAuth ? (
+                                                <>
+                                                    <input
+                                                        type="email"
+                                                        value={settingsData.backupEmail}
+                                                        onChange={e => setSettingsData({ ...settingsData, backupEmail: e.target.value })}
+                                                        placeholder={t.addRecoveryEmail}
+                                                        className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                                    />
+                                                    <Mail size={14} className="absolute left-3 top-2.5 text-slate-500" />
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <input
+                                                        type="tel"
+                                                        value={settingsData.backupPhone}
+                                                        onChange={e => setSettingsData({ ...settingsData, backupPhone: e.target.value })}
+                                                        placeholder={t.addRecoveryPhone}
+                                                        className="w-full bg-white/5 border border-white/10 rounded-lg pl-9 pr-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                                    />
+                                                    <Phone size={14} className="absolute left-3 top-2.5 text-slate-500" />
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.gender}</label>
-                                        <select
-                                            value={settingsData.gender}
-                                            onChange={e => setSettingsData({ ...settingsData, gender: e.target.value })}
-                                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary appearance-none"
-                                        >
-                                            <option value="male" className="bg-slate-800">Male</option>
-                                            <option value="female" className="bg-slate-800">Female</option>
-                                        </select>
-                                    </div>
-                                </div>
 
-                                {/* Backup Contact */}
-                                <div>
-                                    <label className="text-xs font-bold text-slate-500 uppercase mb-2">
-                                        {settingsData.isPhoneAuth ? t.backupEmail : t.backupPhone}
-                                    </label>
-                                    <div className="relative">
-                                        {settingsData.isPhoneAuth ? (
-                                            <>
-                                                <input
-                                                    type="email"
-                                                    value={settingsData.backupEmail}
-                                                    onChange={e => setSettingsData({ ...settingsData, backupEmail: e.target.value })}
-                                                    placeholder={t.addRecoveryEmail}
-                                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-primary"
-                                                />
-                                                <Mail size={18} className="absolute left-4 top-3.5 text-slate-500" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <input
-                                                    type="tel"
-                                                    value={settingsData.backupPhone}
-                                                    onChange={e => setSettingsData({ ...settingsData, backupPhone: e.target.value })}
-                                                    placeholder={t.addRecoveryPhone}
-                                                    className="w-full bg-white/5 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-white focus:outline-none focus:border-primary"
-                                                />
-                                                <Phone size={18} className="absolute left-4 top-3.5 text-slate-500" />
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
 
-                                <button
-                                    onClick={handleSaveSettings}
-                                    disabled={loading}
-                                    className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3.5 rounded-xl shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98]"
-                                >
-                                    {loading ? t.saving : t.saveChanges}
-                                </button>
 
-                                <div className="h-px bg-white/10 my-4" />
-
-                                {/* Security Section */}
-                                <div className=" pt-2">
                                     <button
-                                        onClick={() => setIsPasswordExpanded(!isPasswordExpanded)}
-                                        className="w-full flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors"
+                                        onClick={handleSaveSettings}
+                                        disabled={loading}
+                                        className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-2 rounded-xl shadow-lg hover:shadow-primary/20 transition-all active:scale-[0.98] mt-1 text-sm"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <Lock size={20} className="text-slate-400" />
-                                            <span className="font-bold text-slate-300">{t.security} / {t.password}</span>
-                                        </div>
-                                        <ChevronRight size={20} className={`text-slate-500 transition-transform ${isPasswordExpanded ? 'rotate-90' : ''}`} />
+                                        {loading ? t.saving : t.saveChanges}
                                     </button>
 
-                                    <AnimatePresence>
-                                        {isPasswordExpanded && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                className="overflow-hidden bg-black/20 rounded-xl"
-                                            >
-                                                <div className="p-4 space-y-3">
-                                                    <h3 className="text-sm font-bold text-white mb-2">{t.changePassword}</h3>
-                                                    <input
-                                                        type="password"
-                                                        placeholder={t.currentPassword}
-                                                        value={passwordData.current}
-                                                        onChange={e => setPasswordData({ ...passwordData, current: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
-                                                    />
-                                                    <input
-                                                        type="password"
-                                                        placeholder={t.newPassword}
-                                                        value={passwordData.new}
-                                                        onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
-                                                    />
-                                                    <input
-                                                        type="password"
-                                                        placeholder={t.confirmNewPassword}
-                                                        value={passwordData.confirm}
-                                                        onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
-                                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
-                                                    />
-                                                    <button
-                                                        onClick={handlePasswordUpdate}
-                                                        disabled={loading}
-                                                        className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all text-sm"
-                                                    >
-                                                        {t.updatePassword}
-                                                    </button>
-                                                </div>
-                                            </motion.div>
-                                        )}
+                                    <div className="h-px bg-white/10 my-1" />
 
-                                    </AnimatePresence>
-                                </div>
-
-                                <div className="h-px bg-white/10 my-4" />
-
-                                {/* Dang Zone (Delete Account) */}
-                                <div className="pt-2">
-                                    {!showDeleteVerify ? (
+                                    {/* Security Section */}
+                                    <div>
                                         <button
-                                            onClick={() => {
-                                                setShowDeleteVerify(true);
-                                                handleSendDeleteVerification();
-                                            }}
-                                            className="w-full flex items-center justify-between p-4 bg-red-500/10 rounded-xl border border-red-500/10 hover:bg-red-500/20 transition-colors text-red-500"
+                                            onClick={() => setIsPasswordExpanded(!isPasswordExpanded)}
+                                            className="w-full flex items-center justify-between p-2.5 bg-white/5 rounded-xl border border-white/5 hover:bg-white/10 transition-colors"
                                         >
                                             <div className="flex items-center gap-3">
-                                                <Trash2 size={20} />
-                                                <span className="font-bold">{t.deleteAccount}</span>
+                                                <Lock size={16} className="text-slate-400" />
+                                                <span className="font-bold text-slate-300 text-xs">{t.security} / {t.password}</span>
                                             </div>
+                                            <ChevronRight size={16} className={`text-slate-500 transition-transform ${isPasswordExpanded ? 'rotate-90' : ''}`} />
                                         </button>
-                                    ) : (
-                                        <motion.div
-                                            initial={{ opacity: 0, height: 0 }}
-                                            animate={{ opacity: 1, height: 'auto' }}
-                                            className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 space-y-3"
-                                        >
-                                            <div className="flex justify-between items-center text-red-500 mb-2">
-                                                <span className="text-sm font-bold flex items-center gap-2">
-                                                    <Lock size={14} />
-                                                    {t.verifyIdentity}
-                                                </span>
-                                                <button onClick={() => setShowDeleteVerify(false)} className="bg-red-500/10 p-1 rounded-full hover:bg-red-500/20"><X size={14} /></button>
-                                            </div>
 
-                                            <p className="text-xs text-slate-400">
-                                                {t.verificationRequired}
-                                            </p>
-
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={verifyCodeInput}
-                                                    onChange={(e) => setVerifyCodeInput(e.target.value)}
-                                                    placeholder={t.verifyCode}
-                                                    className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 text-center tracking-widest"
-                                                    maxLength={6}
-                                                />
-                                                <button
-                                                    onClick={handleVerifyAndDelete}
-                                                    disabled={verifyLoading || verifyCodeInput.length < 6}
-                                                    className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 disabled:opacity-50"
+                                        <AnimatePresence>
+                                            {isPasswordExpanded && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="overflow-hidden bg-black/20 rounded-xl"
                                                 >
-                                                    {verifyLoading ? "..." : t.verifyAuth}
-                                                </button>
-                                            </div>
-                                            {verifyTimer > 0 && (
-                                                <p className="text-xs text-center text-slate-500">
-                                                    Resend in {verifyTimer}s
-                                                </p>
+                                                    <div className="p-4 space-y-3">
+                                                        <h3 className="text-sm font-bold text-white mb-2">{t.changePassword}</h3>
+                                                        <input
+                                                            type="password"
+                                                            placeholder={t.currentPassword}
+                                                            value={passwordData.current}
+                                                            onChange={e => setPasswordData({ ...passwordData, current: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                                        />
+                                                        <input
+                                                            type="password"
+                                                            placeholder={t.newPassword}
+                                                            value={passwordData.new}
+                                                            onChange={e => setPasswordData({ ...passwordData, new: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                                        />
+                                                        <input
+                                                            type="password"
+                                                            placeholder={t.confirmNewPassword}
+                                                            value={passwordData.confirm}
+                                                            onChange={e => setPasswordData({ ...passwordData, confirm: e.target.value })}
+                                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary"
+                                                        />
+                                                        <button
+                                                            onClick={handlePasswordUpdate}
+                                                            disabled={loading}
+                                                            className="w-full bg-white/10 text-white font-bold py-3 rounded-lg hover:bg-white/20 transition-all text-sm"
+                                                        >
+                                                            {t.updatePassword}
+                                                        </button>
+                                                    </div>
+                                                </motion.div>
                                             )}
-                                        </motion.div>
-                                    )}
-                                </div>
 
+                                        </AnimatePresence>
+                                    </div>
+
+                                    <div className="h-px bg-white/10 my-1" />
+
+                                    {/* Dang Zone (Delete Account) */}
+                                    <div>
+                                        {!showDeleteVerify ? (
+                                            <button
+                                                onClick={() => {
+                                                    setShowDeleteVerify(true);
+                                                    handleSendDeleteVerification();
+                                                }}
+                                                className="w-full flex items-center justify-between p-2.5 bg-red-500/10 rounded-xl border border-red-500/10 hover:bg-red-500/20 transition-colors text-red-500"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <Trash2 size={16} />
+                                                    <span className="font-bold text-xs">{t.deleteAccount}</span>
+                                                </div>
+                                            </button>
+                                        ) : (
+                                            <motion.div
+                                                initial={{ opacity: 0, height: 0 }}
+                                                animate={{ opacity: 1, height: 'auto' }}
+                                                className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 space-y-3"
+                                            >
+                                                <div className="flex justify-between items-center text-red-500 mb-2">
+                                                    <span className="text-sm font-bold flex items-center gap-2">
+                                                        <Lock size={14} />
+                                                        {t.verifyIdentity}
+                                                    </span>
+                                                    <button onClick={() => setShowDeleteVerify(false)} className="bg-red-500/10 p-1 rounded-full hover:bg-red-500/20"><X size={14} /></button>
+                                                </div>
+
+                                                <p className="text-xs text-slate-400">
+                                                    {t.verificationRequired}
+                                                </p>
+
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        value={verifyCodeInput}
+                                                        onChange={(e) => setVerifyCodeInput(e.target.value)}
+                                                        placeholder={t.verifyCode}
+                                                        className="flex-1 bg-black/20 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500 text-center tracking-widest"
+                                                        maxLength={6}
+                                                    />
+                                                    <button
+                                                        onClick={handleVerifyAndDelete}
+                                                        disabled={verifyLoading || verifyCodeInput.length < 6}
+                                                        className="bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-600 disabled:opacity-50"
+                                                    >
+                                                        {verifyLoading ? "..." : t.verifyAuth}
+                                                    </button>
+                                                </div>
+                                                {verifyTimer > 0 && (
+                                                    <p className="text-xs text-center text-slate-500">
+                                                        Resend in {verifyTimer}s
+                                                    </p>
+                                                )}
+                                            </motion.div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </motion.div>
                     </motion.div>

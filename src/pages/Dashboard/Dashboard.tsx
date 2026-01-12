@@ -270,7 +270,7 @@ export default function Dashboard() {
             </div>
 
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto no-scrollbar pb-24 min-h-0 pt-2">
+            <div className="flex-1 overflow-y-auto no-scrollbar pb-32 min-h-0 pt-2">
                 {/* Stats Grid */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
                     <div className="bg-white/5 rounded-2xl py-3 px-3 flex items-center justify-center gap-3 border border-white/5 shadow-sm">

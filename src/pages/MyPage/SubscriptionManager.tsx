@@ -5,6 +5,7 @@ import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
+import SupportModal from '../../components/layout/SupportModal';
 
 interface SubscriptionManagerProps {
     onClose: () => void;
@@ -38,11 +39,21 @@ const CATEGORIES: GoalCategory[] = ['health', 'growth', 'mindset', 'career', 'so
 export default function SubscriptionManager({ onClose, initialCategory }: SubscriptionManagerProps) {
     const { t } = useLanguage();
     const { user } = useStore();
-    const [activeTab, setActiveTab] = useState<PlanType>('mission');
-    const [selectedCategory, setSelectedCategory] = useState<GoalCategory>(initialCategory);
+    const [activeTab, setActiveTab] = useState<'mission' | 'all'>('mission');
+    const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
+    const [loading, setLoading] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
     const [activeSubs, setActiveSubs] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
+
+    // Support Modal State
+    const [supportModalState, setSupportModalState] = useState<{
+        isOpen: boolean;
+        view: 'main' | 'terms' | 'privacy' | 'refund';
+    }>({ isOpen: false, view: 'main' });
+
+    const openSupportModal = (view: 'main' | 'terms' | 'privacy' | 'refund' = 'main') => {
+        setSupportModalState({ isOpen: true, view });
+    };
 
     useEffect(() => {
         if (user) {
@@ -257,195 +268,232 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-            <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto"
-            >
+        <>
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full max-w-md bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl relative max-h-[90vh] flex flex-col overflow-hidden"
+                >
 
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <CreditCard className="text-primary" size={24} />
-                        {t.manageSubscription}
-                    </h2>
-                    <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white">
-                        <X size={20} />
-                    </button>
-                </div>
-
-                {/* Compact Current Plan Status */}
-                <div className="bg-gradient-to-br from-white/10 to-white/5 rounded-2xl p-4 mb-6 border border-white/5">
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">{t.currentStatusFor} <span className="text-primary">{selectedCategory.toUpperCase()}</span></p>
-                            <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                                {isUnlockedNow
-                                    ? t.unlockedPremium
-                                    : t.freeRestricted}
-                                {isUnlockedNow && <Check size={16} className="text-green-500" />}
-                            </h3>
-                        </div>
-                        {isUnlockedNow && latestRelevantSub && (
-                            <div className="text-right">
-                                <span className="text-xs text-slate-400 block">{t.expires}</span>
-                                <span className="text-xs font-mono font-bold text-white">
-                                    {new Date(latestRelevantSub.end_date).toLocaleDateString()}
-                                </span>
-                            </div>
-                        )}
+                    <div className="flex justify-between items-center mb-4 shrink-0">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <CreditCard className="text-primary" size={24} />
+                            {t.manageSubscription}
+                        </h2>
+                        <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white">
+                            <X size={20} />
+                        </button>
                     </div>
-                </div>
 
-                {/* Subscription Options Tabs */}
-                <div className="flex bg-black/40 p-1 rounded-xl mb-4">
-                    <button
-                        onClick={() => setActiveTab('mission')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'mission' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'
-                            }`}
-                    >
-                        {t.missionPlan}
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('all')}
-                        className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-accent text-black' : 'text-slate-500 hover:text-white'
-                            }`}
-                    >
-                        {t.allAccessPlan}
-                    </button>
-                </div>
+                    {/* Compact Current Plan Status */}
+                    <div className="bg-gradient-to-br from-white/10 to-white/5 rounded-2xl p-4 mb-6 border border-white/5 shrink-0">
+                        <div className="flex justify-between items-center">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase mb-1">{t.currentStatusFor} <span className="text-primary">{selectedCategory.toUpperCase()}</span></p>
+                                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                    {isUnlockedNow
+                                        ? t.unlockedPremium
+                                        : t.freeRestricted}
+                                    {isUnlockedNow && <Check size={16} className="text-green-500" />}
+                                </h3>
+                            </div>
+                            {isUnlockedNow && latestRelevantSub && (
+                                <div className="text-right">
+                                    <span className="text-xs text-slate-400 block">{t.expires}</span>
+                                    <span className="text-xs font-mono font-bold text-white">
+                                        {new Date(latestRelevantSub.end_date).toLocaleDateString()}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-                {/* Category Selector (Only for Mission Plan) */}
-                {activeTab === 'mission' && (
-                    <div className="mb-6 px-1">
-                        <label className="text-xs font-bold text-slate-500 mb-2 block uppercase">Select Category for Plan</label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {CATEGORIES.map(cat => (
+                    {/* Scrollable Content Area */}
+                    <div className="flex-1 overflow-y-auto pr-1 -mr-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:'none'] [scrollbar-width:'none']">
+                        <div className="pb-20">
+                            {/* Subscription Options Tabs */}
+                            <div className="flex bg-black/40 p-1 rounded-xl mb-4">
                                 <button
-                                    key={cat}
-                                    onClick={() => setSelectedCategory(cat)}
-                                    className={`py-2 px-1 text-xs font-bold rounded-lg capitalize transition-all border ${selectedCategory === cat
-                                        ? 'bg-primary/20 border-primary text-white'
-                                        : 'bg-white/5 border-transparent text-slate-400 hover:bg-white/10'
+                                    onClick={() => setActiveTab('mission')}
+                                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'mission' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'
                                         }`}
                                 >
-                                    {cat}
+                                    {t.missionPlan}
                                 </button>
-                            ))}
+                                <button
+                                    onClick={() => setActiveTab('all')}
+                                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'all' ? 'bg-accent text-black' : 'text-slate-500 hover:text-white'
+                                        }`}
+                                >
+                                    {t.allAccessPlan}
+                                </button>
+                            </div>
+
+                            {/* Category Selector (Only for Mission Plan) */}
+                            {activeTab === 'mission' && (
+                                <div className="mb-6 px-1">
+                                    <label className="text-xs font-bold text-slate-500 mb-2 block uppercase">Select Category for Plan</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {CATEGORIES.map(cat => (
+                                            <button
+                                                key={cat}
+                                                onClick={() => setSelectedCategory(cat)}
+                                                className={`py-2 px-1 text-xs font-bold rounded-lg capitalize transition-all border ${selectedCategory === cat
+                                                    ? 'bg-primary/20 border-primary text-white'
+                                                    : 'bg-white/5 border-transparent text-slate-400 hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Pricing Grid (Reverted to 2-cols) */}
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                                {(activeTab === 'mission' ? MISSION_PRICING : ALL_ACCESS_PRICING).map((tier) => (
+                                    <div
+                                        key={tier.months}
+                                        className="p-3 rounded-xl border border-white/5 bg-white/5 flex flex-col justify-between group hover:border-primary/30 transition-all"
+                                    >
+                                        <div className="mb-3">
+                                            <p className="text-xs text-slate-400 font-bold mb-1">{tier.label}</p>
+                                            <p className="text-lg font-bold text-white">₩{tier.price.toLocaleString()}</p>
+                                        </div>
+                                        <button
+                                            onClick={() => handleSubscribe(tier)}
+                                            disabled={loading}
+                                            className="w-full bg-primary text-black text-xs font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                        >
+                                            {t.purchase || "Purchase"}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <p className="text-[10px] text-slate-500 text-center mb-6">
+                                {activeTab === 'mission'
+                                    ? t.unlocksMissionOnly.replace('{category}', selectedCategory.toUpperCase())
+                                    : t.unlocksAllAccess}
+                            </p>
+
+                            <div className="border-t border-white/10 pt-4">
+                                <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
+                                    <Clock size={16} className="text-slate-400" />
+                                    {t.paymentHistory}
+                                </h3>
+                                <div className="space-y-2">
+                                    {history.length === 0 ? (
+                                        <p className="text-xs text-slate-500 text-center py-4">{t.noPaymentHistory}</p>
+                                    ) : (
+                                        history.map((item) => {
+                                            // Parse plan type string like "mission_1mo" or "all_12mo"
+                                            const [type, durationStr] = item.plan_type.split('_');
+                                            const durationNum = parseInt(durationStr); // e.g. 1, 3, 6, 12
+
+                                            let planName = type === 'all' ? t.allAccessPlan : t.missionPlan;
+                                            if (type === 'mission' && item.target_id) {
+                                                // Translate category name if possible (using existing key in t)
+                                                // t[item.target_id] relies on the category string matching the key exactly (health, growth...)
+                                                const translatedCat = (t as any)[item.target_id] || item.target_id;
+                                                planName += ` (${translatedCat})`;
+                                            }
+
+                                            return (
+                                                <div key={item.id} className="bg-white/5 p-3 rounded-xl flex justify-between items-center">
+                                                    <div>
+                                                        <p className={`text-xs font-bold mb-1 ${(item.status === 'cancelled' || !!item.cancelled_at) ? 'text-slate-500 line-through' : 'text-white'}`}>
+                                                            {planName}
+                                                            <span className="text-[10px] text-slate-500 font-normal ml-2">
+                                                                {t.paymentDate} : {(() => {
+                                                                    const d = new Date(item.created_at);
+                                                                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                                                })()}
+                                                            </span>
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                                                            {(() => {
+                                                                const startDate = new Date(item.coverage_start_date || item.created_at);
+                                                                const endDate = item.coverage_end_date
+                                                                    ? new Date(item.coverage_end_date)
+                                                                    : new Date(startDate.getTime() + (durationNum * 30 * 24 * 60 * 60 * 1000)); // approx fallback
+
+                                                                // Fix: Ensure fallback end date is roughly correct (add months) if not present
+                                                                if (!item.coverage_end_date) {
+                                                                    endDate.setTime(startDate.getTime()); // reset
+                                                                    endDate.setMonth(endDate.getMonth() + durationNum);
+                                                                }
+
+                                                                return (
+                                                                    <>
+                                                                        <span>{startDate.toLocaleDateString()}</span>
+                                                                        <span>-</span>
+                                                                        <span>{endDate.toLocaleDateString()}</span>
+                                                                        <span className="ml-1 text-primary">({durationNum}{durationNum > 1 ? t.months : t.month})</span>
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right flex flex-col items-end gap-1">
+                                                        {(item.status === 'cancelled' || !!item.cancelled_at) ? (
+                                                            <>
+                                                                <p className="text-xs font-bold text-red-500">{t.cancelled}</p>
+                                                                <p className="text-[10px] text-slate-500">{new Date(item.cancelled_at || new Date()).toLocaleDateString()}</p>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <p className="text-xs font-bold text-primary">₩{Number(item.amount).toLocaleString()}</p>
+                                                                {(new Date().toDateString() === new Date(item.created_at).toDateString()) && (
+                                                                    <button
+                                                                        onClick={() => handleCancel(item.id, item.created_at)}
+                                                                        className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                                                                    >
+                                                                        {t.cancelPayment}
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Customer Support & Legal Footer */}
+                            <div className="border-t border-white/10 pt-6 mt-6 pb-6 text-center">
+                                <h3 className="text-sm font-bold text-white mb-2">{t.customerSupport}</h3>
+                                <button
+                                    onClick={() => openSupportModal('main')}
+                                    className="inline-block bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs font-bold px-4 py-2 rounded-full transition-colors mb-4"
+                                >
+                                    {t.inquiry} (yujinit2005@gmail.com)
+                                </button>
+
+                                <div className="flex justify-center gap-3 text-[10px] text-slate-500 underline">
+                                    <button onClick={() => openSupportModal('terms')} className="hover:text-white transition-colors">{t.terms}</button>
+                                    <button onClick={() => openSupportModal('privacy')} className="hover:text-white transition-colors">{t.privacy}</button>
+                                    <button onClick={() => openSupportModal('refund')} className="hover:text-white transition-colors">{t.refundPolicy}</button>
+                                </div>
+                                <p className="text-[10px] text-slate-600 mt-2">
+                                    My Re Design | {t.representative}: Jung Changwoo | 010-6614-4561
+                                </p>
+                            </div>
                         </div>
                     </div>
-                )}
+                </motion.div>
+            </div>
 
-                {/* Pricing Grid */}
-                <div className="grid grid-cols-2 gap-3 mb-6">
-                    {(activeTab === 'mission' ? MISSION_PRICING : ALL_ACCESS_PRICING).map((tier) => (
-                        <button
-                            key={tier.months}
-                            onClick={() => handleSubscribe(tier)}
-                            disabled={loading}
-                            className={`p-4 rounded-xl border transition-all text-left relative overflow-hidden group ${loading ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary/50'
-                                } bg-white/5 border-white/5`}
-                        >
-                            <p className="text-xs text-slate-400 font-bold mb-1">{tier.label}</p>
-                            <p className="text-lg font-bold text-white">₩{tier.price.toLocaleString()}</p>
-                            {/* Hover Effect */}
-                            <div className="absolute inset-0 bg-primary/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-                        </button>
-                    ))}
-                </div>
-
-                <p className="text-[10px] text-slate-500 text-center mb-6">
-                    {activeTab === 'mission'
-                        ? t.unlocksMissionOnly.replace('{category}', selectedCategory.toUpperCase())
-                        : t.unlocksAllAccess}
-                </p>
-
-                <div className="border-t border-white/10 pt-4">
-                    <h3 className="text-sm font-bold text-white mb-3 flex items-center gap-2">
-                        <Clock size={16} className="text-slate-400" />
-                        {t.paymentHistory}
-                    </h3>
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-                        {history.length === 0 ? (
-                            <p className="text-xs text-slate-500 text-center py-4">{t.noPaymentHistory}</p>
-                        ) : (
-                            history.map((item) => {
-                                // Parse plan type string like "mission_1mo" or "all_12mo"
-                                const [type, durationStr] = item.plan_type.split('_');
-                                const durationNum = parseInt(durationStr); // e.g. 1, 3, 6, 12
-
-                                let planName = type === 'all' ? t.allAccessPlan : t.missionPlan;
-                                if (type === 'mission' && item.target_id) {
-                                    // Translate category name if possible (using existing key in t)
-                                    // t[item.target_id] relies on the category string matching the key exactly (health, growth...)
-                                    const translatedCat = (t as any)[item.target_id] || item.target_id;
-                                    planName += ` (${translatedCat})`;
-                                }
-
-                                return (
-                                    <div key={item.id} className="bg-white/5 p-3 rounded-xl flex justify-between items-center">
-                                        <div>
-                                            <p className={`text-xs font-bold mb-1 ${(item.status === 'cancelled' || !!item.cancelled_at) ? 'text-slate-500 line-through' : 'text-white'}`}>
-                                                {planName}
-                                                <span className="text-[10px] text-slate-500 font-normal ml-2">
-                                                    {t.paymentDate} : {(() => {
-                                                        const d = new Date(item.created_at);
-                                                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                                    })()}
-                                                </span>
-                                            </p>
-                                            <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                {(() => {
-                                                    const startDate = new Date(item.coverage_start_date || item.created_at);
-                                                    const endDate = item.coverage_end_date
-                                                        ? new Date(item.coverage_end_date)
-                                                        : new Date(startDate.getTime() + (durationNum * 30 * 24 * 60 * 60 * 1000)); // approx fallback
-
-                                                    // Fix: Ensure fallback end date is roughly correct (add months) if not present
-                                                    if (!item.coverage_end_date) {
-                                                        endDate.setTime(startDate.getTime()); // reset
-                                                        endDate.setMonth(endDate.getMonth() + durationNum);
-                                                    }
-
-                                                    return (
-                                                        <>
-                                                            <span>{startDate.toLocaleDateString()}</span>
-                                                            <span>-</span>
-                                                            <span>{endDate.toLocaleDateString()}</span>
-                                                            <span className="ml-1 text-primary">({durationNum}{durationNum > 1 ? t.months : t.month})</span>
-                                                        </>
-                                                    );
-                                                })()}
-                                            </p>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end gap-1">
-                                            {(item.status === 'cancelled' || !!item.cancelled_at) ? (
-                                                <>
-                                                    <p className="text-xs font-bold text-red-500">{t.cancelled}</p>
-                                                    <p className="text-[10px] text-slate-500">{new Date(item.cancelled_at || new Date()).toLocaleDateString()}</p>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <p className="text-xs font-bold text-primary">₩{Number(item.amount).toLocaleString()}</p>
-                                                    {(new Date().toDateString() === new Date(item.created_at).toDateString()) && (
-                                                        <button
-                                                            onClick={() => handleCancel(item.id, item.created_at)}
-                                                            className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
-                                                        >
-                                                            {t.cancelPayment}
-                                                        </button>
-                                                    )}
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })
-                        )}
-                    </div>
-                </div>
-
-            </motion.div>
-        </div>
+            {/* Support Modal */}
+            <SupportModal
+                isOpen={supportModalState.isOpen}
+                onClose={() => setSupportModalState({ ...supportModalState, isOpen: false })}
+                initialView={supportModalState.view}
+            />
+        </>
     );
 }

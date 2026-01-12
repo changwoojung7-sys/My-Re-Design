@@ -17,6 +17,7 @@ interface User {
     subscription_tier?: 'free' | 'premium';
     subscription_end_date?: string;
     custom_free_trial_days?: number;
+    full_name?: string;
     // Profile Image
     profile_image_url?: string;
     // Keeping legacy for compatibility if needed, but prefer top-level
@@ -39,6 +40,9 @@ interface AppState {
     setUser: (user: User | null) => void;
     setMissions: (missions: Mission[]) => void;
     updateMission: (id: string, updates: Partial<Mission>) => void;
+    // Language State
+    language: 'en' | 'ko' | 'ja' | 'zh';
+    setLanguage: (lang: 'en' | 'ko' | 'ja' | 'zh') => void;
 }
 
 import { persist } from 'zustand/middleware';
@@ -56,6 +60,8 @@ export const useStore = create<AppState>()(
                         m.id === id ? { ...m, ...updates } : m
                     ),
                 })),
+            language: 'ko', // Default to Korean as per request
+            setLanguage: (language) => set({ language }),
         }),
         {
             name: 'coreloop-storage',

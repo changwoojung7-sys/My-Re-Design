@@ -16,7 +16,7 @@ export interface MissionData {
     verification_type?: string;
 }
 
-export async function generateMissions(userProfile: any, language: 'en' | 'ko' = 'en', excludedMissions: string[] = []): Promise<MissionData[]> {
+export async function generateMissions(userProfile: any, language: string = 'en', excludedMissions: string[] = []): Promise<MissionData[]> {
     if (!apiKey || apiKey.includes('YOUR_OPENAI')) {
         console.warn("No OpenAI Key found, using Mock Data");
         return MOCK_MISSIONS;
@@ -108,7 +108,7 @@ export async function generateMissions(userProfile: any, language: 'en' | 'ko' =
     }
 }
 
-export async function generateCoaching(user: any, goal: any, stats: any, language: 'en' | 'ko' = 'en') {
+export async function generateCoaching(user: any, goal: any, stats: any, language: string = 'en') {
     if (!apiKey || apiKey.includes('YOUR_OPENAI')) {
         return {
             insight: language === 'ko' ? "꾸준함이 성공의 열쇠입니다!" : "Keep consistent! Consistency is key to success.",

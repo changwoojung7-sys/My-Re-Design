@@ -14,6 +14,7 @@ export default function Friends() {
     const [foundUser, setFoundUser] = useState<any | null>(null);
     const [searching, setSearching] = useState(false);
 
+
     // Social State
     const [likesMap, setLikesMap] = useState<Record<string, { count: number, isLiked: boolean }>>({});
     const [commentsMap, setCommentsMap] = useState<Record<string, any[]>>({});
@@ -370,7 +371,7 @@ export default function Friends() {
     };
 
     return (
-        <div className="w-full flex-1 min-h-0 flex flex-col px-5 pt-6 pb-20">
+        <div className="w-full flex-1 min-h-0 flex flex-col px-5 pt-6 pb-32">
             <div className="flex justify-between items-center mb-2 shrink-0">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
                     <Users size={24} className="text-accent" />
@@ -444,8 +445,8 @@ export default function Friends() {
                     </div>
                 ) : (
                     friends.map((friend) => (
-                        <div key={friend.uniqueKey} className="p-5 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors shadow-sm">
-                            <div className="flex justify-between items-start mb-4">
+                        <div key={friend.uniqueKey} className="p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors shadow-sm">
+                            <div className="flex justify-between items-start mb-2">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 p-0.5 shadow-lg shadow-primary/20 shrink-0 relative">
                                         <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
@@ -528,58 +529,59 @@ export default function Friends() {
                                 </div>
                             )}
 
-                            {/* History Access Action */}
+                            {/* Activity & Action Row (Combined) */}
                             {friend.hasGoal && (
-                                <div className="mt-3">
-                                    {permissionsMap[friend.userGoal.id] === 'approved' ? (
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                    {/* Left: Social Actions */}
+                                    <div className="flex items-center gap-3 shrink-0">
                                         <button
-                                            onClick={() => handleViewHistory(friend.userGoal.id)}
-                                            className="w-full bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2"
+                                            onClick={() => toggleLike(friend.userGoal.id)}
+                                            className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-pink-500 group"
                                         >
-                                            <Trophy size={14} /> View Mission History
+                                            <Heart
+                                                size={16}
+                                                className={likesMap[friend.userGoal.id]?.isLiked ? "fill-pink-500 text-pink-500" : "text-slate-400 group-hover:text-pink-500"}
+                                            />
+                                            <span className={likesMap[friend.userGoal.id]?.isLiked ? "text-pink-500" : "text-slate-400"}>
+                                                {likesMap[friend.userGoal.id]?.count || 0}
+                                            </span>
                                         </button>
-                                    ) : permissionsMap[friend.userGoal.id] === 'pending' ? (
                                         <button
-                                            disabled
-                                            className="w-full bg-slate-800 text-slate-500 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed"
+                                            onClick={() => handleComment(friend.userGoal.id)}
+                                            className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-blue-400 group"
                                         >
-                                            <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse" /> Request Pending...
+                                            <MessageCircle size={16} className="text-slate-400 group-hover:text-blue-400" />
+                                            <span className="text-slate-400">
+                                                {commentsMap[friend.userGoal.id]?.length || 0}
+                                            </span>
                                         </button>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleRequestHistory(friend.id, friend.userGoal.id)}
-                                            className="w-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            🔒 Request to view History
-                                        </button>
-                                    )}
-                                </div>
-                            )}
+                                    </div>
 
-                            {/* Social Actions */}
-                            {friend.hasGoal && (
-                                <div className="mt-3 pt-3 border-t border-white/5 flex gap-4">
-                                    <button
-                                        onClick={() => toggleLike(friend.userGoal.id)}
-                                        className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-pink-500 group"
-                                    >
-                                        <Heart
-                                            size={16}
-                                            className={likesMap[friend.userGoal.id]?.isLiked ? "fill-pink-500 text-pink-500" : "text-slate-400 group-hover:text-pink-500"}
-                                        />
-                                        <span className={likesMap[friend.userGoal.id]?.isLiked ? "text-pink-500" : "text-slate-400"}>
-                                            {likesMap[friend.userGoal.id]?.count || 0}
-                                        </span>
-                                    </button>
-                                    <button
-                                        onClick={() => handleComment(friend.userGoal.id)}
-                                        className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-blue-400 group"
-                                    >
-                                        <MessageCircle size={16} className="text-slate-400 group-hover:text-blue-400" />
-                                        <span className="text-slate-400">
-                                            {commentsMap[friend.userGoal.id]?.length || 0}
-                                        </span>
-                                    </button>
+                                    {/* Right: History Button */}
+                                    <div className="flex-1 min-w-0">
+                                        {permissionsMap[friend.userGoal.id] === 'approved' ? (
+                                            <button
+                                                onClick={() => handleViewHistory(friend.userGoal.id)}
+                                                className="w-full bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2 whitespace-nowrap overflow-hidden text-ellipsis px-2"
+                                            >
+                                                <Trophy size={14} className="shrink-0" /> {t.viewMissionHistory}
+                                            </button>
+                                        ) : permissionsMap[friend.userGoal.id] === 'pending' ? (
+                                            <button
+                                                disabled
+                                                className="w-full bg-slate-800 text-slate-500 text-xs font-bold py-2 rounded-xl flex items-center justify-center gap-2 cursor-not-allowed px-2"
+                                            >
+                                                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse shrink-0" /> {t.requestPending}
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleRequestHistory(friend.id, friend.userGoal.id)}
+                                                className="w-full bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold py-2 rounded-xl transition-colors flex items-center justify-center gap-2 px-2"
+                                            >
+                                                <span className="shrink-0">🔒</span> {t.requestMissionHistory}
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>

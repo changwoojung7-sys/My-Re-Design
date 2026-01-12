@@ -355,7 +355,7 @@ export default function Today() {
     };
 
     return (
-        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-20 relative">
+        <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-32 relative">
             {isPaywallActive && paywallStep === 'warning' && (
                 <PaywallWarning
                     onConfirm={() => setPaywallStep('payment')}
@@ -546,15 +546,15 @@ export default function Today() {
                                                     {!isPreview && !mission.is_completed && !isBeingVerified && (
                                                         <div
                                                             onClick={() => openVerify(mission)}
-                                                            className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer hover:text-primary transition-colors bg-black/20 px-2 py-1 rounded-lg"
+                                                            className="flex items-center gap-1.5 text-[10px] font-bold text-primary cursor-pointer hover:bg-primary/20 transition-all bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg shadow-sm"
                                                         >
                                                             {mission.verification_type === 'text' ? <PenTool size={14} /> : <Camera size={14} />}
-                                                            <span>Verify</span>
+                                                            <span>{t.verify}</span>
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                <h3 className={`text-base font-medium leading-snug ${mission.is_completed ? 'text-slate-500 line-through' : 'text-white'}`}>
+                                                <h3 className={`text-sm font-medium leading-snug ${mission.is_completed ? 'text-slate-500 line-through' : 'text-white'}`}>
                                                     {mission.content}
                                                 </h3>
 
