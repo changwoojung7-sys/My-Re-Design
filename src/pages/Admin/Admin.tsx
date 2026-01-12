@@ -55,9 +55,28 @@ export default function Admin() {
             .order('created_at', { ascending: false });
 
         // Fetch ALL subscriptions
-        const { data: subs } = await supabase
+        const { data: rawSubs } = await supabase
             .from('subscriptions')
             .select('user_id, status, type, target_id, start_date, end_date');
+
+        // Fetch Cancelled Payments for Consistency Check
+        const { data: cancelledPayments } = await supabase
+            .from('payments')
+            .select('user_id, coverage_start_date, coverage_end_date')
+            .eq('status', 'cancelled');
+
+        const subs = rawSubs?.filter(s => {
+            // Filter out explicitly cancelled subscriptions from DB
+            if (s.status === 'cancelled') return false;
+
+            if (!cancelledPayments) return true;
+            // Exclude if matches a cancelled payment (Double check for consistency)
+            return !cancelledPayments.some(p =>
+                p.user_id === s.user_id &&
+                p.coverage_start_date === s.start_date &&
+                p.coverage_end_date === s.end_date
+            );
+        });
 
         // Fetch Deleted Users
         const { data: deleted } = await supabase
@@ -157,7 +176,39 @@ export default function Admin() {
         return diffMonth > 0 ? `${diffMonth} Months` : '1 Month';
     };
 
-    // ... (skip down to table render) ...
+    const cancelPayment = async (id: string) => {
+        if (!confirm('정말 이 결제를 취소하시겠습니까? 기록은 유지되지만 취소 상태로 변경됩니다.')) return;
+
+        // 1. Get Payment Info needed to find subscription
+        const { data: payment } = await supabase
+            .from('payments')
+            .select('coverage_start_date, coverage_end_date')
+            .eq('id', id)
+            .single();
+
+        // 2. Cancel Payment
+        const { error } = await supabase.from('payments').update({
+            status: 'cancelled',
+            cancelled_at: new Date().toISOString()
+        }).eq('id', id);
+
+        if (error) {
+            alert('취소 실패: ' + error.message);
+        } else {
+            // 3. Cancel corresponding subscription
+            if (payment?.coverage_start_date && payment?.coverage_end_date && selectedUser) {
+                await supabase
+                    .from('subscriptions')
+                    .update({ status: 'cancelled' })
+                    .eq('user_id', selectedUser.id)
+                    .eq('start_date', payment.coverage_start_date)
+                    .eq('end_date', payment.coverage_end_date);
+            }
+
+            alert('결제가 취소되었습니다. (구독 정보 업데이트 완료)');
+            if (selectedUser) openUserDetail(selectedUser);
+        }
+    };
 
     if (!isAuthenticated) {
         return (
@@ -504,17 +555,41 @@ export default function Admin() {
                                         {userPayments.length === 0 ? (
                                             <p className="text-[10px] text-slate-500 text-center py-2">결제 내역이 없습니다.</p>
                                         ) : (
-                                            userPayments.map((pay: any, idx: number) => (
-                                                <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-xs font-bold text-white uppercase">{pay.item_name || 'Premium Plan'}</p>
-                                                        <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                                                            {new Date(pay.created_at).toLocaleDateString()}
-                                                        </p>
+                                            userPayments.map((pay: any, idx: number) => {
+                                                const isCancelled = pay.status === 'cancelled' || !!pay.cancelled_at;
+                                                return (
+                                                    <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center">
+                                                        <div>
+                                                            <p className={`text-xs font-bold uppercase ${isCancelled ? 'text-slate-500 line-through' : 'text-white'}`}>
+                                                                {pay.item_name || 'Premium Plan'}
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                                                                {new Date(pay.created_at).toLocaleDateString()}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            {isCancelled ? (
+                                                                <div className="text-[10px] text-red-400 font-bold text-right">
+                                                                    취소됨<br />
+                                                                    <span className="font-mono text-[9px] text-slate-500">
+                                                                        {new Date(pay.cancelled_at).toLocaleDateString()}
+                                                                    </span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex flex-col items-end gap-1">
+                                                                    <span className="text-xs font-bold text-accent">${pay.amount}</span>
+                                                                    <button
+                                                                        onClick={() => cancelPayment(pay.id)}
+                                                                        className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 hover:bg-red-500/30"
+                                                                    >
+                                                                        Cancel
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                    <span className="text-xs font-bold text-accent">${pay.amount}</span>
-                                                </div>
-                                            ))
+                                                );
+                                            })
                                         )}
                                     </div>
                                 </div>
