@@ -643,26 +643,35 @@ export default function MyPage() {
 
         setLoading(true);
         try {
-            // 2. Delete Goal (Cascade triggers for Likes/Comments)
-            const { error: goalError } = await supabase
-                .from('user_goals')
-                .delete()
-                .eq('id', currentGoal.id);
+            // 2. Explicitly Delete All Associated Data (Reverse Order of Dependencies)
 
-            if (goalError) throw goalError;
+            // A. Friend Permissions (Requests tied to this specific goal)
+            await supabase.from('friend_history_permissions').delete().eq('goal_id', currentGoal.id);
 
-            // 3. Delete Related Missions (Cleanup)
-            // Missions are likely linked by user_id and category
+            // B. Social Interactions (Likes/Comments tied to this goal)
+            await supabase.from('goal_likes').delete().eq('goal_id', currentGoal.id);
+            await supabase.from('goal_comments').delete().eq('goal_id', currentGoal.id);
+
+            // C. Missions (Daily Logs for this category)
+            // Missions are loosely coupled by category. To fully reset History/Growth stats for this slot,
+            // we must delete all missions associated with this category for the user.
             const { error: missionError } = await supabase
                 .from('missions')
                 .delete()
                 .eq('user_id', user.id)
-                .eq('category', selectedCategory);
+                .eq('category', selectedCategory)
+                .eq('seq', currentGoal.seq || 1); // Delete specific sequence
 
-            if (missionError) {
-                console.warn("Mission cleanup warning:", missionError);
-                // We don't stop execution here, as the main goal is gone.
-            }
+            if (missionError) throw missionError;
+
+            // D. The Goal Itself
+            const { error: goalError } = await supabase
+                .from('user_goals')
+                .delete()
+                .eq('id', currentGoal.id)
+                .eq('seq', currentGoal.seq || 1);
+
+            if (goalError) throw goalError;
 
             alert(t.alertPlanDeleted);
 
@@ -806,10 +815,18 @@ export default function MyPage() {
                                 <p className="text-sm text-slate-400 mb-6 max-w-xs">{t.subscribeToUnlock || "Subscribe to unlock this mission category and start your journey."}</p>
                                 <button
                                     onClick={() => setIsSubManagerOpen(true)}
-                                    className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2"
+                                    className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2 mb-3"
                                 >
                                     <Sparkles size={18} />
                                     {t.unlockNow || "Unlock Now"}
+                                </button>
+                                {/* Allow Deletion even if Locked */}
+                                <button
+                                    onClick={handleDeleteGoal}
+                                    className="text-xs text-red-500 font-bold hover:text-red-400 transition-colors flex items-center gap-1 opacity-80 hover:opacity-100"
+                                >
+                                    <Trash2 size={14} />
+                                    {t.deletePlan || "Delete Plan"}
                                 </button>
                             </div>
                         )}
@@ -836,17 +853,28 @@ export default function MyPage() {
                             </div>
                         </div>
 
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             {/* Main Goal Input */}
                             <div>
                                 <label className="text-xs text-slate-400 block mb-1">{t.mainGoal}</label>
-                                <input
-                                    type="text"
+                                <textarea
                                     disabled={!isEditing}
                                     value={currentGoal.target_text}
                                     onChange={e => updateGoal('target_text', e.target.value)}
-                                    placeholder={t.whatToAchieve}
-                                    className="w-full bg-white/5 rounded-lg px-3 py-3 text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all"
+                                    placeholder={
+                                        selectedCategory === 'mindset'
+                                            ? "무엇을 이루고 싶으신가요?\n예: 우울감 극복, 자존감 회복, 소심함 극복 등"
+                                            : selectedCategory === 'growth'
+                                                ? "이루고 싶은 성장은 무엇인가요?\n예: 영어 회화 마스터, 코딩 실력 향상, 자격증 취득 등"
+                                                : selectedCategory === 'social'
+                                                    ? "무엇을 이루고 싶으신가요?\n예: 가족과 더 가까워지기, 인맥 넓히기 등"
+                                                    : selectedCategory === 'vitality'
+                                                        ? "무엇을 이루고 싶으신가요?\n예: 규칙적인 생활 습관 만들기, 워라밸 찾기 등"
+                                                        : selectedCategory === 'career'
+                                                            ? "무엇을 이루고 싶으신가요?\n예: 승진, 이직 성공, 매출 목표 달성, 전문성 강화 등"
+                                                            : t.whatToAchieve
+                                    }
+                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all resize-none h-14"
                                 />
                             </div>
 
@@ -872,14 +900,26 @@ export default function MyPage() {
                             <div className="pt-4 border-t border-white/5 space-y-4">
                                 {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
                                 {selectedCategory === 'health' && (
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-3">
                                         <div>
-                                            <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
-                                            <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                            <label className="text-xs text-slate-400 block mb-1">현재 상태 / 구체적 목표</label>
+                                            <textarea
+                                                disabled={!isEditing}
+                                                value={currentGoal.details.current_status || ''}
+                                                onChange={e => updateGoal('current_status', e.target.value, true)}
+                                                placeholder="예: 무릎이 조금 안 좋아요, 주 3회 러닝 가능해요, 풀코스 완주가 목표예요..."
+                                                className="w-full h-20 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none"
+                                            />
                                         </div>
-                                        <div>
-                                            <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
-                                            <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
+                                                <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
+                                                <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -887,38 +927,54 @@ export default function MyPage() {
                                 {selectedCategory === 'growth' && (
                                     <div className="space-y-3">
                                         <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                            <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        </div>
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
                                     </div>
                                 )}
 
                                 {selectedCategory === 'career' && (
                                     <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.project_name || ''} onChange={e => updateGoal('project_name', e.target.value, true)} placeholder={t.projectName} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <textarea disabled={!isEditing} value={currentGoal.details.kpi || ''} onChange={e => updateGoal('kpi', e.target.value, true)} placeholder={t.kpi} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.project_name || ''} onChange={e => updateGoal('project_name', e.target.value, true)} placeholder={`${t.projectName} (예: 신규 서비스 런칭, 팀 리딩)`} className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50" />
+                                        <textarea disabled={!isEditing} value={currentGoal.details.kpi || ''} onChange={e => updateGoal('kpi', e.target.value, true)} placeholder={`${t.kpi}\n예: 매출 10% 증가, 800점 달성, 프로젝트 100% 완료`} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none" />
                                     </div>
                                 )}
 
                                 {selectedCategory === 'mindset' && (
                                     <div className="space-y-3">
                                         <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.affirmation || ''} onChange={e => updateGoal('affirmation', e.target.value, true)} placeholder={t.affirmation} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <textarea
+                                            disabled={!isEditing}
+                                            value={currentGoal.details.affirmation || ''}
+                                            onChange={e => updateGoal('affirmation', e.target.value, true)}
+                                            placeholder={"나에게 해줄 말 (확언)\n예: 나는 매일 더 나아지고 있다. 나는 충분히 가치 있는 사람이다."}
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none h-16"
+                                        />
                                     </div>
                                 )}
 
                                 {selectedCategory === 'social' && (
                                     <div className="space-y-3">
                                         <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialPeople} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.activity_type || ''} onChange={e => updateGoal('activity_type', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <textarea
+                                            disabled={!isEditing}
+                                            value={currentGoal.details.activity_type || ''}
+                                            onChange={e => updateGoal('activity_type', e.target.value, true)}
+                                            placeholder={"어떤 활동을 할까요?\n예: 매일 안부 문자하기, 주 1회 식사하기, 동호회 가입하기"}
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none h-16"
+                                        />
                                     </div>
                                 )}
 
                                 {selectedCategory === 'vitality' && (
                                     <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.hobby || ''} onChange={e => updateGoal('hobby', e.target.value, true)} placeholder={t.vitalityHobby} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.routine || ''} onChange={e => updateGoal('routine', e.target.value, true)} placeholder={t.vitalityRoutine} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.hobby || ''} onChange={e => updateGoal('hobby', e.target.value, true)} placeholder={`${t.vitalityHobby} (예: 독서, 등산, 요리)`} className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50" />
+                                        <textarea
+                                            disabled={!isEditing}
+                                            value={currentGoal.details.routine || ''}
+                                            onChange={e => updateGoal('routine', e.target.value, true)}
+                                            placeholder={"만들고 싶은 루틴은 무엇인가요?\n예: 아침 7시 기상, 매일 물 2L 마시기, 잠들기 전 독서"}
+                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none h-16"
+                                        />
                                     </div>
                                 )}
                             </div>

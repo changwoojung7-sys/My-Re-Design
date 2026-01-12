@@ -60,7 +60,9 @@ export async function generateMissions(userProfile: any, language: 'en' | 'ko' =
     - For Health, Growth, Career categories, you MAY repeat tasks if they are essential (e.g. "Do 10 squats"), but try to vary slightly if possible.
     
     Category Specific Guidelines:
-    1. health: Focus on physical vitality, diet, sleep, or small exercises (e.g. squats, water, stretching). Repeats allowed.
+    1. health: 
+       - CRITICAL: Check 'Details: current_status' if provided. Tailor missions to this condition (e.g. if 'knee injury', avoid jumping; if 'beginner', keep it light).
+       - Focus on physical vitality, diet, sleep, or small exercises relevant to their status (e.g. squats, water, stretching). Repeats allowed.
     2. growth: Focus on learning, reading, or practicing a skill (e.g. read 1 page, practice 10 mins). Repeats allowed.
     3. mindset: Focus on mental health, gratitude, or affirmation. AVOID REPEATS from exclusion list.
     4. career: Focus on work efficiency, planning, or financial check. Repeats allowed.

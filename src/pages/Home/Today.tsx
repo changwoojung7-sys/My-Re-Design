@@ -145,7 +145,8 @@ export default function Today() {
             category: m.category,
             verification_type: m.verification_type || 'image', // Capture AI suggestion
             date: selectedDate,
-            is_completed: false
+            is_completed: false,
+            seq: selectedGoal?.seq || 1
         }));
         setDraftMissions(mapped);
     };
