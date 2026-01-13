@@ -206,6 +206,12 @@ export default function Today() {
         setLoading(true);
         const missionsToInsert = draftMissions.map(({ id, ...rest }) => rest);
         const { data, error } = await supabase.from('missions').insert(missionsToInsert).select();
+
+        if (error) {
+            console.error("Mission Insert Error:", error);
+            alert(`Failed to save missions: ${error.message}`);
+        }
+
         if (!error && data) {
             setMissions(data);
             setDraftMissions([]);

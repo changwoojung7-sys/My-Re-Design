@@ -1,5 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useStore } from './lib/store';
+import { supabase } from './lib/supabase';
+import { APP_VERSION } from './config/appConfig';
+import { useEffect } from 'react';
 
 // Placeholder Components (Detailed implementations coming next)
 import Login from './pages/Auth/Login';
@@ -78,6 +81,30 @@ function Layout() {
 }
 
 function App() {
+  // Version Check & Auto Logout Logic
+  useEffect(() => {
+    const checkVersion = async () => {
+      const storedVersion = localStorage.getItem('app_version');
+
+      if (storedVersion !== APP_VERSION) {
+        console.log(`[System] New version detected (${storedVersion} -> ${APP_VERSION}). Clearing session.`);
+
+        // 1. Sign out from Supabase (clears tokens)
+        await supabase.auth.signOut();
+
+        // 2. Clear Local Storage (clears any cached state)
+        localStorage.clear();
+
+        // 3. Set new version
+        localStorage.setItem('app_version', APP_VERSION);
+
+        // 4. Force Reload to ensure clean slate
+        window.location.href = '/login';
+      }
+    };
+    checkVersion();
+  }, []);
+
   return (
     <Router>
       <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-0 m-0 overflow-hidden relative">
