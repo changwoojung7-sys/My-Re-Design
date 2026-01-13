@@ -322,7 +322,7 @@ export const translations = {
         description: "상세 내용...",
         whatToAchieve: "무엇을 이루고 싶으신가요?",
         currentStatusGoal: "현재 상태 / 구체적 목표",
-        healthPlaceholder: "예: 무릎이 조금 안 좋아요, 주 3회 러닝 가능해요, 풀코스 완주가 목표예요...",
+
 
         // Today (Mission)
         missionOverview: "미션 개요",
@@ -600,7 +600,6 @@ export const translations = {
         description: "詳細...",
         whatToAchieve: "何を達成したいですか？",
         currentStatusGoal: "現在の状態 / 具体的な目標",
-        healthPlaceholder: "例：膝の調子が少し悪いです。週3回ランニング可能です。フルコース完走が目標です...",
         missionOverview: "ミッション概要",
         generateNewMissions: "新しいミッションを生成",
         generating: "生成中...",
@@ -850,7 +849,7 @@ export const translations = {
         description: "详细内容...",
         whatToAchieve: "你想达成什么？",
         currentStatusGoal: "当前状态 / 具体目标",
-        healthPlaceholder: "例如：膝盖有点不好，每周可以跑3次，目标是跑完全程...",
+
         missionOverview: "任务概览",
         generateNewMissions: "生成新任务",
         generating: "生成中...",
@@ -1099,7 +1098,7 @@ export const translations = {
         description: "Descripción...",
         whatToAchieve: "¿Qué quieres lograr?",
         currentStatusGoal: "Estado Actual / Objetivo Específico",
-        healthPlaceholder: "Ej: Me duele un poco la rodilla, puedo correr 3 veces por semana...",
+
         missionOverview: "Resumen de la Misión",
         generateNewMissions: "Generar Nuevas Misiones",
         generating: "Generando...",
@@ -1346,7 +1345,7 @@ export const translations = {
         description: "Description...",
         whatToAchieve: "Que voulez-vous accomplir ?",
         currentStatusGoal: "État Actuel / Objectif",
-        healthPlaceholder: "Ex: J'ai un peu mal au genou...",
+
         missionOverview: "Aperçu de la Mission",
         generateNewMissions: "Générer de Nouvelles Missions",
         generating: "Génération...",
@@ -1593,7 +1592,7 @@ export const translations = {
         description: "Beschreibung...",
         whatToAchieve: "Was möchtest du erreichen?",
         currentStatusGoal: "Aktueller Status / Ziel",
-        healthPlaceholder: "Bsp: Knie tut etwas weh...",
+
         missionOverview: "Missionsübersicht",
         generateNewMissions: "Neue Missionen Generieren",
         generating: "Generieren...",
@@ -1840,7 +1839,7 @@ export const translations = {
         description: "Описание...",
         whatToAchieve: "Чего вы хотите достичь?",
         currentStatusGoal: "Текущий Статус / Цель",
-        healthPlaceholder: "Напр.: Немного болит колено...",
+
         missionOverview: "Обзор Миссии",
         generateNewMissions: "Создать Новые Миссии",
         generating: "Генерация...",
