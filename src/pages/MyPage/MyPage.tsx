@@ -132,7 +132,7 @@ export default function MyPage() {
             fetchIncomingRequests();
             fetchData();
         }
-    }, [user, isSubManagerOpen]); // Re-fetch when sub manager closes
+    }, [user?.id, isSubManagerOpen]); // Re-fetch when sub manager closes, but NOT on every user object update (prevents loop)
 
     // Helper to check if a category is unlocked
     const isCategoryUnlocked = (category: string) => {

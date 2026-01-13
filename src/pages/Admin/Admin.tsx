@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Lock, User, Calendar, Save, Search, X, Check, CreditCard, Settings } from 'lucide-react';
+import { Lock, User, Calendar, Save, Search, X, Check, CreditCard, Settings, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Hardcoded Credentials (MVP)
@@ -13,6 +13,8 @@ export default function Admin() {
 
     // Admin Data State
     const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
+    const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
+    const [adSlotId, setAdSlotId] = useState('');
     const [users, setUsers] = useState<any[]>([]);
     const [deletedUsers, setDeletedUsers] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
@@ -42,8 +44,14 @@ export default function Admin() {
     };
 
     const fetchGlobalSettings = async () => {
-        const { data } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
-        if (data) setGlobalPaywallDay(parseInt(data.value));
+        const { data: dayData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
+        if (dayData) setGlobalPaywallDay(parseInt(dayData.value));
+
+        const { data: modeData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_mode').single();
+        if (modeData) setPaywallMode(modeData.value as 'subscription' | 'ads');
+
+        const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
+        if (slotData) setAdSlotId(slotData.value);
     };
 
     const fetchUsers = async () => {
@@ -68,6 +76,9 @@ export default function Admin() {
         const subs = rawSubs?.filter(s => {
             // Filter out explicitly cancelled subscriptions from DB
             if (s.status === 'cancelled') return false;
+
+            // Filter out EXPIRED subscriptions checking end_date <= now
+            if (s.end_date && new Date(s.end_date) <= new Date()) return false;
 
             if (!cancelledPayments) return true;
             // Exclude if matches a cancelled payment (Double check for consistency)
@@ -95,9 +106,14 @@ export default function Admin() {
                 // Sort so 'all' comes first, then by date
                 userSubs.sort((a: any, _b: any) => (a.type === 'all' ? -1 : 1));
 
+                // Determine status
+                const allAccess = userSubs.find((s: any) => s.type === 'all');
+                const missionPlan = userSubs.find((s: any) => s.type === 'mission');
+
                 return {
                     ...p,
-                    is_premium: userSubs.length > 0,
+                    is_premium: !!allAccess,
+                    active_plan: missionPlan ? missionPlan.target_id : null,
                     subscriptions: userSubs
                 };
             });
@@ -107,11 +123,19 @@ export default function Admin() {
     };
 
     const updateGlobalPaywall = async () => {
-        const { error } = await supabase
+        const { error: errorDay } = await supabase
             .from('admin_settings')
             .upsert({ key: 'paywall_start_day', value: String(globalPaywallDay) });
 
-        if (error) alert('Error updating global settings');
+        const { error: errorMode } = await supabase
+            .from('admin_settings')
+            .upsert({ key: 'paywall_mode', value: paywallMode });
+
+        const { error: errorSlot } = await supabase
+            .from('admin_settings')
+            .upsert({ key: 'ad_slot_id', value: adSlotId });
+
+        if (errorDay || errorMode || errorSlot) alert('Error updating global settings');
         else alert('Global settings updated!');
     };
 
@@ -182,7 +206,7 @@ export default function Admin() {
         // 1. Get Payment Info needed to find subscription
         const { data: payment } = await supabase
             .from('payments')
-            .select('coverage_start_date, coverage_end_date')
+            .select('coverage_start_date, coverage_end_date, plan_type, target_id')
             .eq('id', id)
             .single();
 
@@ -195,17 +219,99 @@ export default function Admin() {
         if (error) {
             alert('취소 실패: ' + error.message);
         } else {
-            // 3. Cancel corresponding subscription
+            // 3. Cancel corresponding subscription (Robust Match)
             if (payment?.coverage_start_date && payment?.coverage_end_date && selectedUser) {
-                await supabase
+                // Parse Type from plan_type (e.g. "mission_3mo" -> "mission", "all_1mo" -> "all")
+                const typeStr = payment.plan_type || '';
+                const [type] = typeStr.split('_');
+                const targetId = (type === 'mission' && payment.target_id) ? payment.target_id : null;
+
+                // Step A: Try to find the specific subscription ID first
+                // We use a lenient search because timestamps might drift slightly or have different ISO formatting
+                const { data: subs } = await supabase
                     .from('subscriptions')
-                    .update({ status: 'cancelled' })
+                    .select('id, start_date, end_date, target_id') // Added target_id to select
                     .eq('user_id', selectedUser.id)
-                    .eq('start_date', payment.coverage_start_date)
-                    .eq('end_date', payment.coverage_end_date);
+                    .eq('type', type || 'all') // Default to 'all' if type missing, though risky
+                    .eq('status', 'active'); // Only cancel active ones
+
+                let targetSubId = null;
+
+                if (subs && subs.length > 0) {
+                    // Filter matches
+                    const expectedStart = new Date(payment.coverage_start_date).getTime();
+                    const expectedEnd = new Date(payment.coverage_end_date).getTime();
+
+                    const match = subs.find(s => {
+                        // Check if timestamps are within 5 seconds allowed drift
+                        const sStart = new Date(s.start_date).getTime();
+                        const sEnd = new Date(s.end_date).getTime();
+
+                        const startDiff = Math.abs(expectedStart - sStart);
+                        const endDiff = Math.abs(expectedEnd - sEnd);
+
+                        // Strict check on ID if provided, otherwise date match
+                        if (targetId && s.target_id !== targetId) return false;
+
+                        return startDiff < 5000 && endDiff < 5000;
+                    });
+
+                    if (match) targetSubId = match.id;
+                }
+
+                if (targetSubId) {
+                    await supabase
+                        .from('subscriptions')
+                        .update({ status: 'cancelled' })
+                        .eq('id', targetSubId);
+                } else {
+                    console.warn("Could not find exact matching subscription to cancel by date.");
+                    // New Fallback: Pick the closest matching subscription by End Date, regardless of count
+                    if (subs && subs.length > 0) {
+                        const expectedEnd = new Date(payment.coverage_end_date).getTime();
+
+                        // Sort by closeness to coverage_end_date
+                        const sortedSubs = subs.sort((a, b) => {
+                            const diffA = Math.abs(new Date(a.end_date).getTime() - expectedEnd);
+                            const diffB = Math.abs(new Date(b.end_date).getTime() - expectedEnd);
+                            return diffA - diffB;
+                        });
+
+                        const bestMatch = sortedSubs[0];
+                        // Provide detailed confirmation
+                        if (confirm(`정확한 날짜 일치 항목을 찾지 못했으나, 가장 유사한 만료일(${new Date(bestMatch.end_date).toLocaleDateString()})을 가진 구독을 찾았습니다. 강제 취소하시겠습니까? (ID: ${bestMatch.id})`)) {
+                            await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', bestMatch.id);
+                            targetSubId = bestMatch.id; // Correctly track for profile update
+                        }
+                    } else {
+                        alert("연동된 활성 구독 정보를 찾을 수 없습니다. 이미 취소되었거나 만료되었을 수 있습니다.");
+                    }
+                }
+
+                // CRITICAL FIX: If we cancelled an 'ALL' plan, check if user still has any active 'all' data.
+                if ((type === 'all' || !type)) {
+                    // Check if ANY active 'all' subscription remains
+                    const { count } = await supabase
+                        .from('subscriptions')
+                        .select('id', { count: 'exact', head: true })
+                        .eq('user_id', selectedUser.id)
+                        .eq('type', 'all')
+                        .eq('status', 'active');
+
+                    // If count is 0 (meaning we just deleted the last one, or there are none), downgrade profile
+                    // Note: 'count' might include the one we just cancelled if transaction isn't committed? 
+                    // Supabase operations are atomic but sequential here. We awaited update above.
+                    if (count === 0 || count === null) {
+                        await supabase.from('profiles').update({ subscription_tier: 'free' }).eq('id', selectedUser.id);
+                        // Update local state
+                        if (selectedUser) setSelectedUser({ ...selectedUser, subscription_tier: 'free' });
+                        // Also update list
+                        setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, is_premium: false } : u));
+                    }
+                }
             }
 
-            alert('결제가 취소되었습니다. (구독 정보 업데이트 완료)');
+            alert('결제가 취소되었습니다. (구독 정보 및 회원 등급 업데이트 완료)');
             if (selectedUser) openUserDetail(selectedUser);
         }
     };
@@ -256,22 +362,84 @@ export default function Admin() {
     return (
         <div className="h-screen w-full bg-slate-950 text-white overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="p-6 border-b border-white/10 flex justify-between items-center bg-slate-900">
-                <h1 className="text-xl font-bold flex items-center gap-2">
-                    <Settings className="text-accent" /> 관리자 대시보드
-                </h1>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-black/30 px-4 py-2 rounded-lg border border-white/5">
-                        <span className="text-xs text-slate-400">전역 무료 체험(일):</span>
-                        <input
-                            type="number"
-                            value={globalPaywallDay}
-                            onChange={e => setGlobalPaywallDay(parseInt(e.target.value))}
-                            className="w-12 bg-transparent text-center font-bold outline-none"
-                        />
-                        <button onClick={updateGlobalPaywall} className="text-accent hover:text-white"><Save size={16} /></button>
+            <div className="p-4 border-b border-white/10 flex flex-col xl:flex-row justify-between items-center bg-slate-900 gap-4">
+                {/* Title */}
+                <div className="flex w-full xl:w-auto justify-start items-center">
+                    <h1 className="text-xl font-bold flex items-center gap-2">
+                        <Settings className="text-accent" /> 관리자 대시보드
+                    </h1>
+                </div>
+
+                {/* Controls Area */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 w-full xl:w-auto">
+
+                    {/* Settings Group */}
+                    <div className="flex flex-wrap items-center justify-center gap-2 bg-black/20 p-2 rounded-xl border border-white/5 shadow-inner">
+                        {/* Trial Days Input */}
+                        <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-1 rounded-lg border border-white/5 hover:border-white/10 transition-colors h-14 min-w-[80px]">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">전역 무료 체험</span>
+                            <div className="flex items-center gap-1">
+                                <input
+                                    type="number"
+                                    value={globalPaywallDay}
+                                    onChange={e => setGlobalPaywallDay(parseInt(e.target.value))}
+                                    className="w-8 bg-transparent text-center font-bold text-sm text-white outline-none appearance-none"
+                                />
+                                <span className="text-[10px] text-slate-500 font-bold">일</span>
+                            </div>
+                        </div>
+
+                        <div className="hidden sm:block w-px h-6 bg-white/10 mx-1"></div>
+
+                        {/* Mode Toggle */}
+                        <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-1 rounded-lg border border-white/5 hover:border-white/10 transition-colors h-14 w-[140px]">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Paywall Mode</span>
+                            <select
+                                value={paywallMode}
+                                onChange={(e) => setPaywallMode(e.target.value as 'subscription' | 'ads')}
+                                className="bg-transparent text-xs font-bold text-accent outline-none cursor-pointer text-center w-full"
+                            >
+                                <option value="subscription" className="bg-slate-900 text-white">구독 유도 (Sub)</option>
+                                <option value="ads" className="bg-slate-900 text-white">광고 보기 (Ads)</option>
+                            </select>
+                        </div>
+
+                        <div className="hidden sm:block w-px h-6 bg-white/10 mx-1"></div>
+
+                        {/* Ad Slot ID Input */}
+                        <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-1 rounded-lg border border-white/5 hover:border-white/10 transition-colors h-14">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Ad Slot ID</span>
+                            <input
+                                type="text"
+                                value={adSlotId}
+                                onChange={e => setAdSlotId(e.target.value)}
+                                placeholder="e.g. 1234567890"
+                                className="w-24 bg-transparent text-center font-bold text-xs text-white outline-none placeholder:text-slate-600"
+                            />
+                        </div>
                     </div>
-                    <button onClick={() => setIsAuthenticated(false)} className="text-xs text-slate-500 hover:text-white">로그아웃</button>
+
+                    {/* Actions Group (Save & Logout) */}
+                    <div className="flex items-center gap-2 ml-2">
+                        {/* Unified Save Button */}
+                        <button
+                            onClick={updateGlobalPaywall}
+                            className="bg-primary hover:bg-primary/90 text-black p-2 rounded-lg transition-all shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 h-9 w-9 flex items-center justify-center border border-primary/50"
+                            title="Save Changes"
+                        >
+                            <Save size={16} strokeWidth={2.5} />
+                        </button>
+
+                        <div className="w-px h-6 bg-white/10 mx-1"></div>
+
+                        {/* Logout Button */}
+                        <button
+                            onClick={() => setIsAuthenticated(false)}
+                            className="text-[10px] font-bold text-slate-500 hover:text-white px-3 h-9 border border-white/5 rounded-lg hover:bg-white/5 transition-colors whitespace-nowrap bg-black/20"
+                        >
+                            LOGOUT
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -437,8 +605,8 @@ export default function Admin() {
                                     <div className="grid grid-cols-2 gap-2 text-center">
                                         <div className="bg-white/5 p-2 rounded-lg">
                                             <p className="text-[10px] text-slate-500 uppercase font-bold">구독 상태</p>
-                                            <p className={`font-bold text-sm ${selectedUser.is_premium ? 'text-accent' : 'text-slate-400'}`}>
-                                                {selectedUser.is_premium ? 'Premium' : 'Free'}
+                                            <p className={`font-bold text-sm ${selectedUser.is_premium ? 'text-accent' : selectedUser.active_plan ? 'text-primary' : 'text-slate-400'}`}>
+                                                {selectedUser.is_premium ? 'Premium (All)' : selectedUser.active_plan ? `Mission (${selectedUser.active_plan})` : 'Free'}
                                             </p>
                                         </div>
                                         <div className="bg-white/5 p-2 rounded-lg">
@@ -528,18 +696,39 @@ export default function Admin() {
                                             <p className="text-[10px] text-slate-500 text-center py-2">구독 내역이 없습니다.</p>
                                         ) : (
                                             selectedUser.subscriptions.map((sub: any, idx: number) => (
-                                                <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center">
+                                                <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center group">
                                                     <div>
                                                         <div className="flex items-center gap-2">
                                                             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${sub.type === 'all' ? 'bg-purple-500/20 text-purple-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
                                                                 {sub.type === 'all' ? '전체 플랜' : sub.target_id}
                                                             </span>
+                                                            {sub.status === 'cancelled' && <span className="text-[9px] text-red-400 font-bold">(취소됨)</span>}
                                                         </div>
                                                         <p className="text-[10px] text-slate-500 font-mono mt-1">
                                                             {new Date(sub.start_date).toLocaleDateString()} ~ {new Date(sub.end_date).toLocaleDateString()}
                                                         </p>
                                                     </div>
-                                                    <span className="text-[10px] text-white font-bold">{getDuration(sub.start_date, sub.end_date)}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] text-white font-bold">{getDuration(sub.start_date, sub.end_date)}</span>
+                                                        {sub.status !== 'cancelled' && (
+                                                            <button
+                                                                onClick={async () => {
+                                                                    if (confirm('이 구독 정보를 강제로 삭제(취소)하시겠습니까? (결제 내역과는 별도로 처리됩니다)')) {
+                                                                        const { error } = await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', sub.id);
+                                                                        if (error) alert('삭제 실패: ' + error.message);
+                                                                        else {
+                                                                            alert('구독 정보가 취소 처리되었습니다.');
+                                                                            openUserDetail(selectedUser);
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                className="text-slate-500 hover:text-red-400 p-1 opacity-0 group-hover:opacity-100 transition-all"
+                                                                title="강제 삭제"
+                                                            >
+                                                                <Trash2 size={12} />
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             ))
                                         )}
@@ -561,7 +750,12 @@ export default function Admin() {
                                                     <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center">
                                                         <div>
                                                             <p className={`text-xs font-bold uppercase ${isCancelled ? 'text-slate-500 line-through' : 'text-white'}`}>
-                                                                {pay.item_name || 'Premium Plan'}
+                                                                {/* Display more descriptive name based on Plan Type */}
+                                                                {pay.plan_type === 'all_1mo' ? 'Premium (1 Month)' :
+                                                                    pay.plan_type === 'all_3mo' ? 'Premium (3 Months)' :
+                                                                        pay.plan_type === 'all_6mo' ? 'Premium (6 Months)' :
+                                                                            pay.plan_type?.startsWith('mission') ? `Mission (${pay.target_id})` :
+                                                                                pay.item_name || 'Plan'}
                                                             </p>
                                                             <p className="text-[10px] text-slate-500 font-mono mt-0.5">
                                                                 {new Date(pay.created_at).toLocaleDateString()}
@@ -598,6 +792,6 @@ export default function Admin() {
                     )}
                 </AnimatePresence>
             </div>
-        </div>
+        </div >
     );
 }

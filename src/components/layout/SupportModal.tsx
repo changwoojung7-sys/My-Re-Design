@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, ChevronLeft, Send, MessageCircle, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, ChevronLeft, Send, MessageCircle, Clock, ChevronDown, ChevronUp, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 import { TERMS_CONTENT, PRIVACY_CONTENT, REFUND_CONTENT } from '../../data/LegalData';
 
@@ -39,6 +40,7 @@ const FAQ_DATA: Record<string, { q: string; a: string }[]> = {
 };
 
 export default function SupportModal({ isOpen, onClose, initialView = 'main' }: SupportModalProps) {
+    const navigate = useNavigate();
     const [view, setView] = useState<'main' | 'terms' | 'privacy' | 'refund'>('main');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
@@ -91,9 +93,20 @@ export default function SupportModal({ isOpen, onClose, initialView = 'main' }: 
                         <MessageCircle size={20} className="text-primary" />
                         Customer Center
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-white">
-                        <X size={24} />
-                    </button>
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => {
+                                navigate('/admin');
+                                onClose();
+                            }}
+                            className="text-white opacity-5 hover:opacity-20 transition-opacity"
+                        >
+                            <Lock size={16} />
+                        </button>
+                        <button onClick={onClose} className="text-slate-400 hover:text-white">
+                            <X size={24} />
+                        </button>
+                    </div>
                 </div>
             );
         } else {

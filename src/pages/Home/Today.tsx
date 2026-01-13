@@ -8,7 +8,10 @@ import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, L
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
 import Paywall from './Paywall';
+// duplicate removed
 import PaywallWarning from './PaywallWarning';
+import AdWarning from './AdWarning';
+import RewardAd from '../../components/ads/RewardAd';
 
 export default function Today() {
     const { user, missions, setMissions } = useStore();
@@ -332,38 +335,117 @@ export default function Today() {
     // --- Monetization Check ---
     const currentDayNum = getSelectedDayNum();
     const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
+    const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
     const [userCustomLimit, setUserCustomLimit] = useState<number | null>(null);
+    const [isAdUnlocked, setIsAdUnlocked] = useState(false); // Session-based Unlock
+    const [showRewardAd, setShowRewardAd] = useState(false);
+    const [adSlotId, setAdSlotId] = useState<string | undefined>(undefined);
+    const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+    const [checkingSubs, setCheckingSubs] = useState(true);
 
     useEffect(() => {
         const fetchSettings = async () => {
+            setCheckingSubs(true);
             // 1. Fetch Global Setting
             const { data: adminData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
             if (adminData?.value) setGlobalPaywallDay(parseInt(adminData.value));
+
+            const { data: modeData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_mode').single();
+            if (modeData?.value) setPaywallMode(modeData.value as 'subscription' | 'ads');
+
+            const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
+            if (slotData?.value) setAdSlotId(slotData.value);
 
             // 2. Fetch User Specific Setting (Fresh)
             if (user) {
                 const { data: profileData } = await supabase.from('profiles').select('custom_free_trial_days').eq('id', user.id).single();
                 if (profileData) setUserCustomLimit(profileData.custom_free_trial_days);
+
+                // 2. Check Subscription
+                // Fetch ALL active subscriptions first, then filter in JS to avoid string comparison issues with timestamps
+                const { data: subData } = await supabase
+                    .from('subscriptions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('status', 'active');
+
+                let hasSub = false;
+
+                if (subData && subData.length > 0) {
+                    console.log("[Debug] All Subs:", subData);
+                    console.log("[Debug] Current Goal Category:", selectedGoal?.category);
+
+                    // Filter: Must be Active Type AND (Started <= Now <= Ended)
+                    // Date-Only Comparison (Ignore Time) as per user request
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0); // Normalize 'Now' to midnight
+
+                    const active = subData.find(s => {
+                        const sStart = new Date(s.start_date);
+                        sStart.setHours(0, 0, 0, 0);
+
+                        const sEnd = new Date(s.end_date);
+                        sEnd.setHours(23, 59, 59, 999); // End of the day for expiration
+
+                        console.log(`[Debug] Checking Sub ${s.id}:`, {
+                            type: s.type,
+                            target: s.target_id,
+                            start: sStart.toLocaleString(),
+                            end: sEnd.toLocaleString(),
+                            now: now.toLocaleString(),
+                            validPeriod: sStart <= now && sEnd >= now,
+                            validTarget: s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase()
+                        });
+
+                        // Check validity period
+                        if (sStart > now || sEnd < now) return false;
+
+                        // Check Type/Target
+                        // Case-Insensitive Check
+                        const targetMatch = s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase();
+                        return s.type === 'all' || (s.type === 'mission' && targetMatch);
+                    });
+
+                    if (active) hasSub = true;
+                    console.log("[Debug] Has Active Sub:", hasSub);
+                }
+                setHasActiveSubscription(hasSub);
             }
+            setCheckingSubs(false);
         };
         fetchSettings();
-    }, [user]);
+    }, [user, selectedGoal?.category]);
 
     // Priority: User Custom > Global Default
-    // Logic: Free Limit is X days. So if Day > X, it is paid.
-    // Example: Limit 10. Day 10 is free. Day 11 is paid.
+    // Logic: Free Limit is X days. So if Day >= X, it is paid.
+    // Example: Limit 4. Day 1,2,3 Free. Day 4+ Paid.
     const paywallLimit = userCustomLimit ?? globalPaywallDay;
-    const isPaywallActive = currentDayNum > paywallLimit && user?.subscription_tier !== 'premium';
+    const isPaywallActive = !checkingSubs && currentDayNum >= paywallLimit && user?.subscription_tier !== 'premium' && !hasActiveSubscription && !isAdUnlocked;
+
+    useEffect(() => {
+        console.log('[Paywall Debug]', {
+            currentDayNum,
+            paywallLimit,
+            isPaywallActive,
+            tier: user?.subscription_tier,
+            hasActiveSubscription,
+            isAdUnlocked
+        });
+    }, [currentDayNum, paywallLimit, isPaywallActive, user, hasActiveSubscription, isAdUnlocked]);
+
     const [paywallStep, setPaywallStep] = useState<'none' | 'warning' | 'payment'>('none');
 
     // Reset step when selection changes
     useEffect(() => {
-        if (isPaywallActive) {
+        // Safety: If subscription is active, FORCE close the paywall
+        if (hasActiveSubscription) {
+            setPaywallStep('none');
+        } else if (isPaywallActive) {
             setPaywallStep('warning');
         } else {
             setPaywallStep('none');
         }
-    }, [selectedGoalId, isPaywallActive]);
+    }, [selectedGoalId, isPaywallActive, hasActiveSubscription]);
 
     const handlePaywallCancel = () => {
         // Find a goal that is NOT in paywall (Day <= 4)
@@ -379,30 +461,45 @@ export default function Today() {
         if (safeGoal) {
             setSelectedGoalId(safeGoal.id);
         } else {
-            // No safe goal? Simply close warning but component remains PaywallActive.
-            // But we don't want to block them forever if they just want to see the screen locked?
-            // User said: "Show mission screen as is"
-            // To do that, we set step to 'none'.
-            // But wait, if step is 'none' AND isPaywallActive is true, logic below might need adjustment to not auto-trigger?
-            // Ah, useEffect above auto-sets it.
-            // If we want to show screen "locked" but viewable, we might need a separate 'dismissed' state.
-            // But 'isPaywallActive' usually implies BLOCKED.
-            // Let's assume switching goal is primary. If fails, maybe go to Dashboard?
             window.location.href = '/dashboard';
         }
+    };
+
+    const handleAdReward = () => {
+        setIsAdUnlocked(true); // Unlock for this session
+        setShowRewardAd(false);
+        setPaywallStep('none');
     };
 
     return (
         <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-32 relative">
             {isPaywallActive && paywallStep === 'warning' && (
-                <PaywallWarning
-                    onConfirm={() => {
-                        if (user?.id === 'demo123') return alert(t.demoPaymentLimit);
-                        setPaywallStep('payment');
-                    }}
-                    onCancel={handlePaywallCancel}
-                />
+                paywallMode === 'ads' ? (
+                    <AdWarning
+                        currentDay={currentDayNum}
+                        onWatchAd={() => setShowRewardAd(true)}
+                        onSubscribe={() => setPaywallStep('payment')}
+                    />
+                ) : (
+                    <PaywallWarning
+                        onConfirm={() => {
+                            if (user?.id === 'demo123') return alert(t.demoPaymentLimit);
+                            setPaywallStep('payment');
+                        }}
+                        onCancel={handlePaywallCancel}
+                    />
+                )
             )}
+
+            <AnimatePresence>
+                {showRewardAd && (
+                    <RewardAd
+                        onReward={handleAdReward}
+                        onClose={() => setShowRewardAd(false)}
+                        adSlotId={adSlotId}
+                    />
+                )}
+            </AnimatePresence>
             {isPaywallActive && paywallStep === 'payment' && (
                 <Paywall onClose={handlePaywallCancel} />
             )}

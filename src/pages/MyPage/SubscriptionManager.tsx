@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CreditCard, Clock, Check, X } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
@@ -44,6 +44,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
     const [loading, setLoading] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
     const [activeSubs, setActiveSubs] = useState<any[]>([]);
+    const hasAutoSelected = useRef(false);
 
     // Support Modal State
     const [supportModalState, setSupportModalState] = useState<{
@@ -95,6 +96,33 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                 return !cancelledPayment;
             });
             setActiveSubs(validSubs);
+
+            // Smart Auto-Select: If default category (Health) has no sub, but another does, switch to it.
+            // This prevents users confusing "Free" status when they have a paid plan elsewhere.
+            // Only run ONCE per session to avoid overriding user interaction.
+            if (validSubs.length > 0 && !hasAutoSelected.current) {
+                // Check if we have coverage for the CURRENT active selection (default 'health', 'mission')
+                // Since we can't easily access current state inside async buffer efficiently without refs, 
+                // we rely on the fact this runs on mount/user change where defaults are active.
+
+                // Find if there is an 'all' plan
+                const allPlan = validSubs.find(s => s.type === 'all');
+                if (allPlan) {
+                    setActiveTab('all');
+                    hasAutoSelected.current = true;
+                } else {
+                    // Find a mission plan. 
+                    // If we have multiple, maybe pick the one that is active/scheduled?
+                    const missionPlan = validSubs.find(s => s.type === 'mission');
+                    if (missionPlan && missionPlan.target_id) {
+                        // Only switch if we assume the user hasn't explicitly selected something else yet (Mount logic)
+                        // But since basic state is 'health', switching to 'mindset' is helpful.
+                        setSelectedCategory(missionPlan.target_id);
+                        setActiveTab('mission');
+                        hasAutoSelected.current = true;
+                    }
+                }
+            }
         }
     };
 
@@ -130,10 +158,21 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
     // This is strictly about "Right Now" access
     const isUnlockedNow = (() => {
         const now = new Date();
+        now.setHours(0, 0, 0, 0); // Compare date only
+
         return activeSubs.some(s => {
-            if (new Date(s.start_date) > now || new Date(s.end_date) <= now) return false;
+            const sStart = new Date(s.start_date);
+            sStart.setHours(0, 0, 0, 0);
+
+            const sEnd = new Date(s.end_date);
+            sEnd.setHours(23, 59, 59, 999); // Active until end of day
+
+            if (sStart > now || sEnd < now) return false;
+
             if (s.type === 'all') return true;
-            return s.type === 'mission' && s.target_id === selectedCategory;
+
+            const targetMatch = s.target_id && s.target_id.toLowerCase() === selectedCategory.toLowerCase();
+            return s.type === 'mission' && targetMatch;
         });
     })();
 
@@ -144,7 +183,10 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         let startDate = new Date();
         let isExtension = false;
 
-        if (latestRelevantSub) {
+        // Logic change: Only chain extension if the user currently has access (isUnlockedNow).
+        // If they are locked out (but have a future scheduled plan), they obviously want access NOW.
+        // So we start a new subscription parallel to the future one to fill the gap.
+        if (latestRelevantSub && isUnlockedNow) {
             startDate = new Date(latestRelevantSub.end_date);
             // Add a small buffer (e.g. 1 second) to avoid overlaps if needed, or just start exact same time
             // Usually start = end is fine for continuity
@@ -232,7 +274,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             // 1. Get Payment Info
             const { data: payment } = await supabase
                 .from('payments')
-                .select('coverage_start_date, coverage_end_date')
+                .select('coverage_start_date, coverage_end_date, plan_type, target_id')
                 .eq('id', paymentId)
                 .single();
 
@@ -247,14 +289,25 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
             if (error) throw error;
 
-            // 3. Cancel Subscription
+            // 3. Cancel Subscription (Robust Match)
             if (payment?.coverage_start_date && payment?.coverage_end_date && user?.id) {
-                await supabase
+                // Parse Type from plan_type (e.g. "mission_3mo" -> "mission", "all_1mo" -> "all")
+                const [type] = payment.plan_type.split('_');
+
+                let query = supabase
                     .from('subscriptions')
                     .update({ status: 'cancelled' })
                     .eq('user_id', user.id)
                     .eq('start_date', payment.coverage_start_date)
-                    .eq('end_date', payment.coverage_end_date);
+                    .eq('end_date', payment.coverage_end_date)
+                    .eq('type', type);
+
+                // If mission type, also match target_id (category)
+                if (type === 'mission' && payment.target_id) {
+                    query = query.eq('target_id', payment.target_id);
+                }
+
+                await query;
             }
 
             alert(t.cancelSuccess);
@@ -294,15 +347,21 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                                     {isUnlockedNow
                                         ? t.unlockedPremium
-                                        : t.freeRestricted}
+                                        : latestRelevantSub && new Date(latestRelevantSub.start_date) > new Date()
+                                            ? <span className="text-yellow-400">Scheduled (Upcoming)</span>
+                                            : t.freeRestricted}
                                     {isUnlockedNow && <Check size={16} className="text-green-500" />}
                                 </h3>
                             </div>
-                            {isUnlockedNow && latestRelevantSub && (
+                            {latestRelevantSub && (
                                 <div className="text-right">
-                                    <span className="text-xs text-slate-400 block">{t.expires}</span>
+                                    <span className="text-xs text-slate-400 block">
+                                        {new Date(latestRelevantSub.start_date) > new Date() ? 'Starts On' : t.expires}
+                                    </span>
                                     <span className="text-xs font-mono font-bold text-white">
-                                        {new Date(latestRelevantSub.end_date).toLocaleDateString()}
+                                        {new Date(latestRelevantSub.start_date) > new Date()
+                                            ? new Date(latestRelevantSub.start_date).toLocaleDateString()
+                                            : new Date(latestRelevantSub.end_date).toLocaleDateString()}
                                     </span>
                                 </div>
                             )}
