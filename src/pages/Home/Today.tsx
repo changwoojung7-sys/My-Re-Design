@@ -61,7 +61,19 @@ export default function Today() {
 
     const initData = async () => {
         setLoading(true);
-        setLoading(true);
+
+        if (user?.id === 'demo123') {
+            // Mock Goals for Demo User
+            const mockGoals = [
+                { id: 'demo-health', user_id: 'demo123', category: 'health', seq: 1, target_text: 'Healthy Lifestyle', created_at: new Date().toISOString() },
+                { id: 'demo-growth', user_id: 'demo123', category: 'growth', seq: 1, target_text: 'Read Books', created_at: new Date().toISOString() }
+            ];
+            setUserGoals(mockGoals);
+            setSelectedGoalId(mockGoals[0].id);
+            setLoading(false);
+            return;
+        }
+
         // Order by seq desc to get the latest challenge first
         const { data: goals } = await supabase
             .from('user_goals')
@@ -81,6 +93,29 @@ export default function Today() {
         setLoading(true);
         setDraftMissions([]);
         setVerifyingId(null); // Clear any active verification
+
+        // Demo User Mock Missions
+        if (user?.id === 'demo123') {
+            const today = formatLocalYMD(new Date());
+            if (selectedDate === today && selectedGoal?.category === 'health') {
+                const mockMissions = [
+                    {
+                        id: 'demo-m1', user_id: 'demo123', category: 'health',
+                        content: language === 'ko' ? '물 2L 마시기' : 'Drink 2L Water',
+                        is_completed: false, date: today, verification_type: 'image'
+                    }
+                ];
+                setMissions(mockMissions);
+            } else {
+                setMissions([]);
+                // Allow generating drafts for Demo
+                if (selectedDate >= today) {
+                    await generateDraftPlan();
+                }
+            }
+            setLoading(false);
+            return;
+        }
 
         // Note: 'date' column in DB is likely type DATE or TEXT (YYYY-MM-DD). 
         // Passing the local YYYY-MM-DD string is correct for matching.
@@ -164,6 +199,7 @@ export default function Today() {
     };
 
     const confirmPlan = async () => {
+        if (user?.id === 'demo123') return alert(t.demoLimit);
         setLoading(true);
         const missionsToInsert = draftMissions.map(({ id, ...rest }) => rest);
         const { data, error } = await supabase.from('missions').insert(missionsToInsert).select();
@@ -188,6 +224,7 @@ export default function Today() {
     };
 
     const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (user?.id === 'demo123') return alert(t.demoLimit);
         const file = event.target.files?.[0];
         if (!file || !verifyingId) return;
 
@@ -219,6 +256,7 @@ export default function Today() {
     };
 
     const handleTextSubmit = async () => {
+        if (user?.id === 'demo123') return alert(t.demoLimit);
         if (!textInput.trim() || !verifyingId) return;
 
         try {
@@ -358,7 +396,10 @@ export default function Today() {
         <div className="w-full flex-1 min-h-0 flex flex-col pt-6 pb-32 relative">
             {isPaywallActive && paywallStep === 'warning' && (
                 <PaywallWarning
-                    onConfirm={() => setPaywallStep('payment')}
+                    onConfirm={() => {
+                        if (user?.id === 'demo123') return alert(t.demoPaymentLimit);
+                        setPaywallStep('payment');
+                    }}
                     onCancel={handlePaywallCancel}
                 />
             )}

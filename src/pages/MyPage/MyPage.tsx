@@ -728,18 +728,21 @@ export default function MyPage() {
             <div className="flex flex-col items-start mb-2 shrink-0">
                 {/* Title Row with Icons */}
                 <div className="flex items-center justify-between gap-4 w-full">
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent shrink-0">
-                        My Re Design
-                    </h1>
+                    <div className="flex items-center gap-3">
+                        <img src="/reme_icon.png" alt="Logo" className="w-9 h-9 rounded-2xl shadow-lg shadow-primary/20" />
+                        <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent shrink-0">
+                            My Re Design
+                        </h1>
+                    </div>
 
-                    <div className="flex items-center gap-2 mr-6">
+                    <div className="flex items-center gap-3">
 
                         {/* Notification Bell */}
                         <button
                             onClick={() => setShowRequestsModal(true)}
                             className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors relative"
                         >
-                            <Bell size={20} />
+                            <Bell size={18} />
                             {incomingRequests.some(r => r.status === 'pending') && (
                                 <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-slate-900 animate-pulse" />
                             )}
@@ -749,13 +752,13 @@ export default function MyPage() {
                             onClick={handleOpenSettings}
                             className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
                         >
-                            <Settings size={20} />
+                            <Settings size={18} />
                         </button>
                         <button
                             onClick={handleLogout}
                             className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"
                         >
-                            <LogOut size={20} />
+                            <LogOut size={18} />
                         </button>
                     </div>
                 </div>
@@ -776,7 +779,10 @@ export default function MyPage() {
                 {/* Profile Header (Read Only / Quick View) */}
                 <div className="relative bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
                     <button
-                        onClick={() => setIsSubManagerOpen(true)}
+                        onClick={() => {
+                            if (user.id === 'demo123') return alert(t.demoPaymentLimit);
+                            setIsSubManagerOpen(true);
+                        }}
                         className="absolute top-6 right-6 p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2"
                     >
                         <CreditCard size={20} className="text-accent" />

@@ -196,7 +196,9 @@ export default function Friends() {
         setFoundUser(null);
 
         try {
-            let query = supabase.from('profiles').select('*').neq('id', user!.id);
+            let query = supabase.from('profiles').select('*')
+                .neq('id', user!.id)
+                .neq('id', 'demo123'); // Exclude Demo User from results
 
             if (searchQuery.includes('@')) {
                 query = query.eq('email', searchQuery);
@@ -220,6 +222,7 @@ export default function Friends() {
     };
 
     const addFriend = async () => {
+        if (user?.id === 'demo123') return alert(t.demoLimit);
         if (!foundUser || !user) return;
         try {
             const { error } = await supabase.from('friends').insert({
@@ -367,6 +370,30 @@ export default function Friends() {
         const friend = friends.find(f => f.userGoal?.id === goalId);
         if (friend && friend.userGoal) {
             setViewingGoal(friend.userGoal);
+        }
+    };
+
+    const handleShare = async () => {
+        const shareData = {
+            title: t.shareTitle,
+            text: t.shareText,
+            url: window.location.origin,
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.error("Error sharing:", err);
+            }
+        } else {
+            // Fallback: Copy to clipboard
+            try {
+                await navigator.clipboard.writeText(`${t.shareText}\n${shareData.url}`);
+                alert("Invite link copied to clipboard!");
+            } catch (err) {
+                alert("Failed to copy link.");
+            }
         }
     };
 
@@ -682,9 +709,12 @@ export default function Friends() {
             </AnimatePresence>
 
             <div className="mt-4 text-center shrink-0">
-                <button className="flex items-center justify-center gap-2 mx-auto text-primary text-sm font-bold hover:underline">
+                <button
+                    onClick={handleShare}
+                    className="flex items-center justify-center gap-2 mx-auto text-primary text-sm font-bold hover:underline"
+                >
                     <Share2 size={16} />
-                    <span>Share Invite Link</span>
+                    <span>{t.shareInviteLink}</span>
                 </button>
             </div>
         </div >

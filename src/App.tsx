@@ -3,6 +3,8 @@ import { useStore } from './lib/store';
 
 // Placeholder Components (Detailed implementations coming next)
 import Login from './pages/Auth/Login';
+import ResetPassword from './pages/Auth/ResetPassword';
+import InstallPrompt from './components/pwa/InstallPrompt';
 import Onboarding from './pages/Onboarding/Onboarding';
 import Today from './pages/Home/Today';
 import Dashboard from './pages/Dashboard/Dashboard';
@@ -38,6 +40,9 @@ function Layout() {
         {/* If logged in but no DNA, go to Onboarding */}
         <Route path="/onboarding" element={<Onboarding />} />
 
+        {/* Reset Password Route */}
+        <Route path="/reset-password" element={<ResetPassword />} />
+
         {/* Main App Routes */}
         <Route path="/" element={user ? <MyPage /> : <Navigate to="/login" replace />} />
         <Route path="/today" element={<Today />} />
@@ -65,6 +70,9 @@ function Layout() {
         onClose={() => setIsSupportOpen(false)}
         initialView={supportView}
       />
+
+      {/* PWA Install Prompt */}
+      <InstallPrompt />
     </div>
   );
 }

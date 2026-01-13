@@ -28,6 +28,8 @@ export default function Login() {
 
     const [verifyCode, setVerifyCode] = useState('');
     const [showVerify, setShowVerify] = useState(false);
+    const [showForgotPassword, setShowForgotPassword] = useState(false);
+    const [showResetVerify, setShowResetVerify] = useState(false);
 
     // Reset forms when switching modes
     useEffect(() => {
@@ -39,6 +41,8 @@ export default function Login() {
         setLoginIdentifier('');
         setVerifyCode('');
         setShowVerify(false);
+        setShowForgotPassword(false);
+        setShowResetVerify(false);
 
         if (isSignUp) {
             setTimeout(() => emailRef.current?.focus(), 100);
@@ -56,14 +60,80 @@ export default function Login() {
                 password,
             });
 
-            if (error) throw error;
+            if (error) {
+                if (error.message.includes('Invalid login credentials')) {
+                    throw new Error(t.invalidCredentials);
+                }
+                throw error;
+            }
+
             if (data.user) {
                 await handleLoginSuccess(data.user);
             }
 
         } catch (err: any) {
             console.error(err);
-            alert(err.message || 'Login failed');
+            if (err.message === "Invalid login credentials") {
+                alert(t.invalidCredentials);
+            } else {
+                alert(err.message || 'Login failed');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetPassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!loginIdentifier.trim()) {
+            alert(t.enterEmailForReset);
+            return;
+        }
+        setLoading(true);
+
+        try {
+            // Using OTP (One Time Code) / Email OTP for password reset flow
+            const { error } = await supabase.auth.signInWithOtp({
+                email: loginIdentifier,
+                options: {
+                    shouldCreateUser: false, // Ensure we don't create new users
+                }
+            });
+
+            if (error) throw error;
+
+            // Switch to verification mode for reset
+            setShowResetVerify(true);
+            setVerifyCode('');
+
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || "Failed to send reset code.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerifyResetCode = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            // Verify the email OTP (Magic Link code)
+            const { error } = await supabase.auth.verifyOtp({
+                email: loginIdentifier,
+                token: verifyCode,
+                type: 'email'
+            });
+
+            if (error) throw error;
+
+            // If success, user is logged in. Redirect to Reset Password Page
+            navigate('/reset-password');
+
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || "Verification failed");
         } finally {
             setLoading(false);
         }
@@ -133,6 +203,7 @@ export default function Login() {
             // 3. Switch to Verify Mode
             alert("Signup successful! Verification code sent to your email.");
             setShowVerify(true);
+            setVerifyCode('');
 
         } catch (err: any) {
             console.error(err);
@@ -206,14 +277,29 @@ export default function Login() {
                 animate={{ opacity: 1, y: 0 }}
                 className="w-full max-w-sm"
             >
-                <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    {t.appTitle}
-                </h1>
-                <p className="text-slate-400 text-center mb-8">{t.appSubtitle}</p>
+                <div className="mb-8 text-center">
+                    <div className="flex justify-center mb-4">
+                        <img
+                            src="/reme_icon.png"
+                            alt="My Re Design Logo"
+                            className="w-24 h-24 rounded-[2.5rem] shadow-lg shadow-primary/50 object-cover"
+                        />
+                    </div>
+                    <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                        {t.appTitle}
+                    </h1>
+                    <p className="text-slate-400 text-center mb-8">{t.appSubtitle}</p>
+                </div>
 
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-2xl">
 
-                    <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+                    <form onSubmit={
+                        isSignUp
+                            ? (showVerify ? handleVerifySignUp : handleSignUp)
+                            : (showForgotPassword
+                                ? (showResetVerify ? handleVerifyResetCode : handleResetPassword)
+                                : handleLogin)
+                    } className="space-y-4">
 
                         {/* Validation Note */}
                         {isSignUp && !showVerify && (
@@ -224,143 +310,160 @@ export default function Login() {
                             </div>
                         )}
 
-                        {isSignUp ? (
-                            showVerify ? (
-                                // Verify Step UI
-                                <div className="space-y-4">
-                                    <div className="text-center mb-4">
-                                        <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-2 text-primary">
-                                            <Mail size={24} />
-                                        </div>
-                                        <h3 className="text-white font-bold text-lg">{t.verifyIdentity}</h3>
-                                        <p className="text-sm text-slate-400">Enter the code sent to {email}</p>
+                        {/* Verify Step UI (Shared for SignUp Verify and Reset Verify) */}
+                        {(showVerify || showResetVerify) ? (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                                <div className="text-center mb-4">
+                                    <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-2 text-primary">
+                                        <Mail size={24} />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.verifyCode}</label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder="123456"
-                                                value={verifyCode}
-                                                onChange={(e) => setVerifyCode(e.target.value)}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors text-center text-xl tracking-widest"
-                                                required
-                                            />
-                                        </div>
-                                    </div>
+                                    <h3 className="text-white font-bold text-lg">{t.verifyIdentity}</h3>
+                                    <p className="text-sm text-slate-400">Enter the code sent to {isSignUp ? email : loginIdentifier}</p>
                                 </div>
-                            ) : (
-                                // Sign Up Form UI
-                                <>
-                                    <div>
-                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.email}</label>
-                                        <div className="relative">
-                                            <input
-                                                ref={emailRef}
-                                                type="email"
-                                                placeholder="user@email.com"
-                                                value={email}
-                                                onChange={(e) => setEmail(e.target.value)}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
-                                                required
-                                            />
-                                            <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex gap-3">
-                                        <div className="flex-1">
-                                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.fullName} <span className="text-red-500">*</span></label>
-                                            <div className="relative">
-                                                <input
-                                                    type="text"
-                                                    placeholder={t.namePlaceholder}
-                                                    value={fullName}
-                                                    onChange={(e) => setFullName(e.target.value)}
-                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
-                                                    required
-                                                />
-                                                <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                            </div>
-                                        </div>
-                                        <div className="flex-[1.2]">
-                                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.phone} <span className="text-red-500">*</span></label>
-                                            <div className="relative">
-                                                <input
-                                                    type="tel"
-                                                    placeholder="010-1234-5678"
-                                                    value={phone}
-                                                    onChange={(e) => setPhone(e.target.value)}
-                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
-                                                    required
-                                                />
-                                                <Phone className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.nickname} <span className="text-[10px] text-slate-600 lowercase ml-1">(optional)</span></label>
-                                        <div className="relative">
-                                            <input
-                                                type="text"
-                                                placeholder={t.nickname}
-                                                value={nickname}
-                                                onChange={(e) => setNickname(e.target.value)}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
-                                            />
-                                            <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                        </div>
-                                    </div>
-                                    {/* Password Field */}
-                                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.password}</label>
-                                        <div className="relative">
-                                            <input
-                                                type="password"
-                                                placeholder="••••••••"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
-                                                required
-                                            />
-                                            <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
-                                        </div>
-                                    </motion.div>
-                                </>
-                            )
-                        ) : (
-                            /* Login Mode: Single Identifier (EMAIL ONLY) */
-                            // ... (Existing Login UI, reusing to ensure we don't break it)
-                            <div>
-                                <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.email}</label>
-                                <div className="relative">
-                                    <input
-                                        type="email"
-                                        placeholder="user@email.com"
-                                        value={loginIdentifier}
-                                        onChange={(e) => setLoginIdentifier(e.target.value)}
-                                        className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
-                                        required
-                                    />
-                                    <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
-                                </div>
-                                {/* Password Field (Login) */}
-                                <div className="mt-4">
-                                    <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.password}</label>
+                                <div>
+                                    <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.enterCode}</label>
                                     <div className="relative">
                                         <input
-                                            type="password"
-                                            placeholder="••••••••"
-                                            value={password}
-                                            onChange={(e) => setPassword(e.target.value)}
-                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
+                                            type="text"
+                                            placeholder="123456"
+                                            value={verifyCode}
+                                            onChange={(e) => setVerifyCode(e.target.value)}
+                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors text-center text-xl tracking-widest"
                                             required
                                         />
-                                        <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
                                     </div>
                                 </div>
                             </div>
+                        ) : (
+                            // Main Forms (Login, SignUp, Forgot Request)
+                            <>
+                                {showForgotPassword ? (
+                                    // Forgot Password Request UI
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                                        <div className="text-center mb-4">
+                                            <div className="w-12 h-12 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-2 text-accent">
+                                                <Lock size={24} />
+                                            </div>
+                                            <h3 className="text-white font-bold text-lg">{t.resetPassword}</h3>
+                                            <p className="text-sm text-slate-400">{t.enterEmailForReset}</p>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.email}</label>
+                                            <div className="relative">
+                                                <input
+                                                    type="email"
+                                                    placeholder="user@email.com"
+                                                    value={loginIdentifier}
+                                                    onChange={(e) => setLoginIdentifier(e.target.value)}
+                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                    required
+                                                />
+                                                <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    // Login / SignUp Inputs
+                                    <>
+                                        <div>
+                                            <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{isSignUp ? t.email : t.email}</label>
+                                            <div className="relative">
+                                                <input
+                                                    ref={emailRef}
+                                                    type={isSignUp ? "email" : "text"} // Allow text for Login ID?
+                                                    placeholder="user@email.com"
+                                                    value={isSignUp ? email : loginIdentifier}
+                                                    onChange={(e) => {
+                                                        if (isSignUp) setEmail(e.target.value);
+                                                        else setLoginIdentifier(e.target.value);
+                                                    }}
+                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                    required
+                                                />
+                                                <Mail className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                            </div>
+                                        </div>
+
+                                        {/* SignUp Extra Fields */}
+                                        {isSignUp && (
+                                            <>
+                                                <div className="flex gap-3">
+                                                    <div className="flex-1">
+                                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.fullName} <span className="text-red-500">*</span></label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="text"
+                                                                placeholder={t.namePlaceholder}
+                                                                value={fullName}
+                                                                onChange={(e) => setFullName(e.target.value)}
+                                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                                required
+                                                            />
+                                                            <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-[1.2]">
+                                                        <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.phone} <span className="text-red-500">*</span></label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="tel"
+                                                                placeholder="010-1234-5678"
+                                                                value={phone}
+                                                                onChange={(e) => setPhone(e.target.value)}
+                                                                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                                required
+                                                            />
+                                                            <Phone className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-xs text-slate-500 font-medium mb-1 ml-1 uppercase">{t.nickname} <span className="text-[10px] text-slate-600 lowercase ml-1">(optional)</span></label>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="text"
+                                                            placeholder={t.nickname}
+                                                            value={nickname}
+                                                            onChange={(e) => setNickname(e.target.value)}
+                                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
+                                                        />
+                                                        <User className="absolute left-3 top-3.5 text-slate-500" size={18} />
+                                                    </div>
+                                                </div>
+                                            </>
+                                        )}
+
+                                        {/* Password Field (Login & SignUp) */}
+                                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <label className="block text-xs text-slate-500 font-medium ml-1 uppercase">{t.password}</label>
+                                                {!isSignUp && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowForgotPassword(true)}
+                                                        className="text-xs text-accent hover:underline"
+                                                    >
+                                                        {t.forgotPassword}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <div className="relative">
+                                                <input
+                                                    type="password"
+                                                    placeholder="••••••••"
+                                                    value={password}
+                                                    onChange={(e) => setPassword(e.target.value)}
+                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
+                                                    required
+                                                />
+                                                <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
+                                            </div>
+                                        </motion.div>
+                                    </>
+                                )}
+                            </>
                         )}
 
 
@@ -372,7 +475,9 @@ export default function Login() {
                             {loading ? (t.generating || 'Processing...') : (
                                 isSignUp
                                     ? (showVerify ? t.verifyAuth : t.createAccount)
-                                    : t.login
+                                    : (showForgotPassword
+                                        ? (showResetVerify ? t.verifyCode : t.sendVerifyCode)
+                                        : t.login)
                             )}
                             {!loading && <ArrowRight size={18} />}
                         </button>
@@ -381,14 +486,19 @@ export default function Login() {
                     {/* Toggle Mode */}
                     <div className="mt-6 text-center">
                         <p className="text-sm text-slate-400">
-                            {isSignUp ? t.login : t.noAccount}
+                            {showForgotPassword
+                                ? <button onClick={() => setShowForgotPassword(false)} className="text-white hover:text-primary font-bold">{t.backToLogin}</button>
+                                : (isSignUp ? t.login : t.noAccount)
+                            }
                         </p>
-                        <button
-                            onClick={() => setIsSignUp(!isSignUp)}
-                            className="text-sm font-bold text-white hover:text-primary transition-colors mt-1"
-                        >
-                            {isSignUp ? t.login : t.createAccount}
-                        </button>
+                        {!showForgotPassword && (
+                            <button
+                                onClick={() => setIsSignUp(!isSignUp)}
+                                className="text-sm font-bold text-white hover:text-primary transition-colors mt-1"
+                            >
+                                {isSignUp ? t.login : t.createAccount}
+                            </button>
+                        )}
                     </div>
 
                     {/* Guest */}
