@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Mail, Phone, Lock, ArrowRight, User } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
+import SupportModal from '../../components/layout/SupportModal';
 
 export default function Login() {
     const { t } = useLanguage();
@@ -30,6 +31,16 @@ export default function Login() {
     const [showVerify, setShowVerify] = useState(false);
     const [showForgotPassword, setShowForgotPassword] = useState(false);
     const [showResetVerify, setShowResetVerify] = useState(false);
+
+    // Support Modal State
+    const [supportModalState, setSupportModalState] = useState<{
+        isOpen: boolean;
+        view: 'main' | 'terms' | 'privacy' | 'refund';
+    }>({ isOpen: false, view: 'main' });
+
+    const openSupportModal = (view: 'main' | 'terms' | 'privacy' | 'refund' = 'main') => {
+        setSupportModalState({ isOpen: true, view });
+    };
 
     // Reset forms when switching modes
     useEffect(() => {
@@ -275,8 +286,15 @@ export default function Login() {
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="w-full max-w-sm"
+                className="w-full max-w-sm relative"
             >
+                {/* 1. Admin Login Button (Hidden/Subtle) */}
+                <button
+                    onClick={() => navigate('/admin')}
+                    className="absolute -top-16 -left-4 text-white/5 hover:text-white/20 transition-colors p-2"
+                >
+                    <Lock size={16} />
+                </button>
                 <div className="mb-8 text-center">
                     <div className="flex justify-center mb-4">
                         <img
@@ -510,8 +528,26 @@ export default function Login() {
                             {t.guestLogin}
                         </button>
                     </div>
+                    {/* Footer Links */}
+                    <div className="mt-8 pt-4 border-t border-dashed border-white/5 text-center">
+                        <div className="flex justify-center gap-4 text-[10px] text-slate-500">
+                            <button onClick={() => openSupportModal('main')} className="hover:text-white/80 transition-colors">{t.inquiry || '문의하기'}</button>
+                            <span className="text-white/10">|</span>
+                            <button onClick={() => openSupportModal('terms')} className="hover:text-white/80 transition-colors">{t.terms || '이용약관'}</button>
+                            <span className="text-white/10">|</span>
+                            <button onClick={() => openSupportModal('privacy')} className="hover:text-white/80 transition-colors">{t.privacy || '개인정보처리방침'}</button>
+                            <span className="text-white/10">|</span>
+                            <button onClick={() => openSupportModal('refund')} className="hover:text-white/80 transition-colors">{t.refundPolicy || '환불정책'}</button>
+                        </div>
+                    </div>
                 </div>
             </motion.div>
+
+            <SupportModal
+                isOpen={supportModalState.isOpen}
+                onClose={() => setSupportModalState({ ...supportModalState, isOpen: false })}
+                initialView={supportModalState.view}
+            />
         </div>
     );
 }

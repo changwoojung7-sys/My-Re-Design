@@ -92,17 +92,17 @@ export default function SupportModal({ isOpen, onClose, initialView = 'main' }: 
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
                         <MessageCircle size={20} className="text-primary" />
                         Customer Center
-                    </h2>
-                    <div className="flex items-center gap-4">
                         <button
                             onClick={() => {
                                 navigate('/admin');
                                 onClose();
                             }}
-                            className="text-white opacity-5 hover:opacity-20 transition-opacity"
+                            className="text-white opacity-5 hover:opacity-20 transition-opacity ml-2"
                         >
                             <Lock size={16} />
                         </button>
+                    </h2>
+                    <div className="flex items-center gap-4">
                         <button onClick={onClose} className="text-slate-400 hover:text-white">
                             <X size={24} />
                         </button>

@@ -58,6 +58,20 @@ export default function Today() {
             const saved = localStorage.getItem(key);
             setRefreshCount(saved ? parseInt(saved) : 0);
 
+            // Check Ad Cooldown (1 Hour)
+            const adKey = `ad_unlocked_${user.id}_${selectedGoalId}_${selectedDate}`;
+            const adTimestamp = localStorage.getItem(adKey);
+            if (adTimestamp) {
+                const diff = Date.now() - parseInt(adTimestamp);
+                if (diff < 60 * 60 * 1000) { // 1 Hour
+                    setIsAdUnlocked(true);
+                } else {
+                    setIsAdUnlocked(false);
+                }
+            } else {
+                setIsAdUnlocked(false);
+            }
+
             fetchMissions();
         }
     }, [selectedDate, selectedGoalId]);
@@ -77,16 +91,40 @@ export default function Today() {
             return;
         }
 
-        // Order by seq desc to get the latest challenge first
+        // 1. Fetch Goals
         const { data: goals } = await supabase
             .from('user_goals')
             .select('*')
             .eq('user_id', user!.id)
             .order('seq', { ascending: false });
 
-        if (goals && goals.length > 0) {
-            setUserGoals(goals);
-            setSelectedGoalId(goals[0].id);
+        if (!goals || goals.length === 0) {
+            setLoading(false);
+            return;
+        }
+
+        // 2. Fetch Active Subscriptions to Prioritize
+        const { data: subs } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user!.id)
+            .eq('status', 'active')
+            .gte('end_date', new Date().toISOString());
+
+        // Sort Goals: Subscribed (Active) First, then by Seq
+        const sortedGoals = [...goals].sort((a, b) => {
+            const isASub = subs?.some(s => s.type === 'all' || (s.type === 'mission' && s.target_id === a.category));
+            const isBSub = subs?.some(s => s.type === 'all' || (s.type === 'mission' && s.target_id === b.category));
+
+            if (isASub && !isBSub) return -1;
+            if (!isASub && isBSub) return 1;
+            return b.seq - a.seq; // Fallback to original seq order
+        });
+
+        setUserGoals(sortedGoals);
+        // Default select the first one (which should be a subscribed one if exists)
+        if (sortedGoals.length > 0) {
+            setSelectedGoalId(sortedGoals[0].id);
         }
         setLoading(false);
     };
@@ -453,28 +491,56 @@ export default function Today() {
         }
     }, [selectedGoalId, isPaywallActive, hasActiveSubscription]);
 
-    const handlePaywallCancel = () => {
-        // Find a goal that is NOT in paywall (Day <= 4)
+    const handlePaywallCancel = async () => {
+        // Smart Fallback: Find any goal that is currently viewable
+        // Viewable = Active Subscription OR (Day < Limit)
+
+        // We need fresh subscription data or rely on what we have. 
+        setLoading(true);
+        const { data: subs } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user!.id)
+            .eq('status', 'active')
+            .gte('end_date', new Date().toISOString());
+
         const safeGoal = userGoals.find(g => {
+            // Check Subscription Coverage
+            const isSubscribed = subs?.some(s =>
+                s.type === 'all' ||
+                (s.type === 'mission' && s.target_id === g.category)
+            );
+            if (isSubscribed) return true;
+
+            // Check Free Trial
             const start = new Date(g.created_at);
             start.setHours(0, 0, 0, 0);
-            const current = new Date(); // roughly today
+            const current = new Date();
             const diffMs = current.getTime() - start.getTime();
             const day = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
+
             return day < paywallLimit;
         });
 
-        if (safeGoal) {
+        setLoading(false);
+
+        if (safeGoal && safeGoal.id !== selectedGoalId) {
             setSelectedGoalId(safeGoal.id);
+            setPaywallStep('none'); // Ensure paywall closes
         } else {
+            // If NO safe goal whatsoever, then we must go to dashboard
             window.location.href = '/dashboard';
         }
     };
 
     const handleAdReward = () => {
-        setIsAdUnlocked(true); // Unlock for this session
+        setIsAdUnlocked(true);
         setShowRewardAd(false);
         setPaywallStep('none');
+
+        // Save Cooldown (1 Hour)
+        const key = `ad_unlocked_${user!.id}_${selectedGoalId}_${selectedDate}`;
+        localStorage.setItem(key, Date.now().toString());
     };
 
     return (
@@ -485,6 +551,7 @@ export default function Today() {
                         currentDay={currentDayNum}
                         onWatchAd={() => setShowRewardAd(true)}
                         onSubscribe={() => setPaywallStep('payment')}
+                        onClose={handlePaywallCancel}
                     />
                 ) : (
                     <PaywallWarning

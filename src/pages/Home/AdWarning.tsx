@@ -4,10 +4,11 @@ import { Play, Sparkles } from 'lucide-react';
 interface AdWarningProps {
     onWatchAd: () => void;
     onSubscribe: () => void;
+    onClose: () => void;
     currentDay: number;
 }
 
-export default function AdWarning({ onWatchAd, onSubscribe, currentDay }: AdWarningProps) {
+export default function AdWarning({ onWatchAd, onSubscribe, onClose, currentDay }: AdWarningProps) {
     return (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center p-6 bg-black/80 backdrop-blur-sm">
             <motion.div
@@ -39,6 +40,14 @@ export default function AdWarning({ onWatchAd, onSubscribe, currentDay }: AdWarn
                     >
                         <Play size={18} className="fill-white" />
                         광고 보고 잠금 해제
+                    </button>
+
+                    {/* Close Button Added Here */}
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2 text-sm text-slate-500 hover:text-slate-300 transition-colors"
+                    >
+                        닫기
                     </button>
 
                     <div className="relative py-2">
