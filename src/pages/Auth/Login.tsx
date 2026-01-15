@@ -255,7 +255,7 @@ export default function Login() {
         if (isSignUp || showForgotPassword || !loginIdentifier.includes('@')) return;
 
         try {
-            const { data, error } = await supabase.rpc('check_user_reset_status', {
+            const { data } = await supabase.rpc('check_user_reset_status', {
                 email_input: loginIdentifier
             });
             if (data === true) {
