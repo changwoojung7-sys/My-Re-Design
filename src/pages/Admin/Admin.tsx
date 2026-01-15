@@ -27,6 +27,43 @@ export default function Admin() {
     const [userPayments, setUserPayments] = useState<any[]>([]);
     const [customTrialDays, setCustomTrialDays] = useState<number | null>(null);
 
+    // Password Reset State
+    const [showPasswordReset, setShowPasswordReset] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const handlePasswordReset = async () => {
+        if (!newPassword || !confirmPassword) return;
+        if (newPassword !== confirmPassword) {
+            alert('비밀번호가 일치하지 않습니다.');
+            return;
+        }
+        if (newPassword.length < 6) {
+            alert('비밀번호는 6자 이상이어야 합니다.');
+            return;
+        }
+        if (!selectedUser) return;
+
+        if (!confirm(`정말 ${selectedUser.nickname} 님의 비밀번호를 변경하시겠습니까?`)) return;
+
+        try {
+            const { error } = await supabase.rpc('admin_reset_user_password', {
+                target_user_id: selectedUser.id,
+                new_password: newPassword
+            });
+
+            if (error) throw error;
+
+            alert('비밀번호가 성공적으로 변경되었습니다.');
+            setShowPasswordReset(false);
+            setNewPassword('');
+            setConfirmPassword('');
+        } catch (err: any) {
+            console.error('Password Reset Error:', err);
+            alert('비밀번호 변경 실패: ' + err.message);
+        }
+    };
+
     useEffect(() => {
         if (isAuthenticated) {
             fetchGlobalSettings();
@@ -512,12 +549,32 @@ export default function Admin() {
                                                 </div>
                                             </div>
                                             {/* Action Button (Top Right for easy access) */}
-                                            <button
-                                                onClick={() => openUserDetail(user)}
-                                                className="shrink-0 bg-primary/10 text-primary border border-primary/20 rounded-lg p-2 hover:bg-primary/20 transition-colors"
-                                            >
-                                                <Settings size={16} />
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    onClick={async (e) => {
+                                                        e.stopPropagation();
+                                                        if (!confirm(`${user.nickname} 님의 비밀번호 초기화 모드를 활성화하시겠습니까?\n\n활성화되면 사용자가 로그인 시 새 비밀번호를 바로 설정할 수 있습니다.`)) return;
+
+                                                        const { error } = await supabase.rpc('admin_set_force_reset', {
+                                                            target_user_id: user.id,
+                                                            enable: true
+                                                        });
+
+                                                        if (error) alert('설정 실패: ' + error.message);
+                                                        else alert('초기화 모드가 활성화되었습니다. 사용자에게 로그인을 시도하여 비밀번호를 재설정하라고 안내해주세요.');
+                                                    }}
+                                                    className="shrink-0 bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 rounded-lg p-2 hover:bg-yellow-500/20 transition-colors"
+                                                    title="비밀번호 초기화 모드 설정"
+                                                >
+                                                    <Lock size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => openUserDetail(user)}
+                                                    className="shrink-0 bg-primary/10 text-primary border border-primary/20 rounded-lg p-2 hover:bg-primary/20 transition-colors"
+                                                >
+                                                    <Settings size={16} />
+                                                </button>
+                                            </div>
                                         </div>
 
                                         {/* Row 2: Sub Details + Date */}
@@ -600,6 +657,42 @@ export default function Admin() {
                                             <p className="text-[10px] text-slate-500 truncate">{selectedUser.email}</p>
                                             <p className="text-[10px] text-slate-600 font-mono mt-0.5 truncate max-w-[200px]">{selectedUser.id}</p>
                                         </div>
+                                    </div>
+
+                                    {/* Password Reset Section */}
+                                    <div className="mt-2 pt-2 border-t border-white/5">
+                                        <button
+                                            onClick={() => setShowPasswordReset(!showPasswordReset)}
+                                            className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
+                                        >
+                                            <Lock size={12} /> {showPasswordReset ? '비밀번호 재설정 닫기' : '비밀번호 재설정'}
+                                        </button>
+
+                                        {showPasswordReset && (
+                                            <div className="mt-2 space-y-2 bg-black/20 p-2 rounded-lg animate-in slide-in-from-top-2">
+                                                <input
+                                                    type="password"
+                                                    value={newPassword}
+                                                    onChange={e => setNewPassword(e.target.value)}
+                                                    placeholder="새 비밀번호"
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-xs text-white outline-none focus:border-accent placeholder:text-slate-600"
+                                                />
+                                                <input
+                                                    type="password"
+                                                    value={confirmPassword}
+                                                    onChange={e => setConfirmPassword(e.target.value)}
+                                                    placeholder="새 비밀번호 확인"
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg p-2 text-xs text-white outline-none focus:border-accent placeholder:text-slate-600"
+                                                />
+                                                <button
+                                                    onClick={handlePasswordReset}
+                                                    disabled={!newPassword || !confirmPassword}
+                                                    className="w-full bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-bold py-2 rounded-lg transition-colors border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                                                >
+                                                    비밀번호 변경하기
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2 text-center">

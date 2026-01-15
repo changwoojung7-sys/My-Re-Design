@@ -232,6 +232,7 @@ export default function History() {
                         const isEffectivelyCompleted = goal.is_completed || isExpired;
 
                         const displayTotal = isEffectivelyCompleted ? totalExpectedMissions : expectedMissionsToDate;
+                        const displayCurrentDay = isEffectivelyCompleted ? totalDays : currentDay;
 
                         // Completed Count
                         const completedCount = completedCounts[`${goal.category}-${goal.seq || 1}`] || 0;
@@ -253,7 +254,7 @@ export default function History() {
                                                 {seqLabel}
                                             </span>
                                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border border-white/10 px-1.5 py-0.5 rounded-full">
-                                                Day {currentDay}/{totalDays}
+                                                Day {displayCurrentDay}/{totalDays}
                                             </span>
                                             {selectedCategory === 'all' && goal.category && (
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider border border-white/10 px-1.5 py-0.5 rounded-full">

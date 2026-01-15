@@ -196,22 +196,18 @@ export default function Friends() {
         setFoundUser(null);
 
         try {
-            let query = supabase.from('profiles').select('*')
-                .neq('id', user!.id)
-                .neq('id', 'demo123'); // Exclude Demo User from results
+            // Use the secure RPC for search to handle RLS and auth.users lookup
+            const { data, error } = await supabase.rpc('search_user_by_email_or_phone', {
+                search_term: searchQuery.trim()
+            });
 
-            if (searchQuery.includes('@')) {
-                query = query.eq('email', searchQuery);
-            } else {
-                const cleanPhone = searchQuery.replace(/[^0-9]/g, '');
-                // Search in phone_number column OR match the phone-based email formats
-                query = query.or(`phone_number.eq.${cleanPhone},email.eq.${cleanPhone}@myredesign.com,email.eq.${cleanPhone}@phone.coreloop.com`);
-            }
+            if (error) throw error;
 
-            const { data } = await query.maybeSingle();
+            // RPC returns an array (setof table), so takes the first item if exists
+            const found = Array.isArray(data) ? data[0] : data;
 
-            if (data) {
-                setFoundUser(data);
+            if (found && found.id !== user?.id && found.id !== 'demo123') { // Safety check
+                setFoundUser(found);
             } else {
                 alert("User not found.");
             }
@@ -672,7 +668,7 @@ export default function Friends() {
                             </div>
 
                             {/* Input */}
-                            <div className="p-4 bg-slate-900 border-t border-white/5 shrink-0 mb-4">
+                            <div className="p-4 bg-slate-900 border-t border-white/5 shrink-0 mb-24">
                                 <div className="flex gap-2">
                                     <input
                                         type="text"

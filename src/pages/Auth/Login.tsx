@@ -246,6 +246,28 @@ export default function Login() {
         }
     };
 
+    const [isResetMode, setIsResetMode] = useState(false);
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    const checkResetStatus = async () => {
+        // Only check if we have a valid email and aren't in signup/forgot mode
+        if (isSignUp || showForgotPassword || !loginIdentifier.includes('@')) return;
+
+        try {
+            const { data, error } = await supabase.rpc('check_user_reset_status', {
+                email_input: loginIdentifier
+            });
+            if (data === true) {
+                setIsResetMode(true);
+            } else {
+                setIsResetMode(false);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const handleLoginSuccess = async (authUser: any) => {
         // Fetch Profile Data
         const { data: profile } = await supabase
@@ -279,6 +301,44 @@ export default function Login() {
             full_name: profile?.full_name,
         });
         navigate('/');
+    };
+
+    const handleResetAndLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+
+        if (newPassword !== confirmPassword) {
+            alert(t.passwordMismatch || "Passwords do not match");
+            setLoading(false);
+            return;
+        }
+
+        try {
+            // Call the complete reset RPC
+            const { error } = await supabase.rpc('complete_force_password_reset', {
+                email_input: loginIdentifier,
+                new_password: newPassword
+            });
+
+            if (error) throw error;
+
+            alert("비밀번호가 재설정되었습니다. 새 비밀번호로 로그인합니다.");
+
+            // Auto Login with new password
+            const { data, error: loginError } = await supabase.auth.signInWithPassword({
+                email: loginIdentifier,
+                password: newPassword,
+            });
+
+            if (loginError) throw loginError;
+            if (data.user) await handleLoginSuccess(data.user);
+
+        } catch (err: any) {
+            console.error(err);
+            alert(err.message || "Reset failed");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -394,8 +454,12 @@ export default function Login() {
                                                     value={isSignUp ? email : loginIdentifier}
                                                     onChange={(e) => {
                                                         if (isSignUp) setEmail(e.target.value);
-                                                        else setLoginIdentifier(e.target.value);
+                                                        else {
+                                                            setLoginIdentifier(e.target.value);
+                                                            if (isResetMode) setIsResetMode(false); // Reset mode if they change email
+                                                        }
                                                     }}
+                                                    onBlur={!isSignUp ? checkResetStatus : undefined}
                                                     className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors pl-10"
                                                     required
                                                 />
@@ -453,31 +517,62 @@ export default function Login() {
                                             </>
                                         )}
 
-                                        {/* Password Field (Login & SignUp) */}
+                                        {/* Password Field or Reset Fields */}
                                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}>
-                                            <div className="flex justify-between items-center mb-1">
-                                                <label className="block text-xs text-slate-500 font-medium ml-1 uppercase">{t.password}</label>
-                                                {!isSignUp && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setShowForgotPassword(true)}
-                                                        className="text-xs text-accent hover:underline"
-                                                    >
-                                                        {t.forgotPassword}
-                                                    </button>
-                                                )}
-                                            </div>
-                                            <div className="relative">
-                                                <input
-                                                    type="password"
-                                                    placeholder="••••••••"
-                                                    value={password}
-                                                    onChange={(e) => setPassword(e.target.value)}
-                                                    className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
-                                                    required
-                                                />
-                                                <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
-                                            </div>
+                                            {isResetMode ? (
+                                                <div className="space-y-4 bg-yellow-500/10 p-4 rounded-xl border border-yellow-500/20">
+                                                    <div className="text-center mb-2">
+                                                        <p className="text-sm text-yellow-500 font-bold">비밀번호 재설정 필요</p>
+                                                        <p className="text-xs text-slate-400">관리자 요청에 의해 비밀번호를 재설정합니다.</p>
+                                                    </div>
+                                                    <div>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="새 비밀번호"
+                                                            value={newPassword}
+                                                            onChange={(e) => setNewPassword(e.target.value)}
+                                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-accent transition-colors"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <input
+                                                            type="password"
+                                                            placeholder="새 비밀번호 확인"
+                                                            value={confirmPassword}
+                                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-accent transition-colors"
+                                                            required
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <label className="block text-xs text-slate-500 font-medium ml-1 uppercase">{t.password}</label>
+                                                        {!isSignUp && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowForgotPassword(true)}
+                                                                className="text-xs text-accent hover:underline"
+                                                            >
+                                                                {t.forgotPassword}
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <div className="relative">
+                                                        <input
+                                                            type="password"
+                                                            placeholder="••••••••"
+                                                            value={password}
+                                                            onChange={(e) => setPassword(e.target.value)}
+                                                            className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-slate-500 focus:outline-none focus:border-primary transition-colors"
+                                                            required
+                                                        />
+                                                        <Lock className="absolute right-4 top-3.5 text-slate-600" size={16} />
+                                                    </div>
+                                                </>
+                                            )}
                                         </motion.div>
                                     </>
                                 )}
@@ -488,14 +583,17 @@ export default function Login() {
                         <button
                             type="submit"
                             disabled={loading}
+                            onClick={isResetMode ? handleResetAndLogin : undefined}
                             className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3 rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-[0.98] flex items-center justify-center gap-2 mt-4"
                         >
                             {loading ? (t.generating || 'Processing...') : (
-                                isSignUp
-                                    ? (showVerify ? t.verifyAuth : t.createAccount)
-                                    : (showForgotPassword
-                                        ? (showResetVerify ? t.verifyCode : t.sendVerifyCode)
-                                        : t.login)
+                                isResetMode
+                                    ? "비밀번호 재설정 및 로그인"
+                                    : isSignUp
+                                        ? (showVerify ? t.verifyAuth : t.createAccount)
+                                        : (showForgotPassword
+                                            ? (showResetVerify ? t.verifyCode : t.sendVerifyCode)
+                                            : t.login)
                             )}
                             {!loading && <ArrowRight size={18} />}
                         </button>
@@ -541,13 +639,13 @@ export default function Login() {
                         </div>
                     </div>
                 </div>
-            </motion.div>
+            </motion.div >
 
             <SupportModal
                 isOpen={supportModalState.isOpen}
                 onClose={() => setSupportModalState({ ...supportModalState, isOpen: false })}
                 initialView={supportModalState.view}
             />
-        </div>
+        </div >
     );
 }
