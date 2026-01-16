@@ -194,8 +194,23 @@ export default function Admin() {
     };
 
     const openUserDetail = async (user: any) => {
-        setSelectedUser(user);
-        setCustomTrialDays(user.custom_free_trial_days);
+        // Fetch fresh data first to ensure sync
+        const { data: freshUser } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+        const { data: freshSubs } = await supabase.from('subscriptions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
+
+        // Calculate enriched fields
+        const enrichedUser = {
+            ...freshUser,
+            // Fallback to existing user data if fresh fetch fails (though unlikely)
+            nickname: freshUser?.nickname || user.nickname,
+            email: freshUser?.email || user.email,
+            subscriptions: freshSubs || [],
+            is_premium: freshSubs?.some((s: any) => s.type === 'all' && s.status === 'active'),
+            active_plan: freshSubs?.find((s: any) => s.status === 'active' && s.type !== 'all')?.target_id
+        };
+
+        setSelectedUser(enrichedUser);
+        setCustomTrialDays(enrichedUser.custom_free_trial_days);
 
         // Fetch user_goals (Plans/Missions)
         const { data: goals } = await supabase
@@ -237,119 +252,29 @@ export default function Admin() {
         return diffMonth > 0 ? `${diffMonth} Months` : '1 Month';
     };
 
-    const cancelPayment = async (id: string) => {
+    const cancelPayment = async (id: string, imp_uid?: string, merchant_uid?: string) => {
         if (!confirm('정말 이 결제를 취소하시겠습니까? 기록은 유지되지만 취소 상태로 변경됩니다.')) return;
 
-        // 1. Get Payment Info needed to find subscription
-        const { data: payment } = await supabase
-            .from('payments')
-            .select('coverage_start_date, coverage_end_date, plan_type, target_id')
-            .eq('id', id)
-            .single();
-
-        // 2. Cancel Payment
-        const { error } = await supabase.from('payments').update({
-            status: 'cancelled',
-            cancelled_at: new Date().toISOString()
-        }).eq('id', id);
-
-        if (error) {
-            alert('취소 실패: ' + error.message);
-        } else {
-            // 3. Cancel corresponding subscription (Robust Match)
-            if (payment?.coverage_start_date && payment?.coverage_end_date && selectedUser) {
-                // Parse Type from plan_type (e.g. "mission_3mo" -> "mission", "all_1mo" -> "all")
-                const typeStr = payment.plan_type || '';
-                const [type] = typeStr.split('_');
-                const targetId = (type === 'mission' && payment.target_id) ? payment.target_id : null;
-
-                // Step A: Try to find the specific subscription ID first
-                // We use a lenient search because timestamps might drift slightly or have different ISO formatting
-                const { data: subs } = await supabase
-                    .from('subscriptions')
-                    .select('id, start_date, end_date, target_id') // Added target_id to select
-                    .eq('user_id', selectedUser.id)
-                    .eq('type', type || 'all') // Default to 'all' if type missing, though risky
-                    .eq('status', 'active'); // Only cancel active ones
-
-                let targetSubId = null;
-
-                if (subs && subs.length > 0) {
-                    // Filter matches
-                    const expectedStart = new Date(payment.coverage_start_date).getTime();
-                    const expectedEnd = new Date(payment.coverage_end_date).getTime();
-
-                    const match = subs.find(s => {
-                        // Check if timestamps are within 5 seconds allowed drift
-                        const sStart = new Date(s.start_date).getTime();
-                        const sEnd = new Date(s.end_date).getTime();
-
-                        const startDiff = Math.abs(expectedStart - sStart);
-                        const endDiff = Math.abs(expectedEnd - sEnd);
-
-                        // Strict check on ID if provided, otherwise date match
-                        if (targetId && s.target_id !== targetId) return false;
-
-                        return startDiff < 5000 && endDiff < 5000;
-                    });
-
-                    if (match) targetSubId = match.id;
+        try {
+            // Call Edge Function for Secure Cancellation
+            const { data, error } = await supabase.functions.invoke('cancel-payment', {
+                body: {
+                    imp_uid: imp_uid,
+                    merchant_uid: merchant_uid,
+                    payment_id: id,
+                    reason: 'Admin cancelled payment via Dashboard'
                 }
+            });
 
-                if (targetSubId) {
-                    await supabase
-                        .from('subscriptions')
-                        .update({ status: 'cancelled' })
-                        .eq('id', targetSubId);
-                } else {
-                    console.warn("Could not find exact matching subscription to cancel by date.");
-                    // New Fallback: Pick the closest matching subscription by End Date, regardless of count
-                    if (subs && subs.length > 0) {
-                        const expectedEnd = new Date(payment.coverage_end_date).getTime();
-
-                        // Sort by closeness to coverage_end_date
-                        const sortedSubs = subs.sort((a, b) => {
-                            const diffA = Math.abs(new Date(a.end_date).getTime() - expectedEnd);
-                            const diffB = Math.abs(new Date(b.end_date).getTime() - expectedEnd);
-                            return diffA - diffB;
-                        });
-
-                        const bestMatch = sortedSubs[0];
-                        // Provide detailed confirmation
-                        if (confirm(`정확한 날짜 일치 항목을 찾지 못했으나, 가장 유사한 만료일(${new Date(bestMatch.end_date).toLocaleDateString()})을 가진 구독을 찾았습니다. 강제 취소하시겠습니까? (ID: ${bestMatch.id})`)) {
-                            await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', bestMatch.id);
-                            targetSubId = bestMatch.id; // Correctly track for profile update
-                        }
-                    } else {
-                        alert("연동된 활성 구독 정보를 찾을 수 없습니다. 이미 취소되었거나 만료되었을 수 있습니다.");
-                    }
-                }
-
-                // CRITICAL FIX: If we cancelled an 'ALL' plan, check if user still has any active 'all' data.
-                if ((type === 'all' || !type)) {
-                    // Check if ANY active 'all' subscription remains
-                    const { count } = await supabase
-                        .from('subscriptions')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('user_id', selectedUser.id)
-                        .eq('type', 'all')
-                        .eq('status', 'active');
-
-                    // If count is 0 (meaning we just deleted the last one, or there are none), downgrade profile
-                    // Note: 'count' might include the one we just cancelled if transaction isn't committed? 
-                    // Supabase operations are atomic but sequential here. We awaited update above.
-                    if (count === 0 || count === null) {
-                        await supabase.from('profiles').update({ subscription_tier: 'free' }).eq('id', selectedUser.id);
-                        // Update local state
-                        if (selectedUser) setSelectedUser({ ...selectedUser, subscription_tier: 'free' });
-                        // Also update list
-                        setUsers(prev => prev.map(u => u.id === selectedUser.id ? { ...u, is_premium: false } : u));
-                    }
-                }
-            }
+            if (error) throw error;
+            if (data?.error) throw new Error(data.error);
 
             alert('결제가 취소되었습니다. (구독 정보 및 회원 등급 업데이트 완료)');
-            if (selectedUser) openUserDetail(selectedUser);
+            await fetchUsers(); // Refresh main list
+            if (selectedUser) openUserDetail(selectedUser); // Refresh modal with fresh data
+        } catch (error: any) {
+            console.error('Cancellation error:', error);
+            alert('취소 실패: ' + error.message);
         }
     };
 
@@ -806,11 +731,18 @@ export default function Admin() {
                                                         {sub.status !== 'cancelled' && (
                                                             <button
                                                                 onClick={async () => {
-                                                                    if (confirm('이 구독 정보를 강제로 삭제(취소)하시겠습니까? (결제 내역과는 별도로 처리됩니다)')) {
-                                                                        const { error } = await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('id', sub.id);
-                                                                        if (error) alert('삭제 실패: ' + error.message);
-                                                                        else {
-                                                                            alert('구독 정보가 취소 처리되었습니다.');
+                                                                    if (confirm('이 구독 정보를 "영구적으로 삭제" 하시겠습니까? \n(DB에서 완전히 제거되며 복구할 수 없습니다)')) {
+                                                                        const { data, error } = await supabase.functions.invoke('cancel-payment', {
+                                                                            body: {
+                                                                                action: 'delete_subscription',
+                                                                                subscription_id: sub.id
+                                                                            }
+                                                                        });
+
+                                                                        if (error || data?.error) {
+                                                                            alert('삭제 실패: ' + (error?.message || data?.error));
+                                                                        } else {
+                                                                            alert('구독 정보가 영구 삭제되었습니다.');
                                                                             openUserDetail(selectedUser);
                                                                         }
                                                                     }
@@ -866,7 +798,7 @@ export default function Admin() {
                                                                 <div className="flex flex-col items-end gap-1">
                                                                     <span className="text-xs font-bold text-accent">${pay.amount}</span>
                                                                     <button
-                                                                        onClick={() => cancelPayment(pay.id)}
+                                                                        onClick={() => cancelPayment(pay.id, pay.imp_uid, pay.merchant_uid)}
                                                                         className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 hover:bg-red-500/30"
                                                                     >
                                                                         Cancel

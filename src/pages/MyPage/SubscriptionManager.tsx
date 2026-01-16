@@ -7,6 +7,12 @@ import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
 import SupportModal from '../../components/layout/SupportModal';
 
+declare global {
+    interface Window {
+        IMP: any;
+    }
+}
+
 interface SubscriptionManagerProps {
     onClose: () => void;
     initialCategory: GoalCategory;
@@ -29,9 +35,9 @@ const MISSION_PRICING: PricingTier[] = [
 
 const ALL_ACCESS_PRICING: PricingTier[] = [
     { months: 1, price: 4900, label: '1 Month' },
-    { months: 3, price: 12500, label: '3 Months' },
-    { months: 6, price: 22500, label: '6 Months' },
-    { months: 12, price: 39000, label: '12 Months' },
+    { months: 3, price: 12900, label: '3 Months' },
+    { months: 6, price: 19900, label: '6 Months' },
+    { months: 12, price: 29900, label: '12 Months' },
 ];
 
 const CATEGORIES: GoalCategory[] = ['health', 'growth', 'mindset', 'career', 'social', 'vitality'];
@@ -176,20 +182,36 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         });
     })();
 
+    // PortOne Setup
+    useEffect(() => {
+        const jquery = document.createElement("script");
+        jquery.src = "https://code.jquery.com/jquery-1.12.4.min.js";
+        const iamport = document.createElement("script");
+        iamport.src = "https://cdn.iamport.kr/js/iamport.payment-1.2.0.js";
+        document.head.appendChild(jquery);
+        document.head.appendChild(iamport);
+        return () => {
+            document.head.removeChild(jquery);
+            document.head.removeChild(iamport);
+        };
+    }, []);
+
     const handleSubscribe = async (tier: PricingTier) => {
         if (!user) return;
+        if (!window.IMP) {
+            alert("Payment module loading...");
+            return;
+        }
+
+        const { IMP } = window;
+        IMP.init('imp05646567'); // User's Identification Code
 
         // Calculate Dates
         let startDate = new Date();
         let isExtension = false;
 
-        // Logic change: Only chain extension if the user currently has access (isUnlockedNow).
-        // If they are locked out (but have a future scheduled plan), they obviously want access NOW.
-        // So we start a new subscription parallel to the future one to fill the gap.
         if (latestRelevantSub && isUnlockedNow) {
             startDate = new Date(latestRelevantSub.end_date);
-            // Add a small buffer (e.g. 1 second) to avoid overlaps if needed, or just start exact same time
-            // Usually start = end is fine for continuity
             isExtension = true;
         }
 
@@ -211,59 +233,80 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         if (!confirmed) return;
 
         setLoading(true);
-        try {
-            // 1. Record Payment
-            const { error: payError } = await supabase
-                .from('payments')
-                .insert({
-                    user_id: user.id,
-                    amount: tier.price,
-                    plan_type: `${activeTab}_${tier.months}mo`,
-                    duration_months: tier.months,
-                    target_id: activeTab === 'mission' ? selectedCategory : null,
-                    status: 'completed',
-                    coverage_start_date: startDate.toISOString(),
-                    coverage_end_date: endDate.toISOString()
-                });
 
-            if (payError) throw payError;
+        // Call PortOne Payment
+        IMP.request_pay({
+            pg: 'html5_inicis', // PG Provider
+            pay_method: 'card',
+            merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
+            name: `MyReDesign Premium - ${targetLabel} (${tier.label})`,
+            amount: tier.price,
+            buyer_email: user.email,
+            buyer_name: user.nickname,
+            buyer_tel: user.phone || '010-0000-0000',
+            m_redirect_url: window.location.href,
+        }, async (rsp: any) => {
+            if (rsp.success) {
+                try {
+                    // 1. Record Payment
+                    const { error: payError } = await supabase
+                        .from('payments')
+                        .insert({
+                            user_id: user.id,
+                            amount: tier.price,
+                            plan_type: `${activeTab}_${tier.months}mo`,
+                            duration_months: tier.months,
+                            target_id: activeTab === 'mission' ? selectedCategory : null,
+                            status: 'paid', // Changed to 'paid' to match Paywall logic commonly used with PG
+                            merchant_uid: rsp.merchant_uid,
+                            imp_uid: rsp.imp_uid,
+                            coverage_start_date: startDate.toISOString(),
+                            coverage_end_date: endDate.toISOString()
+                        });
 
-            // 2. Create Subscription
-            const { error: subError } = await supabase
-                .from('subscriptions')
-                .insert({
-                    user_id: user.id,
-                    type: activeTab,
-                    target_id: activeTab === 'mission' ? selectedCategory : null,
-                    start_date: startDate.toISOString(),
-                    end_date: endDate.toISOString(),
-                    status: 'active'
-                });
+                    if (payError) throw payError;
 
-            if (subError) throw subError;
+                    // 2. Create Subscription
+                    const { error: subError } = await supabase
+                        .from('subscriptions')
+                        .insert({
+                            user_id: user.id,
+                            type: activeTab,
+                            target_id: activeTab === 'mission' ? selectedCategory : null,
+                            start_date: startDate.toISOString(),
+                            end_date: endDate.toISOString(),
+                            status: 'active'
+                        });
 
-            alert(t.subscriptionSuccessful);
-            await fetchData();
+                    if (subError) throw subError;
 
-        } catch (error: any) {
-            console.error('Subscription error:', error);
-            alert(t.subscriptionFailed.replace('{error}', error.message || 'Unknown error'));
-        } finally {
-            setLoading(false);
-        }
+                    alert(t.subscriptionSuccessful);
+                    await fetchData();
+
+                } catch (error: any) {
+                    console.error('Subscription error:', error);
+                    alert(t.subscriptionFailed.replace('{error}', error.message || 'Unknown error'));
+                } finally {
+                    setLoading(false);
+                }
+            } else {
+                setLoading(false);
+                alert(`Payment Failed: ${rsp.error_msg}`);
+            }
+        });
     };
 
-    const handleCancel = async (paymentId: string, createdAt: string) => {
+    const handleCancel = async (paymentId: string, createdAt: string, imp_uid?: string, merchant_uid?: string) => {
         const createdDate = new Date(createdAt);
         const today = new Date();
 
-        // Check if created today (Compare Year, Month, Day)
-        const isToday = createdDate.getFullYear() === today.getFullYear() &&
-            createdDate.getMonth() === today.getMonth() &&
-            createdDate.getDate() === today.getDate();
+        // Check if created within allowed window (Today + Next Day)
+        // Logic: Difference in days should be <= 1
+        const diffTime = today.getTime() - createdDate.getTime();
+        const diffDays = diffTime / (1000 * 3600 * 24);
 
-        if (!isToday) {
-            alert(t.onlyTodayCancel);
+        if (diffDays > 2) { // safe margin, strictly > 1 day but allow up to 48h window practically
+            alert(t.onlyTodayCancel); // Message might need update to "Only cancelable within 24 hours" or similar, but keeping for now as permitted
             return;
         }
 
@@ -271,44 +314,18 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
         setLoading(true);
         try {
-            // 1. Get Payment Info
-            const { data: payment } = await supabase
-                .from('payments')
-                .select('coverage_start_date, coverage_end_date, plan_type, target_id')
-                .eq('id', paymentId)
-                .single();
-
-            // 2. Cancel Payment
-            const { error } = await supabase
-                .from('payments')
-                .update({
-                    status: 'cancelled',
-                    cancelled_at: new Date().toISOString()
-                })
-                .eq('id', paymentId);
+            // Call Edge Function for Secure Cancellation
+            const { data, error } = await supabase.functions.invoke('cancel-payment', {
+                body: {
+                    imp_uid: imp_uid, // Pass imp_uid if available
+                    merchant_uid: merchant_uid, // Pass merchant_uid if available
+                    payment_id: paymentId, // Optional, for logging/lookup
+                    reason: 'User requested cancellation via Subscription Manager'
+                }
+            });
 
             if (error) throw error;
-
-            // 3. Cancel Subscription (Robust Match)
-            if (payment?.coverage_start_date && payment?.coverage_end_date && user?.id) {
-                // Parse Type from plan_type (e.g. "mission_3mo" -> "mission", "all_1mo" -> "all")
-                const [type] = payment.plan_type.split('_');
-
-                let query = supabase
-                    .from('subscriptions')
-                    .update({ status: 'cancelled' })
-                    .eq('user_id', user.id)
-                    .eq('start_date', payment.coverage_start_date)
-                    .eq('end_date', payment.coverage_end_date)
-                    .eq('type', type);
-
-                // If mission type, also match target_id (category)
-                if (type === 'mission' && payment.target_id) {
-                    query = query.eq('target_id', payment.target_id);
-                }
-
-                await query;
-            }
+            if (data?.error) throw new Error(data.error);
 
             alert(t.cancelSuccess);
             await fetchData();
@@ -505,14 +522,21 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                                                         ) : (
                                                             <>
                                                                 <p className="text-xs font-bold text-primary">₩{Number(item.amount).toLocaleString()}</p>
-                                                                {(new Date().toDateString() === new Date(item.created_at).toDateString()) && (
-                                                                    <button
-                                                                        onClick={() => handleCancel(item.id, item.created_at)}
-                                                                        className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
-                                                                    >
-                                                                        {t.cancelPayment}
-                                                                    </button>
-                                                                )}
+                                                                {(() => {
+                                                                    const pDate = new Date(item.created_at);
+                                                                    const now = new Date();
+                                                                    const diff = (now.getTime() - pDate.getTime()) / (1000 * 3600 * 24);
+                                                                    const canCancel = diff <= 2.0;
+
+                                                                    return canCancel && (
+                                                                        <button
+                                                                            onClick={() => handleCancel(item.id, item.created_at, item.imp_uid, item.merchant_uid)}
+                                                                            className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                                                                        >
+                                                                            {t.cancelPayment}
+                                                                        </button>
+                                                                    );
+                                                                })()}
                                                             </>
                                                         )}
                                                     </div>
@@ -533,14 +557,17 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                                     {t.inquiry} (yujinit2005@gmail.com)
                                 </button>
 
-                                <div className="flex justify-center gap-3 text-[10px] text-slate-500 underline">
+                                <div className="flex justify-center gap-3 text-[10px] text-slate-500 underline mb-2">
+                                    <button onClick={() => openSupportModal('main')} className="hover:text-white transition-colors">{t.inquiry}</button>
                                     <button onClick={() => openSupportModal('terms')} className="hover:text-white transition-colors">{t.terms}</button>
                                     <button onClick={() => openSupportModal('privacy')} className="hover:text-white transition-colors">{t.privacy}</button>
                                     <button onClick={() => openSupportModal('refund')} className="hover:text-white transition-colors">{t.refundPolicy}</button>
                                 </div>
-                                <p className="text-[10px] text-slate-600 mt-2">
-                                    My Re Design | {t.representative}: Jung Changwoo | 010-6614-4561
-                                </p>
+                                <div className="text-[10px] text-slate-600 space-y-0.5">
+                                    <p>상호 : 유진IT | 대표자명 : 정창우</p>
+                                    <p>사업자등록번호 : 519-77-00622</p>
+                                    <p>My Re Design | 010-6614-4561</p>
+                                </div>
                             </div>
                         </div>
                     </div>

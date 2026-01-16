@@ -3,6 +3,8 @@ import { Lock } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
+import { useState } from 'react';
+import SupportModal from '../../components/layout/SupportModal';
 
 // PortOne Type Definition (Minimal)
 declare global {
@@ -20,11 +22,20 @@ export default function Paywall({ onClose }: PaywallProps) {
     const { t } = useLanguage();
     const { user } = useStore();
 
+    const [supportModalState, setSupportModalState] = useState<{ isOpen: boolean, view: 'main' | 'terms' | 'privacy' | 'refund' }>({
+        isOpen: false,
+        view: 'main'
+    });
+
+    const openSupportModal = (view: 'main' | 'terms' | 'privacy' | 'refund') => {
+        setSupportModalState({ isOpen: true, view });
+    };
+
     const plans = [
-        { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 8900, save: null },
-        { id: '3m', name: t.plan3Months, price: t.price3Months, amount: 19900, save: '25%' },
-        { id: '6m', name: t.plan6Months, price: t.price6Months, amount: 39900, save: '25%' },
-        { id: '12m', name: t.plan12Months, price: t.price12Months, amount: 59900, save: '44%', best: true },
+        { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 4900, save: null },
+        { id: '3m', name: t.plan3Months, price: t.price3Months, amount: 12900, save: '25%' },
+        { id: '6m', name: t.plan6Months, price: t.price6Months, amount: 19900, save: '25%' },
+        { id: '12m', name: t.plan12Months, price: t.price12Months, amount: 29900, save: '44%', best: true },
     ];
 
     const handleSubscribe = (plan: typeof plans[0]) => {
@@ -32,57 +43,66 @@ export default function Paywall({ onClose }: PaywallProps) {
         const { IMP } = window;
 
         // Initialize PortOne (User Code)
-        // IMPORTANT: Replace 'imp00000000' with your actual Merchant ID from PortOne Dashboard
-        IMP.init('imp00000000');
+        IMP.init('imp05646567'); // User's Identification Code
 
         IMP.request_pay({
-            pg: 'html5_inicis', // PG Provider (e.g., kcp, toss, html5_inicis)
-            pay_method: 'card',
+            pg: 'html5_inicis', // PG Provider
+            pay_method: 'card', // Payment Method
             merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
-            name: `CoreLoop Premium - ${plan.name}`,
+            name: `MyReDesign Premium - ${plan.name}`,
             amount: plan.amount,
             buyer_email: user?.email,
             buyer_name: user?.nickname,
-            buyer_tel: '010-0000-0000', // Optional, can fetch from user profile if available
+            buyer_tel: user?.phone || '010-0000-0000', // Use user's phone if available
+            m_redirect_url: window.location.href, // Redirect URL for mobile
         }, async (rsp: any) => {
             if (rsp.success) {
                 // Payment Success Logic
                 try {
-                    // 1. Log to payment_history
-                    const { error: historyError } = await supabase.from('payment_history').insert({
+                    // Calculate Dates
+                    const monthsToAdd = parseInt(plan.id.replace('m', ''));
+                    const startDate = new Date();
+                    const endDate = new Date(startDate);
+                    endDate.setMonth(endDate.getMonth() + monthsToAdd);
+
+                    // 1. Record Payment (Unified 'payments' table)
+                    const { error: payError } = await supabase.from('payments').insert({
                         user_id: user?.id,
+                        amount: plan.amount,
+                        plan_type: `all_${monthsToAdd}mo`,
+                        duration_months: monthsToAdd,
+                        target_id: null, // Paywall is typically All Access
+                        status: 'paid',
                         merchant_uid: rsp.merchant_uid,
                         imp_uid: rsp.imp_uid,
-                        plan_id: plan.id,
-                        amount: rsp.paid_amount,
-                        status: 'paid',
-                        pay_method: rsp.pay_method
+                        coverage_start_date: startDate.toISOString(),
+                        coverage_end_date: endDate.toISOString()
                     });
-                    if (historyError) throw historyError;
 
-                    // 2. Update Subscription Date
-                    // Calculate new end date
-                    let monthsToAdd = 1;
-                    if (plan.id === '3m') monthsToAdd = 3;
-                    if (plan.id === '6m') monthsToAdd = 6;
-                    if (plan.id === '12m') monthsToAdd = 12;
+                    if (payError) throw payError;
 
-                    // If already valid, extend from current end date. Else from now.
-                    const currentEnd = user?.subscription_end_date ? new Date(user.subscription_end_date) : new Date();
-                    const baseDate = currentEnd > new Date() ? currentEnd : new Date();
-                    baseDate.setMonth(baseDate.getMonth() + monthsToAdd);
+                    // 2. Create Subscription
+                    const { error: subError } = await supabase.from('subscriptions').insert({
+                        user_id: user?.id,
+                        type: 'all',
+                        target_id: null,
+                        start_date: startDate.toISOString(),
+                        end_date: endDate.toISOString(),
+                        status: 'active'
+                    });
 
-                    const newEndDate = baseDate.toISOString();
+                    if (subError) throw subError;
 
+                    // 3. Update Profile (Optional - mainly to ensure 'premium' tier flag if column exists)
+                    // Note: 'subscription_end_date' column might be missing in some schemas, so simplified.
                     const { error: profileError } = await supabase.from('profiles').update({
-                        subscription_tier: 'premium',
-                        subscription_end_date: newEndDate
+                        subscription_tier: 'premium'
                     }).eq('id', user?.id);
 
                     if (profileError) throw profileError;
 
-                    alert('Payment Successful! Premium activated.');
-                    window.location.reload(); // Reload to refresh state
+                    alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
+                    window.location.reload();
                 } catch (err: any) {
                     console.error('Payment DB Error:', err);
                     alert(`Payment processed but failed to save: ${err.message}`);
@@ -142,9 +162,28 @@ export default function Paywall({ onClose }: PaywallProps) {
                     {t.maybeLater}
                 </button>
 
-                <p className="text-[10px] text-center text-slate-500 mb-4">
-                    {t.restorePurchase} • {t.terms} • {t.privacy}
-                </p>
+                {/* New Detailed Footer */}
+                <div className="mt-0 text-center bg-black/20 p-4 rounded-2xl border border-white/5">
+                    <div className="flex justify-center gap-3 text-[10px] text-slate-500 underline mb-2">
+                        <button onClick={() => openSupportModal('main')} className="hover:text-white transition-colors">{t.inquiry}</button>
+                        <button onClick={() => openSupportModal('terms')} className="hover:text-white transition-colors">{t.terms}</button>
+                        <button onClick={() => openSupportModal('privacy')} className="hover:text-white transition-colors">{t.privacy}</button>
+                        <button onClick={() => openSupportModal('refund')} className="hover:text-white transition-colors">{t.refundPolicy}</button>
+                    </div>
+
+                    <div className="text-[10px] text-slate-600 space-y-0.5">
+                        <p>상호 : 유진IT | 대표자명 : 정창우</p>
+                        <p>사업자등록번호 : 519-77-00622</p>
+                        <p>My Re Design | 010-6614-4561</p>
+                    </div>
+                </div>
+
+                {/* Support Modal Overlay */}
+                <SupportModal
+                    isOpen={supportModalState.isOpen}
+                    onClose={() => setSupportModalState({ ...supportModalState, isOpen: false })}
+                    initialView={supportModalState.view}
+                />
 
             </motion.div>
         </div>

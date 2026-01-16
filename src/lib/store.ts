@@ -18,6 +18,7 @@ interface User {
     subscription_end_date?: string;
     custom_free_trial_days?: number;
     full_name?: string;
+    phone?: string;
     // Profile Image
     profile_image_url?: string;
     // Keeping legacy for compatibility if needed, but prefer top-level
