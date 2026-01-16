@@ -358,15 +358,22 @@ export default function Login() {
                 <div className="mb-8 text-center">
                     <div className="flex justify-center mb-4">
                         <img
-                            src="/reme_icon.png"
+                            src="/reme_logo.png"
                             alt="My Re Design Logo"
-                            className="w-24 h-24 rounded-[2.5rem] shadow-lg shadow-primary/50 object-cover"
+                            className="w-24 h-24 rounded-full shadow-lg shadow-primary/50 object-cover"
                         />
                     </div>
-                    <h1 className="text-4xl font-bold text-center mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                    <h1 className="text-4xl font-bold text-center mb-4 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                         {t.appTitle}
                     </h1>
-                    <p className="text-slate-400 text-center mb-8">{t.appSubtitle}</p>
+                    <div className="space-y-1 mb-8">
+                        <p className="text-white font-bold text-sm">
+                            나를 기록하는 성장 브이로그 & 목표 챌린지
+                        </p>
+                        <p className="text-slate-400 text-xs">
+                            사진, 영상, 음성 등 다양한 방식으로 기록하고 친구들과 공유하세요.
+                        </p>
+                    </div>
                 </div>
 
                 <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-3xl shadow-2xl">
