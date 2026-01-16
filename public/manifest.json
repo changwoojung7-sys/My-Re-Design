@@ -3,8 +3,8 @@
     "short_name": "My Re Design",
     "start_url": "/",
     "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#000000",
+    "background_color": "#0f172a",
+    "theme_color": "#0f172a",
     "icons": [
         {
             "src": "/reme_icon.png",
