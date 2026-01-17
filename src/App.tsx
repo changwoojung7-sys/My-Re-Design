@@ -80,6 +80,8 @@ function Layout() {
   );
 }
 
+import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
+
 function App() {
   // Version Check & Auto Logout Logic
   useEffect(() => {
@@ -107,9 +109,11 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-0 m-0 overflow-hidden relative">
-        <Layout />
-      </div>
+      <KakaoRedirectHandler>
+        <div className="min-h-screen bg-background text-foreground flex flex-col items-center justify-center p-0 m-0 overflow-hidden relative">
+          <Layout />
+        </div>
+      </KakaoRedirectHandler>
     </Router>
   );
 }

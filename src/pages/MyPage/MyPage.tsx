@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell, Globe } from 'lucide-react';
+import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell, Globe, HelpCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import SubscriptionManager from './SubscriptionManager';
+import UserGuide from '../../components/common/UserGuide';
 
 export type GoalCategory = 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
 
@@ -37,6 +38,14 @@ export default function MyPage() {
     const navigate = useNavigate();
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [showGuide, setShowGuide] = useState(false);
+
+    useEffect(() => {
+        const hasSeen = localStorage.getItem('has_seen_guide');
+        if (!hasSeen) {
+            setShowGuide(true);
+        }
+    }, []);
 
     // Settings Modal State
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -735,7 +744,15 @@ export default function MyPage() {
                         </h1>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+
+                        {/* Help / Guide Button */}
+                        <button
+                            onClick={() => setShowGuide(true)}
+                            className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
+                        >
+                            <HelpCircle size={18} className="text-yellow-400" />
+                        </button>
 
                         {/* Notification Bell */}
                         <button
@@ -769,6 +786,11 @@ export default function MyPage() {
                     <p className="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">{t.sharePrompt}</p>
                 </div>
             </div>
+
+            {/* User Guide Overlay */}
+            <AnimatePresence>
+                {showGuide && <UserGuide onClose={() => setShowGuide(false)} />}
+            </AnimatePresence>
 
             {/* Notification Bell */}
             <div className="absolute top-10 right-20 mr-12 sm:mr-0 z-10">
