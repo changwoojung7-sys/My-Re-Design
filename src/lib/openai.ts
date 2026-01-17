@@ -41,7 +41,7 @@ export async function generateMissions(userProfile: any, language: string = 'en'
     ).join('\n\n');
 
     const prompt = `
-    Context: User is ${userProfile.age || 25} years old ${userProfile.gender || 'adult'}.
+    Context: User is ${userProfile.age || 25} years old ${userProfile.gender || 'adult'}. ${userProfile.height ? `Height: ${userProfile.height}cm,` : ''} ${userProfile.weight ? `Weight: ${userProfile.weight}kg.` : ''}
     Language: ${language === 'ko' ? 'Korean' : 'English'}
     
     Active Goals:
@@ -49,31 +49,57 @@ export async function generateMissions(userProfile: any, language: string = 'en'
 
     Task:
     For EACH active goal category listed above, create exactly 3 simple daily missions.
-    - The missions must be relevant to the specific goal details.
-    - Doable in < 15 mins.
+    - The PRIMARY GOAL is to let the user feel a "sense of achievement" and "fun".
+    - MUST be doable in < 3 mins (Very quick & easy).
     - Output the content in ${language === 'ko' ? 'Korean' : 'English'}.
 
     EXCLUSION RULES (IMPORTANT):
     - Do NOT generate missions that are identical or very similar to the following recent missions:
     ${excludedMissions.length > 0 ? excludedMissions.map(m => `- ${m}`).join('\n') : "(No exclusions)"}
     - Note: This exclusion applies strictly to categories: Vitality, Social, Mindset.
-    - For Health, Growth, Career categories, you MAY repeat tasks if they are essential (e.g. "Do 10 squats"), but try to vary slightly if possible.
+    - For Health, Growth, Career categories, you MAY repeat tasks if they are essential, but try to vary slightly.
     
     Category Specific Guidelines:
+    
+    [Special Rule for: vitality, social, mindset]
+    - ALL 3 missions must be relevant to the category/goal.
+    - Structure the 3 missions as follows:
+      1. Fun/Enjoyable Mission (Lighthearted, pleasant, RELEVANT to the goal)
+      2. Fun/Enjoyable Mission (Lighthearted, pleasant, RELEVANT to the goal)
+      3. Core Task (Directly addresses the goal, strictly < 3 mins)
+    
     1. health: 
-       - CRITICAL: Check 'Details: current_status' if provided. Tailor missions to this condition (e.g. if 'knee injury', avoid jumping; if 'beginner', keep it light).
-       - Focus on physical vitality, diet, sleep, or small exercises relevant to their status (e.g. squats, water, stretching). Repeats allowed.
-    2. growth: Focus on learning, reading, or practicing a skill (e.g. read 1 page, practice 10 mins). Repeats allowed.
-    3. mindset: Focus on mental health, gratitude, or affirmation. AVOID REPEATS from exclusion list.
-    4. career: Focus on work efficiency, planning, or financial check. Repeats allowed.
-    5. social: Focus on connection and relationships. AVOID REPEATS from exclusion list.
-    6. vitality: Focus on hobbies, recharging, or cleaning. AVOID REPEATS from exclusion list.
+       - STRICTLY analyze 'Goal Details', 'Current Status', and 'Final Goal'.
+       - Use User's Height/Weight if provided to tailor intensity.
+       - Cover diverse topics: Diet, Exercise, Recovery, Physical Health.
+       - TIME LIMIT EXCEPTION: Generally < 3 mins. BUT if goal involves Running/Cardio/Endurance, allow up to 15 mins.
+       - If user specified a target Distance (km) or Duration, RESPECT that value strictly (e.g. "Run 3km" if specified).
+    2. growth: 
+       - STRICTLY analyze 'Final Goal', 'Current Level', and 'Target Level'.
+       - Tailor missions to bridge the gap between Current & Target level.
+       - Focus on actionable micro-learning relevant to the specific goal (e.g. if goal is 'English', then 'memorize 1 word').
+    3. mindset: 
+       - Mix: 1 Fun (e.g. hum a song, smile in mirror) + 2 Core (e.g. praise yourself, write 1 brave sentence).
+       - Concept: Healing, Comfort, and building Inner Strength.
+       - Core missions must offer comfort, encouragement, or courage.
+    4. career: 
+       - STRICTLY analyze 'Final Goal' and 'Key Results' (KPIs).
+       - Create missions that contribute to the specific Career Goal.
+       - Focus on micro-efficiency, planning, or skill check relevant to the goal (e.g. goal is 'sales', then 'list 1 prospect').
+    5. social: 
+       - Mix: 2 Fun (e.g. send a funny emoji, send a heart) + 1 Core (e.g. short heartwarming text, "I appreciate you").
+       - Core mission should be short but Touching/Impactful.
+       - Focus on light connection without pressure.
+    6. vitality: 
+       - Mix: 2 Fun (e.g. play favorite song, dance 1 min) + 1 Core (e.g. high-five yourself in mirror, 1 min hobby focus).
+       - Focus on recharging energy & giving POSITIVE FORCE to oneself.
+       - Encourage self-care and personal hobbies.
 
     Output Format (JSON Array):
     [
-      { "category": "health", "content": "Squat 10 times", "verification_type": "image" },
-      { "category": "mindset", "content": "Write 3 things grateful for", "verification_type": "text" },
-      { "category": "social", "content": "Send a text to a friend", "verification_type": "text" },
+      { "category": "health", "content": "Drink 1 cup of water", "verification_type": "image" },
+      { "category": "mindset", "content": "Smile at yourself in mirror", "verification_type": "camera" },
+      { "category": "social", "content": "Send a heart emoji to friend", "verification_type": "text" },
       ...
     ]
     `;
