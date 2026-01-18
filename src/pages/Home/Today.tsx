@@ -227,8 +227,23 @@ export default function Today() {
         setDraftMissions(mapped);
     };
 
+    const [pendingRefresh, setPendingRefresh] = useState(false);
+
     const handleRefresh = async () => {
         if (refreshCount >= 3) return;
+
+        // Forced Ad Logic for Refresh (Ignore Free Trial)
+        // If not premium/subscribed, MUST watch ad to refresh
+        if (user?.subscription_tier !== 'premium' && !hasActiveSubscription) {
+            setPendingRefresh(true);
+            setShowRewardAd(true);
+            return;
+        }
+
+        executeRefresh();
+    };
+
+    const executeRefresh = async () => {
         setLoading(true);
         await generateDraftPlan();
 
@@ -375,7 +390,6 @@ export default function Today() {
     const isPastEmpty = missions.length === 0 && draftMissions.length === 0 && selectedDate < formatLocalYMD(new Date());
     const activeList = isPreview ? draftMissions : missions;
 
-    // --- Monetization Check ---
     // --- Monetization Check ---
     const currentDayNum = getSelectedDayNum();
     const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
@@ -538,9 +552,15 @@ export default function Today() {
         setShowRewardAd(false);
         setPaywallStep('none');
 
-        // Save Cooldown (1 Hour)
+        // Save Cooldown (1 Hour) - session unlock
         const key = `ad_unlocked_${user!.id}_${selectedGoalId}_${selectedDate}`;
         localStorage.setItem(key, Date.now().toString());
+
+        // EXECUTE PENDING ACTION
+        if (pendingRefresh) {
+            setPendingRefresh(false);
+            executeRefresh();
+        }
     };
 
     return (
