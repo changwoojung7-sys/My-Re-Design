@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Volume2, VolumeX, Award } from 'lucide-react';
-import GoogleAd from './GoogleAd';
+
 import { showNativeRewardedAd, ADMOB_UNITS } from '../../lib/admob';
 
 interface RewardAdProps {
