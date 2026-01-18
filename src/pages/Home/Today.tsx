@@ -79,7 +79,10 @@ export default function Today() {
     const initData = async () => {
         setLoading(true);
 
-        if (user?.id === 'demo123') {
+        // Allow specific reviewer account to see demo data for AdSense/AppStore review
+        const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
+
+        if (isDemoOrReviewer) {
             // Mock Goals for Demo User
             const mockGoals = [
                 { id: 'demo-health', user_id: 'demo123', category: 'health', seq: 1, target_text: 'Healthy Lifestyle', created_at: new Date().toISOString() },
@@ -136,7 +139,10 @@ export default function Today() {
         setVerifyingId(null); // Clear any active verification
 
         // Demo User Mock Missions
-        if (user?.id === 'demo123') {
+        // Allow specific reviewer account to see demo data for AdSense/AppStore review
+        const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
+
+        if (isDemoOrReviewer) {
             const today = formatLocalYMD(new Date());
             if (selectedDate === today && selectedGoal?.category === 'health') {
                 const mockMissions = [

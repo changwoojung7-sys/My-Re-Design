@@ -66,6 +66,21 @@ export default function Login() {
 
         try {
             // Strict Email Login
+            // SPECIAL: Reviewer Bypass (No verification needed for this specific email)
+            if (loginIdentifier === 'reviewer@coreloop.com') {
+                // Mock Success for Reviewer
+                // We mock the user object structure expected by handleLoginSuccess
+                const mockReviewerUser = {
+                    id: 'reviewer-id-global',
+                    email: 'reviewer@coreloop.com',
+                    phone: '',
+                    // We don't have metadata here, but handleLoginSuccess handles missing fields
+                };
+                await handleLoginSuccess(mockReviewerUser);
+                setLoading(false);
+                return;
+            }
+
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: loginIdentifier,
                 password,
@@ -456,6 +471,7 @@ export default function Login() {
                                             <div className="relative">
                                                 <input
                                                     ref={emailRef}
+                                                    name="email"
                                                     type={isSignUp ? "email" : "text"} // Allow text for Login ID?
                                                     placeholder="user@email.com"
                                                     value={isSignUp ? email : loginIdentifier}
@@ -569,6 +585,7 @@ export default function Login() {
                                                     </div>
                                                     <div className="relative">
                                                         <input
+                                                            name="password"
                                                             type="password"
                                                             placeholder="••••••••"
                                                             value={password}

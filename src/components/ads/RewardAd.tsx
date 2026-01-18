@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { X, Volume2, VolumeX, Award } from 'lucide-react';
 import GoogleAd from './GoogleAd';
+import { showNativeRewardedAd, ADMOB_UNITS } from '../../lib/admob';
 
 interface RewardAdProps {
     onReward: () => void;
@@ -10,76 +11,63 @@ interface RewardAdProps {
 }
 
 export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps) {
-    const [timeLeft, setTimeLeft] = useState(10); // 10 Seconds Ad
+    const [timeLeft, setTimeLeft] = useState(5); // 5 Seconds Ad for Test
     const [canClose, setCanClose] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
     const [isCompleted, setIsCompleted] = useState(false);
+    const [isNativeMode, setIsNativeMode] = useState(false);
 
     useEffect(() => {
+        // Try to trigger Native Ad first
+        // We use the TEST ID by default for safety during dev, 
+        // but if adSlotId is provided (from props), we can decide to use that or the test one.
+        // For this specific request, we want to TEST the specific ID provided.
+        const useTestId = ADMOB_UNITS.REWARDED_TEST;
+
+        // Check if we are in Native App Container
+        if (window.Android) {
+            setIsNativeMode(true);
+            const success = showNativeRewardedAd(useTestId);
+            if (success) {
+                // If Native Ad launched, we close this Web Modal immediately 
+                // because the Native Ad covers the screen.
+                // However, we need a way to know if user completed it.
+                // Usually, the Native App calls a Javascript function back (e.g. onUserEarnedReward).
+                // For now, we'll keep this open or rely on the mock if bridge fails.
+                console.log("Native Ad Triggered");
+            }
+        }
+    }, [adSlotId]);
+
+    // Timer Logic for Web Mock
+    useEffect(() => {
+        if (isNativeMode) return; // Don't run timer if native ad is handling it
+
         if (timeLeft > 0) {
             const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
             return () => clearTimeout(timer);
         } else {
             setCanClose(true);
             setIsCompleted(true);
-            // If it's a real ad, we might want to wait for user to close manually?
-            // For now, auto-reward logic remains.
-            if (!adSlotId) onReward();
+            // Auto-reward logic for web mock
+            if (!adSlotId) {
+                // Wait a bit before rewarding? No, instant is fine for mock.
+            }
         }
-    }, [timeLeft]);
+    }, [timeLeft, isNativeMode, adSlotId]);
 
-    // REAL AD MODE
-    if (adSlotId) {
-        return (
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[10000] bg-black/90 flex flex-col items-center justify-center p-4"
-            >
-                <div className="w-full max-w-lg bg-white rounded-xl overflow-hidden relative">
-                    <div className="bg-slate-100 p-2 flex justify-between items-center border-b">
-                        <span className="text-xs font-bold text-slate-500">Sponsored</span>
-                        {canClose ? (
-                            <button onClick={() => { onReward(); onClose(); }} className="text-black font-bold text-xs bg-slate-200 px-3 py-1 rounded-full">
-                                Close X
-                            </button>
-                        ) : (
-                            <span className="text-xs text-slate-400">Reward in {timeLeft}s</span>
-                        )}
-                    </div>
+    // If Native Mode is active and successfully triggered, we might want to just render nothing
+    // or a "Watcher" that listens for the callback.
+    // For simplicity in this step, we assume 'window.Android' means we rely on native UI.
+    // But since we can't test native here, we focus on the Web Mock part mostly.
 
-                    <div className="min-h-[300px] bg-slate-50 relative flex items-center justify-center overflow-hidden">
-                        {/* Placeholder Content (Visible if Ad is empty/loading) */}
-                        <div className="absolute inset-0 flex flex-col items-center justify-center opacity-50 pointer-events-none">
-                            <motion.div
-                                animate={{ scale: [1, 1.1, 1], opacity: [0.5, 1, 0.5] }}
-                                transition={{ repeat: Infinity, duration: 2 }}
-                                className="w-16 h-16 bg-slate-200 rounded-full flex items-center justify-center mb-4"
-                            >
-                                <Award className="text-slate-400" size={32} />
-                            </motion.div>
-                            <p className="text-slate-400 font-bold text-sm">Ad Loading...</p>
-                            <p className="text-slate-300 text-xs mt-1">Waiting for ad inventory</p>
-                        </div>
+    // REAL AD MODE (AdSense - Optional Legacy support)
+    // CoreLoop Note: We are prioritizing AdMob (Native) or Mock (Web).
+    // The legacy AdSense web-ad logic is temporarily disabled to allow testing the AdMob flow in browser.
 
-                        {/* Actual Ad Component (Z-Index higher to cover placeholder) */}
-                        <div className="relative z-10 w-full">
-                            <GoogleAd slotId={adSlotId} className="w-full text-center" />
-                        </div>
-                    </div>
+    // (Legacy AdSense Block Removed for AdMob Testing)
 
-                    <div className="p-4 bg-white border-t relative z-20">
-                        <p className="text-center text-sm text-slate-600">
-                            {canClose ? "Thank you! Reward Unlocked." : "Please wait to unlock your reward."}
-                        </p>
-                    </div>
-                </div>
-            </motion.div>
-        );
-    }
-
-    // MOCK MODE (Original)
+    // MOCK MODE (For Browser Testing with Test ID behavior simulation)
     return (
         <motion.div
             initial={{ opacity: 0 }}
@@ -94,7 +82,7 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                 </div>
                 {canClose && (
                     <button
-                        onClick={onClose}
+                        onClick={() => { onReward(); onClose(); }}
                         className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full backdrop-blur-md transition-all"
                     >
                         <X size={24} />
@@ -119,12 +107,15 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                         >
                             <img src="/reme_icon.png" alt="App Icon" className="w-20 h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
                         </motion.div>
-                        <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">My Re Design</h2>
-                        <p className="text-blue-200 text-lg mb-8 font-medium">Reclaim your rhythm.</p>
+                        <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Test Ad</h2>
+                        <p className="text-blue-200 text-sm mb-4 font-mono select-all bg-black/30 p-2 rounded">
+                            ID: {ADMOB_UNITS.REWARDED_TEST}
+                        </p>
+                        <p className="text-blue-200 text-lg mb-8 font-medium">Native Ad Simulation</p>
 
                         <div className="bg-black/40 backdrop-blur-sm rounded-xl p-4 border border-white/10 inline-block">
-                            <p className="text-xs text-slate-300 uppercase tracking-widest font-bold mb-1">Sponsored Ad</p>
-                            <p className="text-white font-bold">Google Ads (Simulation)</p>
+                            <p className="text-xs text-slate-300 uppercase tracking-widest font-bold mb-1">Test Mode</p>
+                            <p className="text-white font-bold">This is a Web Simulation</p>
                         </div>
                     </div>
 
@@ -150,14 +141,14 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                         <Award className="text-yellow-400" size={24} />
                         <div>
                             <p className="text-white font-bold">Reward Unlocked!</p>
-                            <p className="text-slate-400 text-xs">You can now access today's missions.</p>
+                            <p className="text-slate-400 text-xs">Test Reward Granted on Close.</p>
                         </div>
                     </div>
                     <button
-                        onClick={onClose}
+                        onClick={() => { onReward(); onClose(); }}
                         className="w-full bg-white text-black font-bold py-3 rounded-xl hover:bg-slate-200 transition-colors"
                     >
-                        Close & Continue
+                        Close & Earn Reward
                     </button>
                 </div>
             </div>
