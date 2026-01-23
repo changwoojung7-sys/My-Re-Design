@@ -6,7 +6,7 @@ import { ChevronDown, Calendar, ChevronRight, History as HistoryIcon } from 'luc
 import { motion, AnimatePresence } from 'framer-motion';
 import HistoryDetail from './HistoryDetail';
 
-type GoalCategory = 'all' | 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
+type GoalCategory = 'all' | 'body_wellness' | 'growth_career' | 'mind_connection' | 'funplay';
 
 export default function History() {
     const { user } = useStore();
@@ -103,12 +103,18 @@ export default function History() {
         const { data } = await query.order('created_at', { ascending: false });
 
         if (data) {
-            const filtered = data.filter(goal => {
+            const filtered = data.filter((goal: any) => { // Type hint added
                 const createdAt = new Date(goal.created_at);
                 // Calculate completion date based on user setting (default 1 month if missing)
                 const duration = goal.duration_months || 1;
                 const endDate = new Date(createdAt);
-                endDate.setMonth(endDate.getMonth() + duration);
+
+                if (duration < 1) {
+                    const d = duration === 0.25 ? 7 : duration === 0.5 ? 14 : Math.round(duration * 30);
+                    endDate.setDate(endDate.getDate() + d);
+                } else {
+                    endDate.setMonth(endDate.getMonth() + duration);
+                }
 
                 const now = new Date();
                 const isExpired = now > endDate;
@@ -164,7 +170,7 @@ export default function History() {
                         onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
                         className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"
                     >
-                        {['all', 'health', 'growth', 'mindset', 'career', 'social', 'vitality'].map(cat => {
+                        {['all', 'body_wellness', 'growth_career', 'mind_connection', 'funplay'].map(cat => {
                             let label = '';
                             let enLabel = '';
                             let count = 0;
@@ -175,8 +181,8 @@ export default function History() {
                                 // Sum all counts for 'All'
                                 count = Object.values(missionCounts).reduce((a, b) => a + b, 0);
                             } else {
-                                label = t[cat as Exclude<GoalCategory, 'all'>];
-                                enLabel = cat.charAt(0).toUpperCase() + cat.slice(1);
+                                label = t[cat as Exclude<GoalCategory, 'all'>] || cat;
+                                enLabel = cat.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
                                 count = missionCounts[cat] || 0;
                             }
 
@@ -214,20 +220,32 @@ export default function History() {
                         const seqLabel = goal.seq ? `Challenge #${goal.seq}` : 'Challenge #1';
                         // Duration Calculations
                         const durationMonths = goal.duration_months || 1;
-                        const totalDays = durationMonths * 30;
+                        let totalDays = 0;
+                        if (durationMonths < 1) {
+                            totalDays = durationMonths === 0.25 ? 7 : durationMonths === 0.5 ? 14 : Math.round(durationMonths * 30);
+                        } else {
+                            totalDays = durationMonths * 30;
+                        }
 
                         const diffTime = new Date().getTime() - new Date(goal.created_at).getTime();
                         const currentDay = Math.max(1, Math.floor(diffTime / (1000 * 60 * 60 * 24)) + 1);
 
-                        // Missions Expected To Date (3 per day)
-                        const expectedMissionsToDate = currentDay * 3;
-                        const totalExpectedMissions = totalDays * 3;
+                        // Multiplier: FunPlay = 1, Others = 3
+                        const multiplier = goal.category === 'funplay' ? 1 : 3;
+
+                        // Missions Expected To Date
+                        const expectedMissionsToDate = currentDay * multiplier;
+                        const totalExpectedMissions = totalDays * multiplier;
 
                         // Determine Denominator based on status
                         // If it's completed or expired, show Total Expected for the whole duration.
                         // If it's active, show Expected To Date.
                         const endDate = new Date(goal.created_at);
-                        endDate.setMonth(endDate.getMonth() + durationMonths);
+                        if (durationMonths < 1) {
+                            endDate.setDate(endDate.getDate() + totalDays);
+                        } else {
+                            endDate.setMonth(endDate.getMonth() + durationMonths);
+                        }
                         const isExpired = new Date() > endDate;
                         const isEffectivelyCompleted = goal.is_completed || isExpired;
 

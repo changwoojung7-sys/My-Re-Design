@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SubscriptionManager from './SubscriptionManager';
 import UserGuide from '../../components/common/UserGuide';
 
-export type GoalCategory = 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
+export type GoalCategory = 'body_wellness' | 'growth_career' | 'mind_connection' | 'funplay';
 
 interface UserGoal {
     id?: string;
@@ -24,12 +24,10 @@ import { useLanguage } from '../../lib/i18n';
 
 
 const INITIAL_GOALS: Record<GoalCategory, UserGoal> = {
-    health: { category: 'health', target_text: '', duration_months: 1, details: { height: '', weight: '' }, seq: 1 },
-    growth: { category: 'growth', target_text: '', duration_months: 3, details: { topic: '', current_level: '', target_level: '' }, seq: 1 },
-    mindset: { category: 'mindset', target_text: '', duration_months: 1, details: { current_mood: '', affirmation: '' }, seq: 1 },
-    career: { category: 'career', target_text: '', duration_months: 6, details: { project_name: '', kpi: '' }, seq: 1 },
-    social: { category: 'social', target_text: '', duration_months: 1, details: { people: '', activity_type: '' }, seq: 1 },
-    vitality: { category: 'vitality', target_text: '', duration_months: 1, details: { hobby: '', routine: '' }, seq: 1 }
+    body_wellness: { category: 'body_wellness', target_text: '', duration_months: 1, details: { height: '', weight: '', hobby: '', routine: '' }, seq: 1 },
+    growth_career: { category: 'growth_career', target_text: '', duration_months: 3, details: { topic: '', current_level: '', target_level: '' }, seq: 1 },
+    mind_connection: { category: 'mind_connection', target_text: '', duration_months: 1, details: { current_mood: '', affirmation: '', people: '', activity_type: '' }, seq: 1 },
+    funplay: { category: 'funplay', target_text: '', duration_months: 1, details: { difficulty: 'easy', time_limit: 30, mood: 'fun', avoid_tags: '' }, seq: 1 }
 };
 
 export default function MyPage() {
@@ -70,7 +68,7 @@ export default function MyPage() {
     });
 
     // UI State
-    const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('health');
+    const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('body_wellness');
     const [goals, setGoals] = useState<Record<GoalCategory, UserGoal>>(JSON.parse(JSON.stringify(INITIAL_GOALS)));
 
     // Request Approval State
@@ -593,7 +591,16 @@ export default function MyPage() {
         if (!currentGoal.created_at) return false;
         const start = new Date(currentGoal.created_at);
         const end = new Date(start);
-        end.setMonth(end.getMonth() + currentGoal.duration_months);
+
+        if (currentGoal.duration_months < 1) {
+            // Week handling (0.25 = 1 week, 0.5 = 2 weeks)
+            const days = currentGoal.duration_months === 0.25 ? 7 :
+                currentGoal.duration_months === 0.5 ? 14 :
+                    Math.round(currentGoal.duration_months * 30);
+            end.setDate(end.getDate() + days);
+        } else {
+            end.setMonth(end.getMonth() + currentGoal.duration_months);
+        }
         return new Date() > end;
     };
 
@@ -747,12 +754,7 @@ export default function MyPage() {
                     <div className="flex items-center gap-2">
 
                         {/* Help / Guide Button */}
-                        <button
-                            onClick={() => setShowGuide(true)}
-                            className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
-                        >
-                            <HelpCircle size={18} className="text-yellow-400" />
-                        </button>
+
 
                         {/* Notification Bell */}
                         <button
@@ -781,9 +783,20 @@ export default function MyPage() {
                 </div>
 
                 {/* Subtitles below */}
-                <div className="mt-1">
-                    <p className="text-xs font-medium text-slate-400 whitespace-nowrap">{t.myLoopSubtitle}</p>
-                    <p className="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">{t.sharePrompt}</p>
+                <div className="mt-1 flex items-end justify-between w-full">
+                    <div className="flex-1 min-w-0 mr-2">
+                        <p className="text-xs font-medium text-slate-400 whitespace-nowrap">{t.myLoopSubtitle}</p>
+                        <p className="text-[10px] text-slate-500 mt-0.5 whitespace-nowrap">{t.sharePrompt}</p>
+                    </div>
+
+                    {/* Help Button Moved Here */}
+                    <button
+                        onClick={() => setShowGuide(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 text-slate-400 rounded-lg hover:bg-white/10 hover:text-white transition-colors border border-white/5"
+                    >
+                        <HelpCircle size={14} className="text-yellow-400" />
+                        <span className="text-[10px] font-bold">Guide</span>
+                    </button>
                 </div>
             </div>
 
@@ -859,7 +872,7 @@ export default function MyPage() {
                     </div >
 
                     {/* Dynamic Form Area */}
-                    <div className="bg-black/20 rounded-2xl p-5 border border-white/5 relative overflow-hidden">
+                    <div className="bg-black/20 rounded-2xl p-3 border border-white/5 relative overflow-hidden">
                         {/* Lock Overlay */}
                         {!isCategoryUnlocked(selectedCategory) && (
                             <div className="absolute inset-0 z-20 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
@@ -915,19 +928,15 @@ export default function MyPage() {
                                     value={currentGoal.target_text}
                                     onChange={e => updateGoal('target_text', e.target.value)}
                                     placeholder={
-                                        selectedCategory === 'mindset'
-                                            ? "무엇을 이루고 싶으신가요?\n예: 우울감 극복, 자존감 회복, 소심함 극복 등"
-                                            : selectedCategory === 'growth'
-                                                ? "이루고 싶은 성장은 무엇인가요?\n예: 영어 회화 마스터, 코딩 실력 향상, 자격증 취득 등"
-                                                : selectedCategory === 'social'
-                                                    ? "무엇을 이루고 싶으신가요?\n예: 가족과 더 가까워지기, 인맥 넓히기 등"
-                                                    : selectedCategory === 'vitality'
-                                                        ? "무엇을 이루고 싶으신가요?\n예: 규칙적인 생활 습관 만들기, 워라밸 찾기 등"
-                                                        : selectedCategory === 'career'
-                                                            ? "무엇을 이루고 싶으신가요?\n예: 승진, 이직 성공, 매출 목표 달성, 전문성 강화 등"
-                                                            : t.whatToAchieve
+                                        selectedCategory === 'mind_connection'
+                                            ? "무엇을 이루고 싶으신가요?\n예: 우울감 극복, 자존감 회복, 부모님과 가까워지기 등"
+                                            : selectedCategory === 'growth_career'
+                                                ? "이루고 싶은 성장은 무엇인가요?\n예: 영어 회화 마스터, 승진, 자격증 취득 등"
+                                                : selectedCategory === 'body_wellness'
+                                                    ? "무엇을 이루고 싶으신가요?\n예: 5kg 감량, 규칙적인 생활 습관 만들기 등"
+                                                    : t.whatToAchieve
                                     }
-                                    className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all resize-none h-14"
+                                    className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all resize-none h-12"
                                 />
                             </div>
 
@@ -939,8 +948,10 @@ export default function MyPage() {
                                             disabled={!isEditing}
                                             value={currentGoal.duration_months}
                                             onChange={e => updateGoal('duration_months', Number(e.target.value))}
-                                            className="w-full bg-white/5 rounded-lg px-3 py-3 text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
+                                            className="w-full bg-white/5 rounded-lg px-2 py-2 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
                                         >
+                                            <option value={0.25} className="bg-slate-800 text-white">{t.oneWeek}</option>
+                                            <option value={0.5} className="bg-slate-800 text-white">{t.twoWeeks}</option>
                                             {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                                                 <option key={m} value={m} className="bg-slate-800 text-white">{m} {m > 1 ? t.months : t.month}</option>
                                             ))}
@@ -952,7 +963,7 @@ export default function MyPage() {
                             {/* Details Section */}
                             <div className="pt-4 border-t border-white/5 space-y-4">
                                 {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
-                                {selectedCategory === 'health' && (
+                                {selectedCategory === 'body_wellness' && (
                                     <div className="space-y-3">
                                         <div>
                                             <label className="text-xs text-slate-400 block mb-1">{t.currentStatusGoal}</label>
@@ -961,73 +972,88 @@ export default function MyPage() {
                                                 value={currentGoal.details.current_status || ''}
                                                 onChange={e => updateGoal('current_status', e.target.value, true)}
                                                 placeholder={t.healthPlaceholder}
-                                                className="w-full h-20 bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50 resize-none"
+                                                className="w-full h-12 bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none"
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
                                                 <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
-                                                <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                                <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                             </div>
                                             <div>
                                                 <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
-                                                <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                                <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                             </div>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-slate-400 block mb-1">{t.hobby}</label>
+                                            <textarea
+                                                disabled={!isEditing}
+                                                value={currentGoal.details.hobby || ''}
+                                                onChange={e => updateGoal('hobby', e.target.value, true)}
+                                                placeholder="취미나 루틴을 입력해주세요."
+                                                className="w-full h-12 bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none"
+                                            />
                                         </div>
                                     </div>
                                 )}
 
-                                {selectedCategory === 'growth' && (
-                                    <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                {selectedCategory === 'growth_career' && (
+                                    <div className="space-y-2">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                     </div>
                                 )}
 
-                                {selectedCategory === 'career' && (
-                                    <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.project_name || ''} onChange={e => updateGoal('project_name', e.target.value, true)} placeholder={`${t.projectName} (예: 신규 서비스 런칭, 팀 리딩)`} className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50" />
-                                        <textarea disabled={!isEditing} value={currentGoal.details.kpi || ''} onChange={e => updateGoal('kpi', e.target.value, true)} placeholder={`${t.kpi}\n예: 매출 10% 증가, 800점 달성, 프로젝트 100% 완료`} className="w-full h-16 bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none" />
-                                    </div>
-                                )}
-
-                                {selectedCategory === 'mindset' && (
-                                    <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
+                                {selectedCategory === 'mind_connection' && (
+                                    <div className="space-y-2">
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                         <textarea
                                             disabled={!isEditing}
                                             value={currentGoal.details.affirmation || ''}
                                             onChange={e => updateGoal('affirmation', e.target.value, true)}
-                                            placeholder={"나에게 해줄 말 (확언)\n예: 나는 매일 더 나아지고 있다. 나는 충분히 가치 있는 사람이다."}
-                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none h-16"
+                                            placeholder={"나에게 해줄 말 (확언)"}
+                                            className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none h-12"
                                         />
+                                        <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                     </div>
                                 )}
 
-                                {selectedCategory === 'social' && (
+                                {selectedCategory === 'funplay' && (
                                     <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialPeople} className="w-full bg-white/5 rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" />
-                                        <textarea
-                                            disabled={!isEditing}
-                                            value={currentGoal.details.activity_type || ''}
-                                            onChange={e => updateGoal('activity_type', e.target.value, true)}
-                                            placeholder={"어떤 활동을 할까요?\n예: 매일 안부 문자하기, 주 1회 식사하기, 동호회 가입하기"}
-                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none h-16"
-                                        />
-                                    </div>
-                                )}
-
-                                {selectedCategory === 'vitality' && (
-                                    <div className="space-y-3">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.hobby || ''} onChange={e => updateGoal('hobby', e.target.value, true)} placeholder={`${t.vitalityHobby} (예: 독서, 등산, 요리)`} className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50" />
-                                        <textarea
-                                            disabled={!isEditing}
-                                            value={currentGoal.details.routine || ''}
-                                            onChange={e => updateGoal('routine', e.target.value, true)}
-                                            placeholder={"만들고 싶은 루틴은 무엇인가요?\n예: 아침 7시 기상, 매일 물 2L 마시기, 잠들기 전 독서"}
-                                            className="w-full bg-white/5 rounded-lg px-3 py-2 text-xs outline-none disabled:opacity-50 resize-none h-16"
-                                        />
+                                        <div className="p-3 bg-accent/10 rounded-xl border border-accent/20">
+                                            <p className="text-xs text-accent font-bold mb-1">FunPlay Mode</p>
+                                            <p className="text-[10px] text-slate-300">30초 안에 실행할 수 있는 미션 게임! 지금 바로 시작해보세요.</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">{t.funplayDifficulty}</label>
+                                                <select
+                                                    disabled={!isEditing}
+                                                    value={currentGoal.details.difficulty}
+                                                    onChange={e => updateGoal('difficulty', e.target.value, true)}
+                                                    className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+                                                >
+                                                    <option value="easy" className="bg-slate-800">{t.funplayEasy}</option>
+                                                    <option value="normal" className="bg-slate-800">{t.funplayNormal}</option>
+                                                    <option value="hard" className="bg-slate-800">{t.funplayHard}</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">{t.funplayMood}</label>
+                                                <select
+                                                    disabled={!isEditing}
+                                                    value={currentGoal.details.mood}
+                                                    onChange={e => updateGoal('mood', e.target.value, true)}
+                                                    className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+                                                >
+                                                    <option value="fun" className="bg-slate-800">{t.funplayFun}</option>
+                                                    <option value="calm" className="bg-slate-800">{t.funplayCalm}</option>
+                                                    <option value="focus" className="bg-slate-800">{t.funplayFocus}</option>
+                                                </select>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </div>

@@ -5,15 +5,22 @@ const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
 
 // Mock missions for fallback
 const MOCK_MISSIONS: MissionData[] = [
-    { category: 'health', content: 'Do 10 squats.' },
-    { category: 'growth', content: 'Read one page of a book.' },
-    { category: 'mindset', content: 'Takes 3 deep breaths.' }
+    { category: 'body_wellness', content: 'Do 10 squats.' },
+    { category: 'growth_career', content: 'Read one page of a book.' },
+    { category: 'mind_connection', content: 'Takes 3 deep breaths.' }
 ];
 
 export interface MissionData {
-    category: 'health' | 'growth' | 'mindset' | 'career' | 'social' | 'vitality';
+    category: 'body_wellness' | 'growth_career' | 'mind_connection' | 'funplay';
     content: string;
     verification_type?: string;
+    reasoning?: {
+        user_context?: string;
+        scientific_basis?: string;
+        expected_impact?: string;
+    };
+    trust_score?: number;
+    details?: any; // For flexible extra data like FunPlay difficulty
 }
 
 export async function generateMissions(userProfile: any, language: string = 'en', excludedMissions: string[] = []): Promise<MissionData[]> {
@@ -56,50 +63,46 @@ export async function generateMissions(userProfile: any, language: string = 'en'
     EXCLUSION RULES (IMPORTANT):
     - Do NOT generate missions that are identical or very similar to the following recent missions:
     ${excludedMissions.length > 0 ? excludedMissions.map(m => `- ${m}`).join('\n') : "(No exclusions)"}
-    - Note: This exclusion applies strictly to categories: Vitality, Social, Mindset.
-    - For Health, Growth, Career categories, you MAY repeat tasks if they are essential, but try to vary slightly.
+    - Note: This exclusion applies primarily to daily routine type tasks.
     
-    Category Specific Guidelines:
+    Category Specific Guidelines (Merged Definitions):
     
-    [Special Rule for: vitality, social, mindset]
-    - ALL 3 missions must be relevant to the category/goal.
-    - Structure the 3 missions as follows:
-      1. Fun/Enjoyable Mission (Lighthearted, pleasant, RELEVANT to the goal)
-      2. Fun/Enjoyable Mission (Lighthearted, pleasant, RELEVANT to the goal)
-      3. Core Task (Directly addresses the goal, strictly < 3 mins)
-    
-    1. health: 
-       - STRICTLY analyze 'Goal Details', 'Current Status', and 'Final Goal'.
-       - Use User's Height/Weight if provided to tailor intensity.
-       - Cover diverse topics: Diet, Exercise, Recovery, Physical Health.
-       - TIME LIMIT EXCEPTION: Generally < 3 mins. BUT if goal involves Running/Cardio/Endurance, allow up to 15 mins.
-       - If user specified a target Distance (km) or Duration, RESPECT that value strictly (e.g. "Run 3km" if specified).
-    2. growth: 
-       - STRICTLY analyze 'Final Goal', 'Current Level', and 'Target Level'.
-       - Tailor missions to bridge the gap between Current & Target level.
-       - Focus on actionable micro-learning relevant to the specific goal (e.g. if goal is 'English', then 'memorize 1 word').
-    3. mindset: 
-       - Mix: 1 Fun (e.g. hum a song, smile in mirror) + 2 Core (e.g. praise yourself, write 1 brave sentence).
-       - Concept: Healing, Comfort, and building Inner Strength.
-       - Core missions must offer comfort, encouragement, or courage.
-    4. career: 
-       - STRICTLY analyze 'Final Goal' and 'Key Results' (KPIs).
-       - Create missions that contribute to the specific Career Goal.
-       - Focus on micro-efficiency, planning, or skill check relevant to the goal (e.g. goal is 'sales', then 'list 1 prospect').
-    5. social: 
-       - Mix: 2 Fun (e.g. send a funny emoji, send a heart) + 1 Core (e.g. short heartwarming text, "I appreciate you").
-       - Core mission should be short but Touching/Impactful.
-       - Focus on light connection without pressure.
-    6. vitality: 
-       - Mix: 2 Fun (e.g. play favorite song, dance 1 min) + 1 Core (e.g. high-five yourself in mirror, 1 min hobby focus).
-       - Focus on recharging energy & giving POSITIVE FORCE to oneself.
-       - Encourage self-care and personal hobbies.
+    1. body_wellness (Health & Vitality):
+       - Combines Physical Health + Daily Vitality/Hobbies.
+       - Rules: 
+         * Analyze 'Goal Details' (Height/Weight) OR 'Hobby/Routine'.
+         * Mix: 1 Physical Task (e.g. Squat, Stretch) + 1 Vitality Task (e.g. Drink water, Sun exposure) + 1 Fun/Hobby Task.
+         * If goal is diet/exercise, focus on physical. If goal is routine/happiness, focus on vitality.
+       - TIME: Generally < 3 mins. Exception: Running/Cardio up to 15 mins if explicitly set.
+
+    2. growth_career (Growth & Career):
+       - Combines Self-Development + Professional Work.
+       - Rules:
+         * Analyze 'Topic', 'Current Level', 'Project Name', 'KPI'.
+         * Focus on micro-actions: Read 1 page, Check 1 email, Plan tomorrow's to-do.
+         * Bridge the gap between 'Current Status' and 'Target Goal'.
+
+    3. mind_connection (Mindset & Social):
+       - Combines Inner Peace + Social Connection.
+       - Rules:
+         * Analyze 'Mood', 'Affirmation' OR 'People', 'Activity'.
+         * Mix: 1 Inner (e.g. Affirmation, Breathe) + 1 Social (e.g. Send nice text, Call parents).
+         * If User Goal is purely social, give social tasks. If mindset, give mindset tasks.
+       - Core: Comfort, Encouragement, Connection.
 
     Output Format (JSON Array):
     [
-      { "category": "health", "content": "Drink 1 cup of water", "verification_type": "image" },
-      { "category": "mindset", "content": "Smile at yourself in mirror", "verification_type": "camera" },
-      { "category": "social", "content": "Send a heart emoji to friend", "verification_type": "text" },
+      { 
+        "category": "body_wellness", 
+        "content": "Drink 1 cup of water", 
+        "verification_type": "image",
+        "reasoning": {
+            "user_context": "Hydration is low based on recent logs.",
+            "scientific_basis": "Water boosts metabolism by 24-30%.",
+            "expected_impact": "Vitality +5"
+        },
+        "trust_score": 95
+      },
       ...
     ]
     `;
@@ -110,12 +113,14 @@ export async function generateMissions(userProfile: any, language: string = 'en'
                 {
                     role: "system",
                     content: `You are a personalized habit coach. Output strictly valid JSON.
-                    For EACH active goal category, generate exactly 3 simple daily missions.
                     The output should be a flat JSON array of mission objects.
-                    Each mission object must have "category", "content", and "verification_type" fields.
-                    Valid values for "verification_type" are "text", "image", or "camera".
+                    Each mission object must have "category", "content", "verification_type", "reasoning", and "trust_score".
+                    "reasoning" object must contain "user_context", "scientific_basis", and "expected_impact".
+                    "trust_score" should be an integer between 80 and 99.
+                    Valid values for "verification_type" are "text", "image", or "camera" or "checkbox".
                     Assign "text" for writing, thinking, or social messaging tasks.
                     Assign "image" or "camera" for physical activities, cleaning, or verifiable actions.
+                    Assign "checkbox" for very simple mental tasks or unverifiable quick tasks.
                     Ensure the content is written in ${language === 'ko' ? 'Korean' : 'English'}.
                     `
                 },
@@ -131,6 +136,101 @@ export async function generateMissions(userProfile: any, language: string = 'en'
     } catch (e) {
         console.error("AI Generation Failed", e);
         return MOCK_MISSIONS;
+    }
+}
+
+export async function generateFunPlayMission(
+    userProfile: any,
+    language: string = 'en',
+    excludedKeywords: string[] = [],
+    options: { difficulty: string, time_limit: number, mood: string, place: string }
+): Promise<MissionData> {
+    if (!apiKey || apiKey.includes('YOUR_OPENAI')) {
+        return {
+            category: 'funplay',
+            content: language === 'ko' ? "30초 동안 제자리 뛰기" : "Jump in place for 30 seconds",
+            verification_type: 'checkbox'
+        };
+    }
+
+    const openai = new OpenAI({ apiKey, dangerouslyAllowBrowser: true, maxRetries: 2 });
+
+    const systemPrompt = `
+    너는 "FunPlay – 30초 리얼 미션"의 미션 생성 엔진이다.
+    목표는 사용자가 지금 있는 장소에서 30초~60초 안에 수행 가능한, 가볍고 재미있는 현실 미션을 만드는 것이다.
+
+    원칙:
+    - 매우 간단: 한 번 읽고 바로 할 수 있어야 한다.
+    - 안전: 위험/불법/혐오/성적/자해/괴롭힘/무리한 운동/과음/운전 중 수행 금지.
+    - 비용 0원: 구매/결제/외출 강요 금지.
+    - 접근성: 특별한 도구 없이(휴대폰만 OK) 가능한 미션 우선.
+    - 부끄러움 최소: 공공장소에서 민망하거나 타인에게 피해 주는 행동 금지.
+    - 결과는 성공/실패로만 체크 가능해야 한다(정답 검증 필요 없음).
+    - 텍스트는 짧고, 친근하고, 유치하지 않게.
+    - 한국어로 출력. (If language is English, output English).
+
+    금지 예시:
+    - 도로에서 달리기, 계단 뛰기, 위험한 자세/스트레칭, 불특정 타인 촬영, 음주/흡연, 약물, 폭력, 혐오표현, 선정적 행동, 도박, 불법행위, 자기비하 유도.
+
+    출력은 반드시 JSON만 반환한다(설명 문장 금지).
+    Format:
+    {
+        "category": "funplay",
+        "content": "미션 내용",
+        "verification_type": "checkbox",
+        "reasoning": { "expected_impact": "..." },
+        "trust_score": 90
+    }
+    `;
+
+    const userPrompt = `
+    [미션 생성 요청]
+    난이도: ${options.difficulty} (easy/normal)
+    제한시간(초): ${options.time_limit}
+    장소 컨텍스트: ${options.place} (home/office/outside/transit/unknown)
+    분위기: ${options.mood} (calm/fun/focus)
+    인증방식: checkbox
+    제외하고 싶은 테마: (none)
+    오늘의 중복 방지 키워드: ${excludedKeywords.join(', ')}
+
+    요구사항:
+    - 미션 1개만 생성
+    - 중복 방지 키워드를 최대한 피해서 새롭게
+    - 30~60초 내 완료 가능한 것
+    - 제목(짧게) + 미션 설명(1~2문장) + 성공 조건(체크 가능) + 실패해도 괜찮다는 한 줄 코멘트 포함
+    - 태그 3개 이내로
+    - 언어: ${language === 'ko' ? 'Korean' : 'English'}
+    `;
+
+    try {
+        const completion = await openai.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            model: "gpt-3.5-turbo",
+            temperature: 0.9, // Higher variance for fun
+        });
+
+        const content = completion.choices[0].message.content;
+        const parsed = JSON.parse(content || "{}");
+
+        // Normalize
+        return {
+            category: 'funplay',
+            content: parsed.content || parsed.mission || "Mission Generation Failed",
+            verification_type: 'checkbox',
+            reasoning: parsed.reasoning || { expected_impact: "Instant Refresh" },
+            trust_score: parsed.trust_score || 90,
+            details: parsed // Store extra fields if needed
+        };
+    } catch (e) {
+        console.error("FunPlay Generation Failed", e);
+        return {
+            category: 'funplay',
+            content: language === 'ko' ? "30초 동안 심호흡 하기" : "Take deep breaths for 30 seconds",
+            verification_type: 'checkbox'
+        };
     }
 }
 

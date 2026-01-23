@@ -306,12 +306,6 @@ export default function Login() {
             // Map flat columns
             age: profile?.age,
             gender: profile?.gender,
-            goal_health: profile?.goal_health,
-            goal_growth: profile?.goal_growth,
-            goal_career: profile?.goal_career,
-            goal_mindset: profile?.goal_mindset,
-            goal_social: profile?.goal_social,
-            goal_vitality: profile?.goal_vitality,
             custom_free_trial_days: profile?.custom_free_trial_days,
             full_name: profile?.full_name,
         });

@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
-import { generateMissions } from '../../lib/openai';
+import { generateMissions, generateFunPlayMission } from '../../lib/openai';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight } from 'lucide-react';
+import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb, BarChart, ShieldCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
 import Paywall from './Paywall';
@@ -85,8 +85,8 @@ export default function Today() {
         if (isDemoOrReviewer) {
             // Mock Goals for Demo User
             const mockGoals = [
-                { id: 'demo-health', user_id: 'demo123', category: 'health', seq: 1, target_text: 'Healthy Lifestyle', created_at: new Date().toISOString() },
-                { id: 'demo-growth', user_id: 'demo123', category: 'growth', seq: 1, target_text: 'Read Books', created_at: new Date().toISOString() }
+                { id: 'demo-body', user_id: 'demo123', category: 'body_wellness', seq: 1, target_text: 'Healthy Body', created_at: new Date().toISOString() },
+                { id: 'demo-growth', user_id: 'demo123', category: 'growth_career', seq: 1, target_text: 'Career Growth', created_at: new Date().toISOString() }
             ];
             setUserGoals(mockGoals);
             setSelectedGoalId(mockGoals[0].id);
@@ -144,10 +144,10 @@ export default function Today() {
 
         if (isDemoOrReviewer) {
             const today = formatLocalYMD(new Date());
-            if (selectedDate === today && selectedGoal?.category === 'health') {
+            if (selectedDate === today && selectedGoal?.category === 'body_wellness') {
                 const mockMissions = [
                     {
-                        id: 'demo-m1', user_id: 'demo123', category: 'health',
+                        id: 'demo-m1', user_id: 'demo123', category: 'body_wellness',
                         content: language === 'ko' ? '물 2L 마시기' : 'Drink 2L Water',
                         is_completed: false, date: today, verification_type: 'image'
                     }
@@ -205,30 +205,57 @@ export default function Today() {
             .gte('date', sevenDaysStr);
 
         if (recentMissions) {
-            // Filter: Only exclude if NOT in (health, growth, career)
-            // Meaning: Vitality, Social, Mindset should avoid repeats.
-            const exceptions = ['health', 'growth', 'career'];
+            // Filter: Only exclude if NOT in (body_wellness)
+            // Meaning: Mindset, Social etc. should avoid repeats.
+            // Updated Logic: We generally want to avoid repeats for Re:Play too.
+            const exceptions = ['body_wellness']; // Daily routines might repeat
             exclusionList = recentMissions
                 .filter(m => !exceptions.includes(m.category.toLowerCase()))
                 .map(m => m.content);
         }
 
-        // Generate via AI with exclusions
-        const newMissions = await generateMissions(user, language, exclusionList);
+        let newMissions: any[] = [];
 
-        // Filter for CURRENT selected category
-        const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());
-        const finalDrafts = currentCategoryMissions.slice(0, 3);
+        // BRANCH: FunPlay Logic
+        if (selectedGoal?.category === 'funplay') {
+            // Generate 1 Mission for FunPlay
+            const details = selectedGoal.details || {};
+            const funplayMission = await generateFunPlayMission(
+                user,
+                language,
+                exclusionList,
+                {
+                    difficulty: details.difficulty || 'easy',
+                    time_limit: details.time_limit || 30,
+                    mood: details.mood || 'fun',
+                    place: 'unknown' // Could detect context or ask user, default unknown for now
+                }
+            );
+            // Wrap in array
+            newMissions = [funplayMission];
 
-        const mapped = finalDrafts.map((m, i) => ({
+        } else {
+            // Standard Generation (3 Missions)
+            newMissions = await generateMissions(user, language, exclusionList);
+
+            // Filter for CURRENT selected category just in case AI returns mixed
+            const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());
+            newMissions = currentCategoryMissions.slice(0, 3);
+        }
+
+        const mapped = newMissions.map((m: any, i: number) => ({
             id: `draft-${i}`,
             user_id: user!.id,
             content: m.content,
             category: m.category,
-            verification_type: m.verification_type || 'image', // Capture AI suggestion
+            verification_type: m.verification_type || 'checkbox', // Default to checkbox for Re:Play if unspecified
+            reasoning: m.reasoning,
+            trust_score: m.trust_score,
             date: selectedDate,
             is_completed: false,
-            seq: selectedGoal?.seq || 1
+            seq: selectedGoal?.seq || 1,
+            // Re:Play specific fields could be added here if needed, e.g. failing_comment
+            details: m.details // if AI returns extra details
         }));
         setDraftMissions(mapped);
     };
@@ -791,9 +818,65 @@ export default function Today() {
                                                     )}
                                                 </div>
 
-                                                <h3 className={`text-sm font-medium leading-snug ${mission.is_completed ? 'text-slate-500 line-through' : 'text-white'}`}>
+                                                <h3 className="text-sm font-bold text-white mb-1 leading-snug">
                                                     {mission.content}
                                                 </h3>
+
+                                                {/* PERSONALIZATION & INSIGHT UI */}
+                                                {!mission.is_completed && mission.reasoning && (
+                                                    <div className="mt-2 space-y-2">
+                                                        {/* 1. Decision Support via Trust Score */}
+                                                        {mission.trust_score && (
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                                <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
+                                                                    <div
+                                                                        className="h-full bg-accent"
+                                                                        style={{ width: `${mission.trust_score}%` }}
+                                                                    />
+                                                                </div>
+                                                                <span className="text-[10px] text-accent font-bold">{mission.trust_score}% Match</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* 2. Insight Badge (Why?) - Expandable or inline context */}
+                                                        <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 backdrop-blur-sm">
+                                                            <div className="flex items-start gap-2">
+                                                                <Lightbulb size={14} className="text-yellow-400 mt-0.5 shrink-0" />
+                                                                <div className="space-y-1.5">
+                                                                    {/* User Context (Source) */}
+                                                                    {mission.reasoning.user_context && (
+                                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                                            <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded border border-white/5 flex items-center gap-1">
+                                                                                <BarChart size={10} />
+                                                                                Source
+                                                                            </span>
+                                                                            <p className="text-xs text-slate-300 leading-snug">
+                                                                                "{mission.reasoning.user_context}"
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Impact / Prediction */}
+                                                                    {mission.reasoning.expected_impact && (
+                                                                        <p className="text-xs text-primary font-medium">
+                                                                            ✨ {mission.reasoning.expected_impact}
+                                                                        </p>
+                                                                    )}
+
+                                                                    {/* Scientific Basis (Double Check) */}
+                                                                    {mission.reasoning.scientific_basis && (
+                                                                        <div className="pt-1.5 mt-1.5 border-t border-white/5 flex items-start gap-1.5">
+                                                                            <ShieldCheck size={12} className="text-blue-400 mt-0.5 shrink-0" />
+                                                                            <p className="text-[10px] text-slate-400 leading-tight">
+                                                                                {mission.reasoning.scientific_basis}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* COMPLETED PROOF DISPLAY */}
                                                 {mission.is_completed && (
@@ -928,6 +1011,6 @@ export default function Today() {
                     </motion.div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

@@ -40,7 +40,7 @@ const ALL_ACCESS_PRICING: PricingTier[] = [
     { months: 12, price: 29900, label: '12 Months' },
 ];
 
-const CATEGORIES: GoalCategory[] = ['health', 'growth', 'mindset', 'career', 'social', 'vitality'];
+const CATEGORIES: GoalCategory[] = ['body_wellness', 'growth_career', 'mind_connection', 'funplay'];
 
 export default function SubscriptionManager({ onClose, initialCategory }: SubscriptionManagerProps) {
     const { t } = useLanguage();
@@ -107,7 +107,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             // This prevents users confusing "Free" status when they have a paid plan elsewhere.
             // Only run ONCE per session to avoid overriding user interaction.
             if (validSubs.length > 0 && !hasAutoSelected.current) {
-                // Check if we have coverage for the CURRENT active selection (default 'health', 'mission')
+                // Check if we have coverage for the CURRENT active selection
                 // Since we can't easily access current state inside async buffer efficiently without refs, 
                 // we rely on the fact this runs on mount/user change where defaults are active.
 
@@ -122,7 +122,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                     const missionPlan = validSubs.find(s => s.type === 'mission');
                     if (missionPlan && missionPlan.target_id) {
                         // Only switch if we assume the user hasn't explicitly selected something else yet (Mount logic)
-                        // But since basic state is 'health', switching to 'mindset' is helpful.
+                        // But since basic state is default, switching is helpful.
                         setSelectedCategory(missionPlan.target_id);
                         setActiveTab('mission');
                         hasAutoSelected.current = true;
@@ -248,7 +248,21 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         }, async (rsp: any) => {
             if (rsp.success) {
                 try {
-                    // 1. Record Payment
+                    // 1. Verify Payment Server-Side (Secure)
+                    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+                        body: {
+                            imp_uid: rsp.imp_uid,
+                            merchant_uid: rsp.merchant_uid
+                        }
+                    });
+
+                    if (verifyError) throw verifyError;
+                    if (verifyData?.error) throw new Error(verifyData.error);
+
+                    // Optional: Check amount matches expected
+                    // if (verifyData.payment.amount !== tier.price) ...
+
+                    // 2. Record Payment
                     const { error: payError } = await supabase
                         .from('payments')
                         .insert({
@@ -257,7 +271,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                             plan_type: `${activeTab}_${tier.months}mo`,
                             duration_months: tier.months,
                             target_id: activeTab === 'mission' ? selectedCategory : null,
-                            status: 'paid', // Changed to 'paid' to match Paywall logic commonly used with PG
+                            status: 'paid',
                             merchant_uid: rsp.merchant_uid,
                             imp_uid: rsp.imp_uid,
                             coverage_start_date: startDate.toISOString(),
@@ -472,7 +486,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                                             let planName = type === 'all' ? t.allAccessPlan : t.missionPlan;
                                             if (type === 'mission' && item.target_id) {
                                                 // Translate category name if possible (using existing key in t)
-                                                // t[item.target_id] relies on the category string matching the key exactly (health, growth...)
+                                                // t[item.target_id] relies on the category string matching the key exactly
                                                 const translatedCat = (t as any)[item.target_id] || item.target_id;
                                                 planName += ` (${translatedCat})`;
                                             }

@@ -59,6 +59,17 @@ export default function Paywall({ onClose }: PaywallProps) {
             if (rsp.success) {
                 // Payment Success Logic
                 try {
+                    // Verify Payment Server-Side
+                    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+                        body: {
+                            imp_uid: rsp.imp_uid,
+                            merchant_uid: rsp.merchant_uid
+                        }
+                    });
+
+                    if (verifyError) throw verifyError;
+                    if (verifyData?.error) throw new Error(verifyData.error);
+
                     // Calculate Dates
                     const monthsToAdd = parseInt(plan.id.replace('m', ''));
                     const startDate = new Date();
