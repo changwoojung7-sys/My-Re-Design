@@ -140,7 +140,7 @@ export async function generateMissions(userProfile: any, language: string = 'en'
 }
 
 export async function generateFunPlayMission(
-    userProfile: any,
+    _userProfile: any,
     language: string = 'en',
     excludedKeywords: string[] = [],
     options: { difficulty: string, time_limit: number, mood: string, place: string }
