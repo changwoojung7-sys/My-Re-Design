@@ -14,6 +14,7 @@ export default function Admin() {
     // Admin Data State
     const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
     const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
+    const [paymentMode, setPaymentMode] = useState<'test' | 'real'>('test');
     const [adSlotId, setAdSlotId] = useState('');
     const [users, setUsers] = useState<any[]>([]);
     const [deletedUsers, setDeletedUsers] = useState<any[]>([]);
@@ -21,62 +22,79 @@ export default function Admin() {
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
-    // User Detail Modal State
+    // Detailed View State
     const [selectedUser, setSelectedUser] = useState<any>(null);
+    const [customTrialDays, setCustomTrialDays] = useState<number | null>(null);
     const [userMissions, setUserMissions] = useState<any[]>([]);
     const [userPayments, setUserPayments] = useState<any[]>([]);
-    const [customTrialDays, setCustomTrialDays] = useState<number | null>(null);
 
     // Password Reset State
     const [showPasswordReset, setShowPasswordReset] = useState(false);
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
-    const handlePasswordReset = async () => {
-        if (!newPassword || !confirmPassword) return;
-        if (newPassword !== confirmPassword) {
-            alert('비밀번호가 일치하지 않습니다.');
+    // Data Fetching
+    const fetchUsers = async () => {
+        setLoading(true);
+        const { data: profiles, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching users:', error);
+            setLoading(false);
             return;
         }
-        if (newPassword.length < 6) {
-            alert('비밀번호는 6자 이상이어야 합니다.');
-            return;
-        }
-        if (!selectedUser) return;
 
-        if (!confirm(`정말 ${selectedUser.nickname} 님의 비밀번호를 변경하시겠습니까?`)) return;
+        // Fetch subscriptions for all fetched users to enrich the list
+        const userIds = profiles.map(p => p.id);
+        const { data: subs } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .in('user_id', userIds)
+            .order('created_at', { ascending: false });
 
-        try {
-            const { error } = await supabase.rpc('admin_reset_user_password', {
-                target_user_id: selectedUser.id,
-                new_password: newPassword
-            });
+        // Join subscriptions to users
+        const enrichedUsers = profiles.map(user => ({
+            ...user,
+            subscriptions: subs?.filter(s => s.user_id === user.id) || []
+        }));
 
-            if (error) throw error;
-
-            alert('비밀번호가 성공적으로 변경되었습니다.');
-            setShowPasswordReset(false);
-            setNewPassword('');
-            setConfirmPassword('');
-        } catch (err: any) {
-            console.error('Password Reset Error:', err);
-            alert('비밀번호 변경 실패: ' + err.message);
-        }
+        setUsers(enrichedUsers);
+        setLoading(false);
     };
-
-    useEffect(() => {
-        if (isAuthenticated) {
-            fetchGlobalSettings();
-            fetchUsers();
-        }
-    }, [isAuthenticated]);
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
         if (credentials.id === ADMIN_ID && credentials.password === ADMIN_PASS) {
             setIsAuthenticated(true);
+            fetchGlobalSettings();
+            fetchUsers();
         } else {
-            alert('Invalid credentials');
+            alert('Admin Login Failed: Invalid Credentials');
+        }
+    };
+
+    const handlePasswordReset = async () => {
+        if (!selectedUser || !newPassword) return;
+        if (newPassword !== confirmPassword) {
+            alert('Passwords do not match');
+            return;
+        }
+
+        const { error } = await supabase.auth.admin.updateUserById(
+            selectedUser.id,
+            { password: newPassword }
+        );
+
+        if (error) {
+            alert('Password reset failed: ' + error.message);
+        } else {
+            alert('Password updated successfully');
+            setShowPasswordReset(false);
+            setNewPassword('');
+            setConfirmPassword('');
         }
     };
 
@@ -89,75 +107,17 @@ export default function Admin() {
 
         const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
         if (slotData) setAdSlotId(slotData.value);
+
+        const { data: payModeData } = await supabase.from('admin_settings').select('value').eq('key', 'payment_mode').single();
+        if (payModeData) setPaymentMode(payModeData.value as 'test' | 'real');
     };
 
-    const fetchUsers = async () => {
-        setLoading(true);
-        // Fetch profiles
-        const { data: profiles } = await supabase
-            .from('profiles')
-            .select('id, email, nickname, created_at, custom_free_trial_days')
-            .order('created_at', { ascending: false });
-
-        // Fetch ALL subscriptions
-        const { data: rawSubs } = await supabase
-            .from('subscriptions')
-            .select('user_id, status, type, target_id, start_date, end_date');
-
-        // Fetch Cancelled Payments for Consistency Check
-        const { data: cancelledPayments } = await supabase
-            .from('payments')
-            .select('user_id, coverage_start_date, coverage_end_date')
-            .eq('status', 'cancelled');
-
-        const subs = rawSubs?.filter(s => {
-            // Filter out explicitly cancelled subscriptions from DB
-            if (s.status === 'cancelled') return false;
-
-            // Filter out EXPIRED subscriptions checking end_date <= now
-            if (s.end_date && new Date(s.end_date) <= new Date()) return false;
-
-            if (!cancelledPayments) return true;
-            // Exclude if matches a cancelled payment (Double check for consistency)
-            return !cancelledPayments.some(p =>
-                p.user_id === s.user_id &&
-                p.coverage_start_date === s.start_date &&
-                p.coverage_end_date === s.end_date
-            );
-        });
-
-        // Fetch Deleted Users
-        const { data: deleted } = await supabase
-            .from('deleted_users')
-            .select('*')
-            .order('deleted_at', { ascending: false });
-
-        if (deleted) {
-            setDeletedUsers(deleted);
+    useEffect(() => {
+        if (isAuthenticated) {
+            fetchUsers();
+            fetchGlobalSettings();
         }
-
-        if (profiles) {
-            const enriched = profiles.map(p => {
-                // Case-insensitive comparison just in case
-                const userSubs = subs?.filter(s => s.user_id?.toLowerCase() === p.id?.toLowerCase()) || [];
-                // Sort so 'all' comes first, then by date
-                userSubs.sort((a: any, _b: any) => (a.type === 'all' ? -1 : 1));
-
-                // Determine status
-                const allAccess = userSubs.find((s: any) => s.type === 'all');
-                const missionPlan = userSubs.find((s: any) => s.type === 'mission');
-
-                return {
-                    ...p,
-                    is_premium: !!allAccess,
-                    active_plan: missionPlan ? missionPlan.target_id : null,
-                    subscriptions: userSubs
-                };
-            });
-            setUsers(enriched);
-        }
-        setLoading(false);
-    };
+    }, [isAuthenticated]);
 
     const updateGlobalPaywall = async () => {
         const { error: errorDay } = await supabase
@@ -172,7 +132,11 @@ export default function Admin() {
             .from('admin_settings')
             .upsert({ key: 'ad_slot_id', value: adSlotId });
 
-        if (errorDay || errorMode || errorSlot) alert('Error updating global settings');
+        const { error: errorPayMode } = await supabase
+            .from('admin_settings')
+            .upsert({ key: 'payment_mode', value: paymentMode });
+
+        if (errorDay || errorMode || errorSlot || errorPayMode) alert('Error updating global settings');
         else alert('Global settings updated!');
     };
 
@@ -363,6 +327,21 @@ export default function Admin() {
                             >
                                 <option value="subscription" className="bg-slate-900 text-white">구독 유도 (Sub)</option>
                                 <option value="ads" className="bg-slate-900 text-white">광고 보기 (Ads)</option>
+                            </select>
+                        </div>
+
+                        <div className="hidden sm:block w-px h-6 bg-white/10 mx-1"></div>
+
+                        {/* Payment Mode Toggle */}
+                        <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-1 rounded-lg border border-white/5 hover:border-white/10 transition-colors h-14 w-[140px]">
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Payment Mode</span>
+                            <select
+                                value={paymentMode}
+                                onChange={(e) => setPaymentMode(e.target.value as 'test' | 'real')}
+                                className={`bg-transparent text-xs font-bold outline-none cursor-pointer text-center w-full ${paymentMode === 'real' ? 'text-red-400' : 'text-emerald-400'}`}
+                            >
+                                <option value="test" className="bg-slate-900 text-emerald-400">테스트 (Test)</option>
+                                <option value="real" className="bg-slate-900 text-red-400">실연동 (Real)</option>
                             </select>
                         </div>
 

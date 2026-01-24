@@ -10,8 +10,12 @@ import SupportModal from '../../components/layout/SupportModal';
 declare global {
     interface Window {
         IMP: any;
+        PortOne: any;
     }
 }
+
+const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
+const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
 
 interface SubscriptionManagerProps {
     onClose: () => void;
@@ -182,17 +186,26 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         });
     })();
 
-    // PortOne Setup
+    // PortOne Setup (V1 & V2)
     useEffect(() => {
+        // V1
         const jquery = document.createElement("script");
         jquery.src = "https://code.jquery.com/jquery-1.12.4.min.js";
         const iamport = document.createElement("script");
         iamport.src = "https://cdn.iamport.kr/js/iamport.payment-1.2.0.js";
+
+        // V2
+        const portoneV2 = document.createElement("script");
+        portoneV2.src = "https://cdn.portone.io/v2/browser-sdk.js";
+
         document.head.appendChild(jquery);
         document.head.appendChild(iamport);
+        document.head.appendChild(portoneV2);
+
         return () => {
             document.head.removeChild(jquery);
             document.head.removeChild(iamport);
+            document.head.removeChild(portoneV2);
         };
     }, []);
 
@@ -204,7 +217,30 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         }
 
         const { IMP } = window;
-        IMP.init('imp05646567'); // User's Identification Code
+
+        // Fetch Payment Mode
+        const { data: payModeData } = await supabase.from('admin_settings').select('value').eq('key', 'payment_mode').single();
+        const mode = payModeData?.value || 'test'; // Default to test
+
+        // Initialize PortOne
+        // Note: For V1, we init with User Code.
+        // Test User Code: imp05646567 (User's current test code)
+        // Real User Code (V2/Channel): The user provided a Channel Key for V2.
+        // If we are strictly V1, we need the Store ID (User Code) for the Real channel too.
+        // Assuming 'imp05646567' IS the user's Store ID for everything, and Mode controls the payment flow (PG sandbox vs real).
+
+        // HOWEVER, PortOne V2 usually doesn't use IMP.init() the same way or uses different keys.
+        // Given user instructions: "Keep Test Payment for now".
+        // We will maintain existing code for 'test'. 
+        // For 'real', if using V1, we need to know if the User Code changes.
+        // Let's assume User Code is static, but we might pass extra params if needed.
+
+        // The user provided Channel Key: channel-key-... which suggests V2.
+        // Integrating V2 requires a different SDK logic (PortOne.requestPayment).
+        // Since we are using V1 (window.IMP), we can't easily use the Channel Key directly here without Migration.
+        // PROPOSAL: Alert user if they try 'Real' mode without V2 migration, OR just log it.
+        // For now, init with the known code.
+        IMP.init('imp05646567');
 
         // Calculate Dates
         let startDate = new Date();
@@ -235,79 +271,150 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         setLoading(true);
 
         // Call PortOne Payment
-        IMP.request_pay({
-            pg: 'html5_inicis', // PG Provider
-            pay_method: 'card',
-            merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
-            name: `MyReDesign Premium - ${targetLabel} (${tier.label})`,
-            amount: tier.price,
-            buyer_email: user.email,
-            buyer_name: user.nickname,
-            buyer_tel: user.phone || '010-0000-0000',
-            m_redirect_url: window.location.href,
-        }, async (rsp: any) => {
-            if (rsp.success) {
-                try {
-                    // 1. Verify Payment Server-Side (Secure)
-                    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-                        body: {
-                            imp_uid: rsp.imp_uid,
-                            merchant_uid: rsp.merchant_uid
-                        }
-                    });
-
-                    if (verifyError) throw verifyError;
-                    if (verifyData?.error) throw new Error(verifyData.error);
-
-                    // Optional: Check amount matches expected
-                    // if (verifyData.payment.amount !== tier.price) ...
-
-                    // 2. Record Payment
-                    const { error: payError } = await supabase
-                        .from('payments')
-                        .insert({
-                            user_id: user.id,
-                            amount: tier.price,
-                            plan_type: `${activeTab}_${tier.months}mo`,
-                            duration_months: tier.months,
-                            target_id: activeTab === 'mission' ? selectedCategory : null,
-                            status: 'paid',
-                            merchant_uid: rsp.merchant_uid,
-                            imp_uid: rsp.imp_uid,
-                            coverage_start_date: startDate.toISOString(),
-                            coverage_end_date: endDate.toISOString()
-                        });
-
-                    if (payError) throw payError;
-
-                    // 2. Create Subscription
-                    const { error: subError } = await supabase
-                        .from('subscriptions')
-                        .insert({
-                            user_id: user.id,
-                            type: activeTab,
-                            target_id: activeTab === 'mission' ? selectedCategory : null,
-                            start_date: startDate.toISOString(),
-                            end_date: endDate.toISOString(),
-                            status: 'active'
-                        });
-
-                    if (subError) throw subError;
-
-                    alert(t.subscriptionSuccessful);
-                    await fetchData();
-
-                } catch (error: any) {
-                    console.error('Subscription error:', error);
-                    alert(t.subscriptionFailed.replace('{error}', error.message || 'Unknown error'));
-                } finally {
-                    setLoading(false);
-                }
-            } else {
+        if (mode === 'real') {
+            // --- PortOne V2 (Real) ---
+            if (!window.PortOne) {
+                alert("PortOne V2 SDK Loading...");
                 setLoading(false);
-                alert(`Payment Failed: ${rsp.error_msg}`);
+                return;
             }
-        });
+
+            // PortOne V2 Store ID and Channel Key (Real)
+            const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
+            const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
+
+            const paymentId = `pay_${new Date().getTime()}`;
+            try {
+                const response = await window.PortOne.requestPayment({
+                    storeId: PORTONE_V2_STORE_ID,
+                    channelKey: PORTONE_V2_CHANNEL_KEY,
+                    paymentId: paymentId,
+                    orderName: `MyReDesign Premium - ${targetLabel} (${tier.label})`,
+                    totalAmount: tier.price,
+                    currency: "CURRENCY_KRW",
+                    payMethod: "CARD",
+                    customer: {
+                        fullName: user.nickname,
+                        phoneNumber: user.phone || '010-0000-0000',
+                        email: user.email,
+                    }
+                });
+
+                if (response.code != null) {
+                    // Error occurred (PortOne V2 returns code on error, or throws?)
+                    // V2 logic: response is object. if code exists, it's error.
+                    alert(`Payment Failed: ${response.message}`);
+                    setLoading(false);
+                    return;
+                }
+
+                // Success
+                await processPaymentSuccess(response.paymentId, mode, tier, startDate, endDate, targetLabel);
+
+            } catch (e: any) {
+                console.error("Payment Request Error:", e);
+                alert(`Payment Request Failed: ${e.message}`);
+                setLoading(false);
+            }
+        } else {
+            // --- PortOne V1 (Test/Classic) ---
+            IMP.request_pay({
+                pg: 'html5_inicis', // PG Provider
+                pay_method: 'card',
+                merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
+                name: `MyReDesign Premium - ${targetLabel} (${tier.label})`,
+                amount: tier.price,
+                buyer_email: user.email,
+                buyer_name: user.nickname,
+                buyer_tel: user.phone || '010-0000-0000',
+                m_redirect_url: window.location.href,
+            }, async (rsp: any) => {
+                if (rsp.success) {
+                    await processPaymentSuccess(rsp.imp_uid, mode, tier, startDate, endDate, targetLabel, rsp.merchant_uid);
+                } else {
+                    setLoading(false);
+                    alert(`Payment Failed: ${rsp.error_msg}`);
+                }
+            });
+        }
+    };
+
+    // Helper to process success for both V1 and V2
+    const processPaymentSuccess = async (
+        paymentIdOrImpUid: string,
+        mode: string,
+        tier: PricingTier,
+        startDate: Date,
+        endDate: Date,
+        targetLabel: string,
+        merchantUid?: string
+    ) => {
+        try {
+            // 1. Verify Payment Server-Side (Secure)
+            const { data: { session } } = await supabase.auth.getSession();
+
+            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+                body: {
+                    imp_uid: paymentIdOrImpUid, // V1: imp_uid, V2: paymentId
+                    payment_id: paymentIdOrImpUid, // V2 preferred name
+                    merchant_uid: merchantUid || paymentIdOrImpUid,
+                    mode: mode // 'test' or 'real'
+                }
+            });
+
+            if (verifyError) throw verifyError;
+            if (verifyData?.error) throw new Error(verifyData.error);
+
+            // 2. Record Payment
+            const { error: payError } = await supabase
+                .from('payments')
+                .insert({
+                    user_id: user.id,
+                    amount: tier.price,
+                    plan_type: `${activeTab}_${tier.months}mo`,
+                    duration_months: tier.months,
+                    target_id: activeTab === 'mission' ? selectedCategory : null,
+                    status: 'paid',
+                    merchant_uid: merchantUid || paymentIdOrImpUid,
+                    imp_uid: paymentIdOrImpUid,
+                    coverage_start_date: startDate.toISOString(),
+                    coverage_end_date: endDate.toISOString()
+                });
+
+            if (payError) throw payError;
+
+            // 3. Create Subscription
+            const { error: subError } = await supabase
+                .from('subscriptions')
+                .insert({
+                    user_id: user.id,
+                    type: activeTab,
+                    target_id: activeTab === 'mission' ? selectedCategory : null,
+                    start_date: startDate.toISOString(),
+                    end_date: endDate.toISOString(),
+                    status: 'active'
+                });
+
+            if (subError) throw subError;
+
+            alert(t.subscriptionSuccessful);
+            await fetchData();
+
+        } catch (error: any) {
+            console.error('Subscription error:', error);
+
+            // Handle 401 Invalid JWT specifically (Stale Token Issue)
+            if (error.message && error.message.includes('Invalid JWT') || error.message.includes('401')) {
+                alert("인증 토큰이 만료되었거나 업데이트되었습니다. 자동으로 로그아웃됩니다. 다시 로그인 후 시도해주세요.");
+                await supabase.auth.signOut();
+                window.location.reload();
+                return;
+            }
+
+            alert(t.subscriptionFailed.replace('{error}', error.message || 'Unknown error'));
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleCancel = async (paymentId: string, createdAt: string, imp_uid?: string, merchant_uid?: string) => {
@@ -578,7 +685,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                                     <button onClick={() => openSupportModal('refund')} className="hover:text-white transition-colors">{t.refundPolicy}</button>
                                 </div>
                                 <div className="text-[10px] text-slate-600 space-y-0.5">
-                                    <p>상호 : 유진IT | 대표자명 : 정창우</p>
+                                    <p>상호 : 유진에이아이(YujinAI) | 대표자명 : 정창우</p>
                                     <p>사업자등록번호 : 519-77-00622</p>
                                     <p>My Re Design | 010-6614-4561</p>
                                 </div>

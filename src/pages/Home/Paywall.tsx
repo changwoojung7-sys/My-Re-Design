@@ -183,7 +183,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                     </div>
 
                     <div className="text-[10px] text-slate-600 space-y-0.5">
-                        <p>상호 : 유진IT | 대표자명 : 정창우</p>
+                        <p>상호 : 유진에이아이(YujinAI) | 대표자명 : 정창우</p>
                         <p>사업자등록번호 : 519-77-00622</p>
                         <p>My Re Design | 010-6614-4561</p>
                     </div>

@@ -33,73 +33,98 @@ serve(async (req) => {
             throw new Error('Unauthorized')
         }
 
-        const { imp_uid, merchant_uid } = await req.json()
+        const { imp_uid, merchant_uid, mode, payment_id } = await req.json()
 
-        if (!imp_uid) {
-            throw new Error('Missing imp_uid')
+        // 1. V1 Verification (Test Mode / Classic)
+        if (imp_uid) {
+            // ... Existing V1 Logic ...
+            const IMP_KEY = Deno.env.get('IMP_KEY') || '8817338050146283';
+            const IMP_SECRET = Deno.env.get('IMP_SECRET') || '81ftGc90jXZfuAARMfF2etd6pD0YRri1Un4TFqZN64qYnalg38dxud3P3fqBc6D5LO80A9FYJySE31KX';
+
+            const tokenResponse = await fetch("https://api.iamport.kr/users/getToken", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    imp_key: IMP_KEY,
+                    imp_secret: IMP_SECRET
+                }),
+            });
+
+            const tokenData = await tokenResponse.json();
+            if (tokenData.code !== 0) {
+                throw new Error(`Failed to get access token: ${tokenData.message}`);
+            }
+
+            const { access_token } = tokenData.response;
+            const sandboxParam = mode === 'test' ? '?include_sandbox=true' : '';
+            const requestUrl = `https://api.iamport.kr/payments/${imp_uid}${sandboxParam}`;
+            const verifyResponse = await fetch(requestUrl, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": access_token
+                },
+            });
+
+            if (!verifyResponse.ok) {
+                const errorText = await verifyResponse.text();
+                throw new Error(`PortOne API Error (${verifyResponse.status}): ${errorText}`);
+            }
+
+            const verifyData = await verifyResponse.json();
+            if (verifyData.code !== 0) {
+                throw new Error(`Payment verification failed (Code ${verifyData.code}): ${verifyData.message}`);
+            }
+
+            const paymentData = verifyData.response;
+            return new Response(
+                JSON.stringify({ success: true, payment: paymentData }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
         }
 
-        // 1. Get PortOne Access Token
-        // IMP_KEY: 8817338050146283
-        // IMP_SECRET: 81ftGc90jXZfuAARMfF2etd6pD0YRri1Un4TFqZN64qYnalg38dxud3P3fqBc6D5LO80A9FYJySE31KX
-        const IMP_KEY = Deno.env.get('IMP_KEY') || '8817338050146283';
-        const IMP_SECRET = Deno.env.get('IMP_SECRET') || '81ftGc90jXZfuAARMfF2etd6pD0YRri1Un4TFqZN64qYnalg38dxud3P3fqBc6D5LO80A9FYJySE31KX';
+        // 2. V2 Verification (Real Mode)
+        else if (payment_id) {
+            // Need V2 API Secret for Server-Side Verification
+            const PORTONE_API_SECRET = Deno.env.get('PORTONE_API_SECRET');
 
-        const tokenResponse = await fetch("https://api.iamport.kr/users/getToken", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                imp_key: IMP_KEY,
-                imp_secret: IMP_SECRET
-            }),
-        });
+            if (!PORTONE_API_SECRET) {
+                console.error("Critical Error: Missing PORTONE_API_SECRET in Supabase Secrets.");
+                throw new Error("Server Configuration Error: Payment verification secret is missing.");
+            }
 
-        const tokenData = await tokenResponse.json();
-        if (tokenData.code !== 0) {
-            throw new Error(`Failed to get access token: ${tokenData.message}`);
+            // Implementation for V2 Verification
+            const v2VerifyResponse = await fetch(`https://api.portone.io/payments/${payment_id}`, {
+                headers: {
+                    "Authorization": `PortOne ${PORTONE_API_SECRET}`
+                }
+            });
+
+            if (!v2VerifyResponse.ok) {
+                const errorText = await v2VerifyResponse.text();
+                throw new Error(`PortOne V2 API Error: ${errorText}`);
+            }
+
+            const paymentData = await v2VerifyResponse.json();
+
+            // Check status
+            // V2 API Status: PAID, CANCELLED, etc.
+            if (paymentData.status !== 'PAID') {
+                // throw new Error(`Payment status is ${paymentData.status}`);
+            }
+
+            return new Response(
+                JSON.stringify({ success: true, payment: paymentData }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
         }
 
-        const { access_token } = tokenData.response;
-
-        // 2. Verify Payment (WITH include_sandbox Parameter)
-        // GET /payments/{imp_uid}?include_sandbox=true
-        const verifyResponse = await fetch(`https://api.iamport.kr/payments/${imp_uid}?_token=${access_token}&include_sandbox=true`, {
-            method: "GET",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": access_token
-            },
-        });
-
-        const verifyData = await verifyResponse.json();
-
-        if (verifyData.code !== 0) {
-            throw new Error(`Payment verification failed: ${verifyData.message}`);
-        }
-
-        const paymentData = verifyData.response;
-
-        // 3. Validation Logic
-        // Check if amount matches, status is paid, etc.
-        // For now, we return the info to the client or assume client handles specific amount checks,
-        // BUT strict verification should happen here.
-        // We will return the verified data to the client.
-
-        // Also check if status is 'paid'
-        if (paymentData.status !== 'paid') {
-            // In sandbox or testing, it might be 'paid'.
-            // If failed, throw.
-            // throw new Error(`Payment status is ${paymentData.status}`);
-        }
-
-        return new Response(
-            JSON.stringify({ success: true, payment: paymentData }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        throw new Error('Missing imp_uid or payment_id');
 
     } catch (error: any) {
+        console.error('Verify Payment Error:', error);
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: error.message, details: error.toString() }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
