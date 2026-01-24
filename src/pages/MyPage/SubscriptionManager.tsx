@@ -14,9 +14,6 @@ declare global {
     }
 }
 
-const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
-const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
-
 interface SubscriptionManagerProps {
     onClose: () => void;
     initialCategory: GoalCategory;
@@ -346,12 +343,13 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         tier: PricingTier,
         startDate: Date,
         endDate: Date,
-        targetLabel: string,
+        _targetLabel: string, // Renamed to _targetLabel as it's not used in the body
         merchantUid?: string
     ) => {
         try {
             // 1. Verify Payment Server-Side (Secure)
-            const { data: { session } } = await supabase.auth.getSession();
+            // The session object was destructured but not used. The call itself might be for token refresh or similar.
+            await supabase.auth.getSession();
 
             const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
                 body: {

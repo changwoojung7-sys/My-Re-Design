@@ -17,7 +17,7 @@ export default function Admin() {
     const [paymentMode, setPaymentMode] = useState<'test' | 'real'>('test');
     const [adSlotId, setAdSlotId] = useState('');
     const [users, setUsers] = useState<any[]>([]);
-    const [deletedUsers, setDeletedUsers] = useState<any[]>([]);
+    const [deletedUsers] = useState<any[]>([]);
     const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
