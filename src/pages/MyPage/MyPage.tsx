@@ -90,7 +90,7 @@ export default function MyPage() {
 
     // Verification Timer
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
         if (verifyTimer > 0) {
             interval = setInterval(() => setVerifyTimer(t => t - 1), 1000);
         }
