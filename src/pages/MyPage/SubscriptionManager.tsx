@@ -35,10 +35,10 @@ const MISSION_PRICING: PricingTier[] = [
 ];
 
 const ALL_ACCESS_PRICING: PricingTier[] = [
-    { months: 1, price: 4900, label: '1 Month' },
-    { months: 3, price: 12900, label: '3 Months' },
-    { months: 6, price: 19900, label: '6 Months' },
-    { months: 12, price: 29900, label: '12 Months' },
+    { months: 1, price: 3000, label: '1 Month' },
+    { months: 3, price: 7500, label: '3 Months' },
+    { months: 6, price: 12000, label: '6 Months' },
+    { months: 12, price: 18000, label: '12 Months' },
 ];
 
 const CATEGORIES: GoalCategory[] = ['body_wellness', 'growth_career', 'mind_connection', 'funplay'];
@@ -229,7 +229,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         // HOWEVER, PortOne V2 usually doesn't use IMP.init() the same way or uses different keys.
         // Given user instructions: "Keep Test Payment for now".
         // We will maintain existing code for 'test'. 
-        // For 'real', if using V1, we need to know if the User Code changes.
+        // For 'real', if using V1, we need the Store ID (User Code) for the Real channel too.
         // Let's assume User Code is static, but we might pass extra params if needed.
 
         // The user provided Channel Key: channel-key-... which suggests V2.
@@ -548,24 +548,53 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
                             {/* Pricing Grid (Reverted to 2-cols) */}
                             <div className="grid grid-cols-2 gap-3 mb-6">
-                                {(activeTab === 'mission' ? MISSION_PRICING : ALL_ACCESS_PRICING).map((tier) => (
-                                    <div
-                                        key={tier.months}
-                                        className="p-3 rounded-xl border border-white/5 bg-white/5 flex flex-col justify-between group hover:border-primary/30 transition-all"
-                                    >
-                                        <div className="mb-3">
-                                            <p className="text-xs text-slate-400 font-bold mb-1">{tier.label}</p>
-                                            <p className="text-lg font-bold text-white">₩{tier.price.toLocaleString()}</p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleSubscribe(tier)}
-                                            disabled={loading}
-                                            className="w-full bg-primary text-black text-xs font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                {(activeTab === 'mission' ? MISSION_PRICING : ALL_ACCESS_PRICING).map((tier) => {
+                                    // Calculate Discount
+                                    // Default/Base Monthly Value. If 'All', it's 4 categories * 990 = 3960. If Mission, it's just 990.
+
+                                    // User Request: "Discount rate based on 990 KRW/mission/month * 4 for All Plan"
+
+                                    let discountPercent = 0;
+                                    if (activeTab === 'all') {
+                                        const referenceMonthly = 990 * 4; // 3960
+                                        const totalReferencePrice = referenceMonthly * tier.months;
+                                        if (totalReferencePrice > tier.price) {
+                                            discountPercent = Math.round((1 - (tier.price / totalReferencePrice)) * 100);
+                                        }
+                                    } else {
+                                        // Mission Plan Discount (Standard Logic: compare to 1 mo * months)
+                                        // 1 mo = 990.
+                                        const referenceMonthly = 990;
+                                        const totalReferencePrice = referenceMonthly * tier.months;
+                                        if (totalReferencePrice > tier.price) {
+                                            discountPercent = Math.round((1 - (tier.price / totalReferencePrice)) * 100);
+                                        }
+                                    }
+
+                                    return (
+                                        <div
+                                            key={tier.months}
+                                            className="p-3 rounded-xl border border-white/5 bg-white/5 flex flex-col justify-between group hover:border-primary/30 transition-all relative overflow-hidden"
                                         >
-                                            {t.purchase || "Purchase"}
-                                        </button>
-                                    </div>
-                                ))}
+                                            {discountPercent > 0 && (
+                                                <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-bl-lg">
+                                                    SAVE {discountPercent}%
+                                                </div>
+                                            )}
+                                            <div className="mb-3">
+                                                <p className="text-xs text-slate-400 font-bold mb-1">{tier.label}</p>
+                                                <p className="text-lg font-bold text-white">₩{tier.price.toLocaleString()}</p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleSubscribe(tier)}
+                                                disabled={loading}
+                                                className="w-full bg-primary text-black text-xs font-bold py-2 rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
+                                            >
+                                                {t.purchase || "Purchase"}
+                                            </button>
+                                        </div>
+                                    )
+                                })}
                             </div>
 
                             <p className="text-[10px] text-slate-500 text-center mb-6">

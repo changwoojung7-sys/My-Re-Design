@@ -1,36 +1,52 @@
-export { };
-
-// Define the Android Native Interface
-declare global {
-    interface Window {
-        Android: {
-            showRewardedAd: (adUnitId: string) => void;
-        };
-    }
-}
+import { AdMob, type RewardAdOptions } from '@capacitor-community/admob';
+import { Capacitor } from '@capacitor/core';
 
 // Rewarded Ad Unit IDs
 export const ADMOB_UNITS = {
     // TEST UNIT ID for Android Rewarded Video
-    // Use this for development and testing
     REWARDED_TEST: 'ca-app-pub-3940256099942544/5224354917',
 
-    // Real Production ID (Should be replaced with config or env variable later)
+    // Real Production ID
     REWARDED_PROD: 'ca-app-pub-2810872681064029/7646925189'
 };
 
+export const initializeAdMob = async () => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    try {
+        await AdMob.initialize({
+            initializeForTesting: false,
+        });
+        console.log('[AdMob] Initialized');
+    } catch (e) {
+        console.error('[AdMob] Failed to initialize', e);
+    }
+};
+
 /**
- * Triggers the Native Android AdMob Rewarded Ad
+ * Triggers the Native AdMob Rewarded Ad
  * @param adUnitId The Ad Unit ID to load and show
- * @returns boolean true if native bridge was found and called, false otherwise.
  */
-export const showNativeRewardedAd = (adUnitId: string = ADMOB_UNITS.REWARDED_TEST): boolean => {
-    if (window.Android && window.Android.showRewardedAd) {
-        console.log(`[AdMob] Calling Native Bridge with ID: ${adUnitId}`);
-        window.Android.showRewardedAd(adUnitId);
-        return true;
+export const showNativeRewardedAd = async (adUnitId: string = ADMOB_UNITS.REWARDED_TEST): Promise<boolean> => {
+    if (!Capacitor.isNativePlatform()) {
+        console.log('[AdMob] Not native platform (Running in Browser Mode)');
+        return false;
     }
 
-    console.log('[AdMob] Native Bridge not found (Running in Browser Mode)');
-    return false;
+    try {
+        const options: RewardAdOptions = {
+            adId: adUnitId,
+            // isTesting: true, // simplified for now, let initialize handle it
+        };
+
+        console.log(`[AdMob] Preparing Ad: ${adUnitId}`);
+        await AdMob.prepareRewardVideoAd(options);
+
+        console.log(`[AdMob] Showing Ad`);
+        await AdMob.showRewardVideoAd();
+        return true;
+    } catch (e) {
+        console.error('[AdMob] Failed to show native ad', e);
+        return false;
+    }
 };

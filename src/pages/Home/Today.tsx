@@ -236,7 +236,8 @@ export default function Today() {
 
         } else {
             // Standard Generation (3 Missions)
-            newMissions = await generateMissions(user, language, exclusionList);
+            // Optimize: Pass selectedGoal to generate ONLY for this category
+            newMissions = await generateMissions(user, language, exclusionList, selectedGoal);
 
             // Filter for CURRENT selected category just in case AI returns mixed
             const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());

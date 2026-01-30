@@ -32,15 +32,19 @@ export default function Paywall({ onClose }: PaywallProps) {
     };
 
     const plans = [
-        { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 4900, save: null },
-        { id: '3m', name: t.plan3Months, price: t.price3Months, amount: 12900, save: '25%' },
-        { id: '6m', name: t.plan6Months, price: t.price6Months, amount: 19900, save: '25%' },
-        { id: '12m', name: t.plan12Months, price: t.price12Months, amount: 29900, save: '44%', best: true },
+        { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 3000, save: '24%' },
+        { id: '3m', name: t.plan3Months, price: t.price3Months, amount: 7500, save: '37%' },
+        { id: '6m', name: t.plan6Months, price: t.price6Months, amount: 12000, save: '50%' },
+        { id: '12m', name: t.plan12Months, price: t.price12Months, amount: 18000, save: '62%', best: true },
     ];
 
-    const handleSubscribe = (plan: typeof plans[0]) => {
+    const handleSubscribe = async (plan: typeof plans[0]) => {
         if (!window.IMP) return;
         const { IMP } = window;
+
+        // Fetch Payment Mode
+        const { data: payModeData } = await supabase.from('admin_settings').select('value').eq('key', 'payment_mode').single();
+        const mode = payModeData?.value || 'test'; // Default to test
 
         // Initialize PortOne (User Code)
         IMP.init('imp05646567'); // User's Identification Code
@@ -63,7 +67,8 @@ export default function Paywall({ onClose }: PaywallProps) {
                     const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
                         body: {
                             imp_uid: rsp.imp_uid,
-                            merchant_uid: rsp.merchant_uid
+                            merchant_uid: rsp.merchant_uid,
+                            mode: mode // Pass mode to verify sandbox transactions
                         }
                     });
 
@@ -104,13 +109,18 @@ export default function Paywall({ onClose }: PaywallProps) {
 
                     if (subError) throw subError;
 
-                    // 3. Update Profile (Optional - mainly to ensure 'premium' tier flag if column exists)
-                    // Note: 'subscription_end_date' column might be missing in some schemas, so simplified.
-                    const { error: profileError } = await supabase.from('profiles').update({
-                        subscription_tier: 'premium'
-                    }).eq('id', user?.id);
+                    // 3. Update Profile (Optional - gracefully handle missing column)
+                    try {
+                        const { error: profileError } = await supabase.from('profiles').update({
+                            subscription_tier: 'premium'
+                        }).eq('id', user?.id);
 
-                    if (profileError) throw profileError;
+                        if (profileError) {
+                            console.warn('Profile update warning (tier):', profileError.message);
+                        }
+                    } catch (profileErr) {
+                        console.warn('Profile update failed (likely missing column), but payment success.', profileErr);
+                    }
 
                     alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
                     window.location.reload();

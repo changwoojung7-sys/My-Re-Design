@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
+
 import { motion } from 'framer-motion';
 import { X, Volume2, VolumeX, Award } from 'lucide-react';
 
-import { showNativeRewardedAd, ADMOB_UNITS } from '../../lib/admob';
+import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';
+import { showNativeRewardedAd, ADMOB_UNITS, initializeAdMob } from '../../lib/admob';
 
 interface RewardAdProps {
     onReward: () => void;
@@ -17,26 +20,54 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
     const [isCompleted, setIsCompleted] = useState(false);
     const [isNativeMode, setIsNativeMode] = useState(false);
 
-    useEffect(() => {
-        // Try to trigger Native Ad first
-        // We use the TEST ID by default for safety during dev, 
-        // but if adSlotId is provided (from props), we can decide to use that or the test one.
-        // For this specific request, we want to TEST the specific ID provided.
-        const useTestId = ADMOB_UNITS.REWARDED_TEST;
 
-        // Check if we are in Native App Container
-        if (window.Android) {
-            setIsNativeMode(true);
-            const success = showNativeRewardedAd(useTestId);
-            if (success) {
-                // If Native Ad launched, we close this Web Modal immediately 
-                // because the Native Ad covers the screen.
-                // However, we need a way to know if user completed it.
-                // Usually, the Native App calls a Javascript function back (e.g. onUserEarnedReward).
-                // For now, we'll keep this open or rely on the mock if bridge fails.
-                console.log("Native Ad Triggered");
+
+    useEffect(() => {
+        let listeners: any[] = [];
+
+        const setupAdMob = async () => {
+            if (Capacitor.isNativePlatform()) {
+                setIsNativeMode(true);
+
+                await initializeAdMob();
+
+                // Setup Listeners
+                const onRewarded = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
+                    console.log('User rewarded', reward);
+                    onReward();
+                    onClose();
+                });
+
+                const onDismissed = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+                    console.log('Ad dismissed');
+                    onClose();
+                });
+
+                const onFailed = await AdMob.addListener(RewardAdPluginEvents.FailedToLoad, (error) => {
+                    console.error('Ad failed to load', error);
+                    setIsNativeMode(false); // Fallback to web mock
+                });
+
+                listeners = [onRewarded, onDismissed, onFailed];
+
+                // Trigger Ad
+                // Use REWARDED_PROD for release as per policy
+                const adUnitId = ADMOB_UNITS.REWARDED_PROD;
+                const success = await showNativeRewardedAd(adUnitId);
+
+                if (!success) {
+                    setIsNativeMode(false);
+                }
+            } else {
+                setIsNativeMode(false);
             }
-        }
+        };
+
+        setupAdMob();
+
+        return () => {
+            listeners.forEach(l => l.remove());
+        };
     }, [adSlotId]);
 
     // Timer Logic for Web Mock
@@ -78,7 +109,7 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
             {/* Top Bar */}
             <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-10 bg-gradient-to-b from-black/80 to-transparent">
                 <div className="text-white text-xs bg-black/50 px-3 py-1 rounded-full border border-white/20 backdrop-blur-md">
-                    {timeLeft > 0 ? `Reward in ${timeLeft}s` : 'Reward Granted'}
+                    {timeLeft > 0 ? `광고 시청 중... ${timeLeft}초` : '보상 지급 가능'}
                 </div>
                 {canClose && (
                     <button
@@ -101,21 +132,19 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
 
                     <div className="z-10 text-center p-8">
                         <motion.div
-                            animate={{ scale: [1, 1.05, 1] }}
-                            transition={{ repeat: Infinity, duration: 2 }}
-                            className="bg-white/10 p-6 rounded-3xl border border-white/20 backdrop-blur-xl mb-6 inline-block shadow-2xl"
+                            animate={{ scale: [1, 1.05, 1], rotate: [0, 5, -5, 0] }}
+                            transition={{ repeat: Infinity, duration: 4 }}
+                            className="bg-white/10 p-6 rounded-3xl border border-white/20 backdrop-blur-xl mb-8 inline-block shadow-2xl"
                         >
-                            <img src="/reme_icon.png" alt="App Icon" className="w-20 h-20 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
+                            <img src="/reme_icon.png" alt="App Icon" className="w-24 h-24 object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.5)]" />
                         </motion.div>
-                        <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Test Ad</h2>
-                        <p className="text-blue-200 text-sm mb-4 font-mono select-all bg-black/30 p-2 rounded">
-                            ID: {ADMOB_UNITS.REWARDED_TEST}
-                        </p>
-                        <p className="text-blue-200 text-lg mb-8 font-medium">Native Ad Simulation</p>
 
-                        <div className="bg-black/40 backdrop-blur-sm rounded-xl p-4 border border-white/10 inline-block">
-                            <p className="text-xs text-slate-300 uppercase tracking-widest font-bold mb-1">Test Mode</p>
-                            <p className="text-white font-bold">This is a Web Simulation</p>
+                        <h2 className="text-2xl font-bold text-white mb-3 tracking-tight">광고를 불러오는 중입니다</h2>
+                        <p className="text-slate-300 text-sm mb-8 animate-pulse">잠시만 기다려주세요...</p>
+
+                        <div className="inline-flex items-center gap-2 bg-black/30 px-4 py-2 rounded-lg border border-white/5">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-ping" />
+                            <span className="text-xs text-slate-400">Secure Connection</span>
                         </div>
                     </div>
 
@@ -138,17 +167,19 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                 {/* Bottom CTA */}
                 <div className={`p-6 bg-slate-950 border-t border-white/10 transition-all duration-500 ${isCompleted ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}`}>
                     <div className="flex items-center gap-3 mb-4">
-                        <Award className="text-yellow-400" size={24} />
+                        <div className="p-2 bg-yellow-400/20 rounded-lg">
+                            <Award className="text-yellow-400" size={24} />
+                        </div>
                         <div>
-                            <p className="text-white font-bold">Reward Unlocked!</p>
-                            <p className="text-slate-400 text-xs">Test Reward Granted on Close.</p>
+                            <p className="text-white font-bold">보상 지급 완료!</p>
+                            <p className="text-slate-400 text-xs">이제 보상을 받으실 수 있습니다.</p>
                         </div>
                     </div>
                     <button
                         onClick={() => { onReward(); onClose(); }}
-                        className="w-full bg-white text-black font-bold py-3 rounded-xl hover:bg-slate-200 transition-colors"
+                        className="w-full bg-white text-black font-bold py-3 rounded-xl hover:bg-slate-200 transition-colors shadow-lg shadow-white/10"
                     >
-                        Close & Earn Reward
+                        닫기 & 보상 받기
                     </button>
                 </div>
             </div>
