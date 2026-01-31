@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import SubscriptionManager from './SubscriptionManager';
 import UserGuide from '../../components/common/UserGuide';
+import { deleteFilesFromStorage } from '../../lib/storageHelper';
 
 export type GoalCategory = 'body_wellness' | 'growth_career' | 'mind_connection' | 'funplay';
 
@@ -530,10 +531,6 @@ export default function MyPage() {
 
             setVerifyTimer(60);
             alert(t.alertCodeSent);
-            // Note: If Supabase prevents duplicate OTPs or 'Sign in with OTP' while logged in?
-            // Usually it works and just sends a code/link.
-            // If it sends a Magic Link, this UI (entering code) might be confusing unless we configured "Send Code".
-            // We assume Project Config is set to Send Code for Email OTP.
         } catch (err: any) {
             console.error(err);
             alert(err.message);
@@ -563,6 +560,32 @@ export default function MyPage() {
             // If success, proceed to delete
             const confirmFinal = window.confirm(t.deleteAccountConfirm2 || "Are you sure? This is irreversible.");
             if (!confirmFinal) return;
+
+            // -------------------------------------------------------------
+            // NEW: Clean up Storage Files BEFORE deleting DB records
+            // -------------------------------------------------------------
+            // 1. Fetch all mission images/videos for this user
+            const { data: userMissions } = await supabase
+                .from('missions')
+                .select('image_url')
+                .eq('user_id', user!.id)
+                .not('image_url', 'is', null);
+
+            // 2. Get profile image
+            const profileImage = user!.profile_image_url;
+
+            // 3. Collect all URLs
+            const allUrlsToDelete = [
+                ...(userMissions?.map(m => m.image_url) || []),
+                profileImage
+            ];
+
+            // 4. Delete files
+            if (allUrlsToDelete.length > 0) {
+                await deleteFilesFromStorage(allUrlsToDelete);
+            }
+            // -------------------------------------------------------------
+
 
             // Call RPC
             const { error: rpcError } = await supabase.rpc('delete_account');
@@ -696,6 +719,25 @@ export default function MyPage() {
             // C. Missions (Daily Logs for this category)
             // Missions are loosely coupled by category. To fully reset History/Growth stats for this slot,
             // we must delete all missions associated with this category for the user.
+
+            // -----------------------------------------------------------------
+            // NEW: Clean up storage files for these missions
+            // -----------------------------------------------------------------
+            const { data: goalMissions } = await supabase
+                .from('missions')
+                .select('image_url')
+                .eq('user_id', user.id)
+                .eq('category', selectedCategory)
+                .eq('seq', currentGoal.seq || 1)
+                .not('image_url', 'is', null);
+
+            const urlsToDelete = goalMissions?.map(m => m.image_url) || [];
+            if (urlsToDelete.length > 0) {
+                await deleteFilesFromStorage(urlsToDelete);
+            }
+            // -----------------------------------------------------------------
+
+
             const { error: missionError } = await supabase
                 .from('missions')
                 .delete()
