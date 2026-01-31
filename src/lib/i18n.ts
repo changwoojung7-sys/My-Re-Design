@@ -85,7 +85,7 @@ export const translations = {
 
         // Friends
         addFriend: "Add Friend",
-        searchPlaceholder: "Phone or Email",
+        searchPlaceholder: "Phone, Email, or Nickname",
         readyToStart: "Ready to start...",
         missions: "Missions",
         progress: "Progress",
@@ -378,8 +378,8 @@ export const translations = {
 
         // Friends
         addFriend: "친구 추가",
-        searchPlaceholder: "전화번호 또는 이메일",
-        readyToStart: "시작 준비 중...",
+        searchPlaceholder: "이메일, 휴대폰, 닉네임 검색",
+        readyToStart: "준비 중...",
         missions: "미션",
         progress: "진행도",
 

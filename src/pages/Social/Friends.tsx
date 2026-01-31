@@ -11,7 +11,7 @@ export default function Friends() {
     const { t } = useLanguage();
     const [friends, setFriends] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [foundUser, setFoundUser] = useState<any | null>(null);
+    const [foundUsers, setFoundUsers] = useState<any[]>([]);
     const [searching, setSearching] = useState(false);
 
 
@@ -193,44 +193,86 @@ export default function Friends() {
     const handleSearch = async () => {
         if (!searchQuery.trim()) return;
         setSearching(true);
-        setFoundUser(null);
+        setFoundUsers([]);
+
+        let searchTerm = searchQuery.trim();
+
+        // Phone Number Normalization
+        // Remove hyphens/spaces
+        const rawInput = searchTerm.replace(/[^0-9a-zA-Z@.]/g, '');
+        // For fuzzy search, we might NOT want to force +82 if they are typing "4561"
+        // But if they typed "010...", we usually want to search for the E.164 format too?
+        // Actually, the SQL now does %term%, so "0101234..." might fail if DB has "+8210..."
+        // So we should send BOTH or rely on the SQL to handle it.
+        // Let's send the raw digit string for the SQL to fuzzy match,
+        // OR convert 010 to +82 as primary.
+
+        // Re-thinking: User wants "22171125" (no 010) to match.
+        // And "4561" to match.
+        // So we should probably just send the raw input (digits only) and let SQL %like% handle it?
+        // BUT if they type "010-1234-5678", we want to find "+821012345678".
+        // The previous logic converted 010 -> +82.
+        // If I type "4561", it is NOT 010 start. So it sends "4561". SQL does %4561%. Correct.
+        // If I type "01012345678", I convert to "+821012345678". SQL does %+8210...%. Correct.
+
+        // KEEP logic for 010 conversion, but if it doesn't start with 010, treat as partial.
+
+        const isEmail = rawInput.includes('@');
+        const isPhone = /^[0-9]+$/.test(rawInput.replace(/-/g, ''));
+
+        if (!isEmail && (isPhone || rawInput.startsWith('010'))) {
+            let cleanPhone = rawInput.replace(/-/g, '');
+            if (cleanPhone.startsWith('010')) {
+                cleanPhone = '+82' + cleanPhone.substring(1);
+            }
+            searchTerm = cleanPhone;
+        }
 
         try {
             // Use the secure RPC for search to handle RLS and auth.users lookup
             const { data, error } = await supabase.rpc('search_user_by_email_or_phone', {
-                search_term: searchQuery.trim()
+                search_term: searchTerm
             });
 
             if (error) throw error;
 
-            // RPC returns an array (setof table), so takes the first item if exists
-            const found = Array.isArray(data) ? data[0] : data;
+            const results = Array.isArray(data) ? data : (data ? [data] : []);
 
-            if (found && found.id !== user?.id && found.id !== 'demo123') { // Safety check
-                setFoundUser(found);
+            // Check if found self
+            const foundSelf = results.find((u: any) => u.id === user?.id);
+
+            // Filter self and demo
+            const valid = results.filter((u: any) => u.id !== user?.id && u.id !== 'demo123');
+
+            if (valid.length > 0) {
+                setFoundUsers(valid);
             } else {
-                alert("User not found.");
+                if (foundSelf) alert("검색 결과가 본인입니다.");
+                else alert("User not found.");
             }
         } catch (err) {
+            console.error(err);
             alert("Error searching user.");
         }
         setSearching(false);
     };
 
-    const addFriend = async () => {
+
+    const addFriend = async (targetUser: any) => {
         if (user?.id === 'demo123') return alert(t.demoLimit);
-        if (!foundUser || !user) return;
+        if (!targetUser || !user) return;
         try {
             const { error } = await supabase.from('friends').insert({
                 user_id: user.id,
-                friend_id: foundUser.id,
+                friend_id: targetUser.id,
                 status: 'accepted'
             });
             if (error) throw error;
 
-            alert(`Added ${foundUser.nickname || 'Friend'}!`);
-            setFoundUser(null);
-            setSearchQuery('');
+            alert(`Added ${targetUser.nickname || 'Friend'}!`);
+            // Remove from list
+            setFoundUsers(prev => prev.filter(u => u.id !== targetUser.id));
+            if (foundUsers.length <= 1) setSearchQuery('');
             fetchFriends();
         } catch (err) {
             // @ts-ignore
@@ -435,26 +477,35 @@ export default function Friends() {
                     </button>
                 </div>
 
-                {/* Search Result */}
-                {foundUser && (
-                    <div className="mt-4 p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between animate-in fade-in slide-in-from-top-1">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center">
-                                <User size={20} className="text-slate-300" />
+                {/* Search Results List */}
+                {foundUsers.length > 0 && (
+                    <div className="mt-4 space-y-2 animate-in fade-in slide-in-from-top-1">
+                        <p className="text-xs text-slate-400 pl-1 mb-2">Found {foundUsers.length} users</p>
+                        {foundUsers.map(u => (
+                            <div key={u.id} className="p-3 bg-primary/10 border border-primary/20 rounded-xl flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
+                                        {u.profile_image_url ? (
+                                            <img src={u.profile_image_url} alt={u.nickname} className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={20} className="text-slate-300" />
+                                        )}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">{u.nickname || 'Unknown User'}</p>
+                                        <p className="text-[10px] text-slate-400">
+                                            {u.email ? u.email : 'Phone User'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => addFriend(u)}
+                                    className="bg-primary text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-primary/90"
+                                >
+                                    Add
+                                </button>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold text-white">{foundUser.nickname || 'Unknown User'}</p>
-                                <p className="text-[10px] text-slate-400">
-                                    {foundUser.email ? 'Found via Email' : 'Found User'}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={addFriend}
-                            className="bg-primary text-black text-xs font-bold px-4 py-2 rounded-lg hover:bg-primary/90"
-                        >
-                            Add
-                        </button>
+                        ))}
                     </div>
                 )}
             </div>

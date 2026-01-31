@@ -23,8 +23,7 @@ begin
   
   -- Logic:
   -- 1. Exact Email Match (case insensitive)
-  -- 2. Phone Match (try to match input, or formatted input)
-  --    Note: auth.users.phone usually stores E.164 (e.g., +821012345678)
+  -- 2. Phone Match (fuzzy)
   
   return query
   select 
@@ -40,19 +39,27 @@ begin
     OR
     -- Phone Match (if input looks like phone digits)
     (
-      length(clean_term) >= 8 and (
-         au.phone = search_term
-         or au.phone = '+' || search_term
-         or au.phone like '%' || clean_term -- Loose match for last digits
-         -- Support the legacy/custom phone-email formats from Friends.tsx
-         or au.email = clean_term || '@myredesign.com'
-         or au.email = clean_term || '@phone.coreloop.com'
+      length(clean_term) >= 4 and (
+         au.phone like '%' || clean_term || '%' -- Fuzzy match (contains)
+         or 
+         -- Check if they stored it without +82 locally? usually auth.users is strict.
+         -- But maybe clean_term matches without country code?
+         -- Let's just do simple LIKE on the digits we cleaned? 
+         -- Actually au.phone has +82... so cleaning au.phone might be expensive.
+         -- Just relying on LIKE is simplest for now.
+         au.phone like '%' || search_term || '%' 
+         -- Also search in metadata (for email signups who added phone)
+         or
+         au.raw_user_meta_data->>'phone' like '%' || clean_term || '%'
+         or
+         au.raw_user_meta_data->>'phone_number' like '%' || clean_term || '%'
+         or
+         au.raw_user_meta_data->>'phone' like '%' || search_term || '%'
       )
     )
     OR
-    -- Search by nickname (optional, but requested "phone and email") -> user prompt says "phone and email", so maybe not nickname.
-    -- But Friends.tsx was only email/phone. Let's stick to email/phone to avoid leaking users by random name guesses.
-    false
-  limit 1;
+    -- Nickname Match
+    (p.nickname is not null and p.nickname ilike '%' || search_term || '%')
+  limit 20; -- Return up to 20 matches instead of 1
 end;
 $$;

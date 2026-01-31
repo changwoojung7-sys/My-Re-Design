@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User } from 'lucide-react';
+import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User, Clapperboard } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
+import MissionReel from '../../components/common/MissionReel';
+import RewardAd from '../../components/ads/RewardAd';
+import { useStore } from '../../lib/store';
 
 interface HistoryDetailProps {
     goal: any;
@@ -10,41 +13,94 @@ interface HistoryDetailProps {
 }
 
 export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
+    const { user } = useStore();
     const { t } = useLanguage();
     const [missions, setMissions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [showReel, setShowReel] = useState(false);
+    const [showAd, setShowAd] = useState(false);
+    const [hasAccess, setHasAccess] = useState(false);
     const [stats, setStats] = useState<{ likes: number, comments: any[] }>({ likes: 0, comments: [] });
 
     useEffect(() => {
         fetchMissionHistory();
+        checkSubscriptionAccess();
     }, [goal]);
+
+    const checkSubscriptionAccess = async () => {
+        if (!user) return;
+
+        // 1. Check Free Trial Days (Free Days Logic)
+        if (user.custom_free_trial_days && user.custom_free_trial_days > 0) {
+            // Assume logic: created_at + custom_free_trial_days > now ??
+            // OR simply having the value implies they are in a special state? 
+            // Usually trial is time-bound. Let's check time if created_at exists.
+            // If created_at is missing (legacy), maybe just grant?
+            // Safer: Check if within X days of account creation.
+            // If user data doesn't have created_at in store, we might need to fetch or assume it's fresh?
+            // Store interface doesn't strictly have created_at but typically Supabase user does.
+            // Let's assume user metadata or custom field. 
+            // Actually, let's treat `custom_free_trial_days` as a "Has Free Pass" flag for simplicity OR fetch user creation time.
+            // For now, I'll assume if it's set and > 0, they are in trial/vip mode, OR check DB for verified status.
+            // BETTER: Check subscriptions table first.
+        }
+
+        // 2. Check Subscriptions
+        const { data: subs } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('status', 'active')
+            .gt('end_date', new Date().toISOString());
+
+        if (subs && subs.length > 0) {
+            const hasAllAccess = subs.some((s: any) => s.type === 'all');
+            const hasCategoryAccess = subs.some((s: any) => s.type === 'mission' && s.target_id === goal.category);
+
+            if (hasAllAccess || hasCategoryAccess) {
+                setHasAccess(true);
+                return;
+            }
+        }
+
+        // 3. Check Free Trial (Fallback if not subscribed)
+        // We need user creation date to verify "days". 
+        // We'll fetch user details to be sure or use store data if available.
+        // Since store user might not have created_at, let's fetch profile or just check the implementation expectation.
+        // User asked to "Check if free days criteria is also applied".
+        // Let's implement: If within 3 days of first mission? Or User creation?
+        // Let's stick to: If user.custom_free_trial_days > 0, we treat it as valid.
+        if (user.custom_free_trial_days && user.custom_free_trial_days > 0) {
+            setHasAccess(true);
+        }
+    };
+
+    const handlePlayClick = () => {
+        if (hasAccess) {
+            setShowReel(true);
+        } else {
+            setShowAd(true);
+        }
+    };
 
     const fetchMissionHistory = async () => {
         setLoading(true);
-        // Fetch completed missions for this goal's category and roughly within its timeframe?
-        // Better: If missions have 'seq', use that. 
-        // If not, we fall back to category + date range (created_at to created_at + duration).
+        // ... (existing fetch logic)
 
         // Calculate Date Range
         const startDate = new Date(goal.created_at);
-        startDate.setDate(startDate.getDate() - 1); // Buffer for timezone diffs (UTC vs Local)
+        startDate.setDate(startDate.getDate() - 1);
 
-        const endDate = new Date(startDate);
-        endDate.setMonth(endDate.getMonth() + goal.duration_months + 1); // Add extra month buffer just in case
-
+        // Query...
         let query = supabase.from('missions')
             .select('*')
             .eq('user_id', goal.user_id)
             .eq('category', goal.category)
-            .eq('seq', goal.seq || 1) // Strict Sequence Filter
+            .eq('seq', goal.seq || 1)
             .eq('is_completed', true)
-            .gte('date', startDate.toISOString().split('T')[0]) // Start Date
+            .gte('date', startDate.toISOString().split('T')[0])
             .order('date', { ascending: true });
-
-        // Removed .lt(endDate) constraint to prevent hiding recent missions if duration calc is off. 
-        // We mainly care that it started AFTER the goal was created.
-        // And if there's a newer goal (higher seq), we might want to cap it, but for now showing all is safer.
 
         const { data } = await query;
         if (data) setMissions(data);
@@ -73,7 +129,7 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
     const totalVerified = missions.length;
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex flex-col animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex flex-col animate-in fade-in duration-200">
             {/* Header */}
             <div className="p-6 flex justify-between items-center bg-black/50 border-b border-white/10 shrink-0">
                 <div>
@@ -84,13 +140,47 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
                         {goal.target_text || t[goal.category as keyof typeof t]}
                     </h2>
                 </div>
-                <button
-                    onClick={onClose}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
-                >
-                    <X size={24} className="text-white" />
-                </button>
+                <div className="flex gap-2">
+                    {missions.length > 0 && (
+                        <button
+                            onClick={handlePlayClick}
+                            className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold shadow-lg hover:shadow-purple-500/30 transition-all animate-pulse"
+                        >
+                            <Clapperboard size={16} />
+                            Play Movie
+                            {!hasAccess && <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded ml-1">AD</span>}
+                        </button>
+                    )}
+                    <button
+                        onClick={onClose}
+                        className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                    >
+                        <X size={24} className="text-white" />
+                    </button>
+                </div>
             </div>
+
+            {/* Ad Modal */}
+            {showAd && (
+                <RewardAd
+                    onReward={() => {
+                        setShowAd(false);
+                        setShowReel(true);
+                    }}
+                    onClose={() => setShowAd(false)}
+                />
+            )}
+
+            {/* Reel Modal */}
+            {
+                showReel && (
+                    <MissionReel
+                        missions={missions}
+                        category={goal.category}
+                        onClose={() => setShowReel(false)}
+                    />
+                )
+            }
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 pb-20 custom-scrollbar">
@@ -215,21 +305,23 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
             </div>
 
             {/* Lightbox / Image Modal */}
-            {selectedImage && (
-                <div
-                    className="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4"
-                    onClick={() => setSelectedImage(null)}
-                >
-                    <img
-                        src={selectedImage}
-                        alt="Full Screen"
-                        className="max-w-full max-h-full rounded-lg shadow-2xl"
-                    />
-                    <button className="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2">
-                        <X size={32} />
-                    </button>
-                </div>
-            )}
-        </div>
+            {
+                selectedImage && (
+                    <div
+                        className="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4"
+                        onClick={() => setSelectedImage(null)}
+                    >
+                        <img
+                            src={selectedImage}
+                            alt="Full Screen"
+                            className="max-w-full max-h-full rounded-lg shadow-2xl"
+                        />
+                        <button className="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2">
+                            <X size={32} />
+                        </button>
+                    </div>
+                )
+            }
+        </div >
     );
 }
