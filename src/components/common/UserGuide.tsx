@@ -64,7 +64,7 @@ export default function UserGuide({ onClose }: UserGuideProps) {
         // Slide 2: Mission Setup (Animated Interaction)
         {
             title: "나만의 미션 설계하기",
-            subtitle: "편집 모드로 목표를 입력하세요",
+            subtitle: "수정 모드로 목표를 입력하세요",
             content: (
                 <div className="relative w-full px-8 py-4">
                     {/* Mockup Card */}
@@ -86,14 +86,14 @@ export default function UserGuide({ onClose }: UserGuideProps) {
                                     animate={{ display: ["inline", "inline", "none", "none"] }}
                                     transition={{ duration: 4, times: [0, 0.3, 0.35, 1], repeat: Infinity, repeatDelay: 1 }}
                                 >
-                                    조회
+                                    조회모드
                                 </motion.span>
                                 <motion.span
                                     initial={{ display: "none" }}
                                     animate={{ display: ["none", "none", "inline", "inline"] }}
                                     transition={{ duration: 4, times: [0, 0.3, 0.35, 1], repeat: Infinity, repeatDelay: 1 }}
                                 >
-                                    편집
+                                    수정모드
                                 </motion.span>
                             </motion.div>
                         </div>
@@ -145,7 +145,7 @@ export default function UserGuide({ onClose }: UserGuideProps) {
 
                     <div className="mt-4 text-center">
                         <p className="text-xs text-slate-300">
-                            <span className="text-emerald-400 font-bold">[조회]</span> 버튼을 눌러 편집 모드로 전환하고<br />
+                            <span className="text-emerald-400 font-bold">[조회모드]</span> 버튼을 눌러 수정 모드로 전환하고<br />
                             나만의 목표를 입력해보세요.
                         </p>
                     </div>
@@ -155,126 +155,143 @@ export default function UserGuide({ onClose }: UserGuideProps) {
         // Slide 3: Mission History (Mosaic Animation)
         {
             title: "성공을 기록하세요",
-            subtitle: "미션 인증으로 나만의 히스토리를 만드세요",
+            subtitle: "미션 인증 & Play Movie",
             content: (
-                <div className="relative w-full h-[320px] rounded-xl overflow-hidden shadow-2xl border border-slate-700 bg-slate-900 group">
-                    {/* Background Layer: List View */}
-                    <div className="absolute inset-0 bg-slate-900">
-                        <img
-                            src="/guide_history_list.png"
-                            alt="History List"
-                            className="w-full h-full object-cover opacity-80"
-                        />
-                        {/* Transition Overlay to Detail */}
-                        <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: [0, 0, 1, 1] }}
-                            transition={{ duration: 4, times: [0, 0.4, 0.5, 1], repeat: Infinity, repeatDelay: 1 }}
-                            className="absolute inset-0 bg-slate-900 z-10"
-                        >
+                <div className="flex flex-col gap-4 w-full">
+                    <div className="relative w-full h-[250px] rounded-xl overflow-hidden shadow-2xl border border-slate-700 bg-slate-900 group">
+                        {/* Background Layer: List View */}
+                        <div className="absolute inset-0 bg-slate-900">
                             <img
-                                src="/guide_history_detail.png"
-                                alt="History Detail"
+                                src="/guide_history_list.png"
+                                alt="History List"
                                 className="w-full h-full object-cover opacity-80"
                             />
-                            {/* Mosaic/Blur Effects on Text Areas */}
+                            {/* Transition Overlay to Detail */}
                             <motion.div
-                                animate={{ backdropFilter: ["blur(4px)", "blur(0px)", "blur(4px)"] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                                className="absolute top-[20%] left-[5%] w-[90%] h-[10%] bg-white/5 rounded"
-                            />
-                            <motion.div
-                                animate={{ backdropFilter: ["blur(4px)", "blur(0px)", "blur(4px)"] }}
-                                transition={{ duration: 2, delay: 0.5, repeat: Infinity }}
-                                className="absolute top-[35%] left-[5%] w-[90%] h-[15%] bg-white/5 rounded"
-                            />
-                        </motion.div>
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: [0, 0, 1, 1] }}
+                                transition={{ duration: 4, times: [0, 0.4, 0.5, 1], repeat: Infinity, repeatDelay: 1 }}
+                                className="absolute inset-0 bg-slate-900 z-10"
+                            >
+                                <img
+                                    src="/guide_history_detail.png"
+                                    alt="History Detail"
+                                    className="w-full h-full object-cover opacity-80"
+                                />
+                                {/* Mosaic/Blur Effects on Text Areas */}
+                                <motion.div
+                                    animate={{ backdropFilter: ["blur(4px)", "blur(0px)", "blur(4px)"] }}
+                                    transition={{ duration: 2, repeat: Infinity }}
+                                    className="absolute top-[20%] left-[5%] w-[90%] h-[10%] bg-white/5 rounded"
+                                />
+                                <motion.div
+                                    animate={{ backdropFilter: ["blur(4px)", "blur(0px)", "blur(4px)"] }}
+                                    transition={{ duration: 2, delay: 0.5, repeat: Infinity }}
+                                    className="absolute top-[35%] left-[5%] w-[90%] h-[15%] bg-white/5 rounded"
+                                />
+                            </motion.div>
 
-                        {/* Hand Click Animation on List Item */}
-                        <motion.div
-                            animate={{
-                                opacity: [1, 1, 0, 0],
-                                scale: [1, 0.9, 1, 0]
-                            }}
-                            transition={{ duration: 4, times: [0, 0.35, 0.4, 0.45], repeat: Infinity, repeatDelay: 1 }}
-                            className="absolute top-[25%] left-[50%] -translate-x-1/2 z-20"
-                        >
-                            <Hand size={32} className="text-white fill-slate-900" />
-                        </motion.div>
+                            {/* Hand Click Animation on List Item */}
+                            <motion.div
+                                animate={{
+                                    opacity: [1, 1, 0, 0],
+                                    scale: [1, 0.9, 1, 0]
+                                }}
+                                transition={{ duration: 4, times: [0, 0.35, 0.4, 0.45], repeat: Infinity, repeatDelay: 1 }}
+                                className="absolute top-[25%] left-[50%] -translate-x-1/2 z-20"
+                            >
+                                <Hand size={32} className="text-white fill-slate-900" />
+                            </motion.div>
+                        </div>
+                    </div>
+                    <div className="bg-white/5 p-4 rounded-xl text-center">
+                        <p className="text-xs text-slate-300">
+                            완료한 미션은 <span className="text-primary font-bold">Play Movie</span> 기능을 통해
+                            <br />영상으로 생생하게 다시 볼 수 있습니다.
+                        </p>
                     </div>
                 </div>
             )
         },
-        // Slide 3: Friends (Image Overlay Animation)
+        // Slide 4: Friends (Image Overlay Animation)
         {
             title: "함께 성장하는 즐거움",
-            subtitle: "친구와 서로 동기부여를 주고받으세요",
+            subtitle: "친구 검색 및 응원하기",
             content: (
-                <div className="relative w-full h-[320px] rounded-xl overflow-hidden shadow-2xl border border-slate-700 bg-slate-900 group">
-                    {/* Background Image */}
-                    <img
-                        src="/guide_friends.png"
-                        alt="Friends Guide"
-                        className="w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity duration-500 blur-[1px] group-hover:blur-sm"
-                    />
-
-                    {/* Overlay: Focused Areas Sequence */}
-
-                    {/* 1. Search Bar Focus */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: [0, 1, 1, 0] }}
-                        transition={{ duration: 3, times: [0, 0.1, 0.9, 1], repeat: Infinity, repeatDelay: 9 }}
-                        className="absolute top-[16%] left-[5%] w-[90%] h-[15%] border-2 border-yellow-400 rounded-lg bg-yellow-400/10 shadow-[0_0_15px_rgba(250,204,21,0.5)] z-10 flex items-center justify-center"
-                    >
-                        <span className="bg-black/80 px-2 py-1 rounded text-xs font-bold text-yellow-400 backdrop-blur-md">친구 검색 & 추가</span>
-                    </motion.div>
-
-                    {/* 2. Like & Comment Focus */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: [0, 1, 1, 0] }}
-                        transition={{ duration: 3, times: [0, 0.1, 0.9, 1], delay: 3, repeat: Infinity, repeatDelay: 9 }}
-                        className="absolute bottom-[28%] left-[4%] w-[25%] h-[10%] border-2 border-pink-500 rounded-lg bg-pink-500/10 shadow-[0_0_15px_rgba(236,72,153,0.5)] z-10 flex items-center justify-center"
-                    >
-                        <span className="bg-black/80 px-2 py-1 rounded text-xs font-bold text-pink-500 backdrop-blur-md">응원하기</span>
-                    </motion.div>
-
-                    {/* 3. History View Request Focus */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: [0, 1, 1, 0] }}
-                        transition={{ duration: 3, times: [0, 0.1, 0.9, 1], delay: 6, repeat: Infinity, repeatDelay: 9 }}
-                        className="absolute bottom-[38%] right-[5%] w-[45%] h-[10%] border-2 border-primary rounded-lg bg-primary/10 shadow-[0_0_15px_rgba(59,130,246,0.5)] z-10 flex items-center justify-center"
-                    >
-                        <span className="bg-black/80 px-2 py-1 rounded text-xs font-bold text-primary backdrop-blur-md">히스토리 보기 요청</span>
-                    </motion.div>
-
-
-                    {/* Animated Hand Cursor */}
-                    <motion.div
-                        animate={{
-                            top: ["80%", "23%", "23%", "64%", "64%", "60%", "60%"],
-                            left: ["90%", "50%", "50%", "15%", "15%", "70%", "70%"],
-                            scale: [1, 1, 0.9, 1, 0.9, 1, 0.9],
-                        }}
-                        transition={{
-                            duration: 12,
-                            times: [0, 0.2, 0.25, 0.5, 0.55, 0.8, 0.85],
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                        }}
-                        className="absolute z-50 drop-shadow-2xl"
-                    >
-                        <Hand size={32} className="text-white fill-slate-900 stroke-[1.5]" />
-
-                        {/* Click Ripple Effect */}
-                        <motion.div
-                            animate={{ scale: [1, 2], opacity: [0.8, 0] }}
-                            transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }} // Simplified sync
-                            className="absolute -top-2 -left-2 w-12 h-12 bg-white/50 rounded-full"
+                <div className="flex flex-col gap-4 w-full">
+                    <div className="relative w-full h-[250px] rounded-xl overflow-hidden shadow-2xl border border-slate-700 bg-slate-900 group">
+                        {/* Background Image */}
+                        <img
+                            src="/guide_friends.png"
+                            alt="Friends Guide"
+                            className="w-full h-full object-cover opacity-60 group-hover:opacity-40 transition-opacity duration-500 blur-[1px] group-hover:blur-sm"
                         />
-                    </motion.div>
+
+                        {/* Overlay: Focused Areas Sequence */}
+
+                        {/* 1. Search Bar Focus */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: [0, 1, 1, 0] }}
+                            transition={{ duration: 3, times: [0, 0.1, 0.9, 1], repeat: Infinity, repeatDelay: 9 }}
+                            className="absolute top-[16%] left-[5%] w-[90%] h-[15%] border-2 border-yellow-400 rounded-lg bg-yellow-400/10 shadow-[0_0_15px_rgba(250,204,21,0.5)] z-10 flex items-center justify-center"
+                        >
+                            <span className="bg-black/80 px-2 py-1 rounded text-xs font-bold text-yellow-400 backdrop-blur-md">친구 검색 (이메일, 번호, 닉네임)</span>
+                        </motion.div>
+
+                        {/* 2. Like & Comment Focus */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: [0, 1, 1, 0] }}
+                            transition={{ duration: 3, times: [0, 0.1, 0.9, 1], delay: 3, repeat: Infinity, repeatDelay: 9 }}
+                            className="absolute bottom-[28%] left-[4%] w-[25%] h-[10%] border-2 border-pink-500 rounded-lg bg-pink-500/10 shadow-[0_0_15px_rgba(236,72,153,0.5)] z-10 flex items-center justify-center"
+                        >
+                            <span className="bg-black/80 px-2 py-1 rounded text-xs font-bold text-pink-500 backdrop-blur-md">응원하기</span>
+                        </motion.div>
+
+                        {/* 3. History View Request Focus */}
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: [0, 1, 1, 0] }}
+                            transition={{ duration: 3, times: [0, 0.1, 0.9, 1], delay: 6, repeat: Infinity, repeatDelay: 9 }}
+                            className="absolute bottom-[38%] right-[5%] w-[45%] h-[10%] border-2 border-primary rounded-lg bg-primary/10 shadow-[0_0_15px_rgba(59,130,246,0.5)] z-10 flex items-center justify-center"
+                        >
+                            <span className="bg-black/80 px-2 py-1 rounded text-xs font-bold text-primary backdrop-blur-md">히스토리 보기 요청</span>
+                        </motion.div>
+
+
+                        {/* Animated Hand Cursor */}
+                        <motion.div
+                            animate={{
+                                top: ["80%", "23%", "23%", "64%", "64%", "60%", "60%"],
+                                left: ["90%", "50%", "50%", "15%", "15%", "70%", "70%"],
+                                scale: [1, 1, 0.9, 1, 0.9, 1, 0.9],
+                            }}
+                            transition={{
+                                duration: 12,
+                                times: [0, 0.2, 0.25, 0.5, 0.55, 0.8, 0.85],
+                                repeat: Infinity,
+                                ease: "easeInOut"
+                            }}
+                            className="absolute z-50 drop-shadow-2xl"
+                        >
+                            <Hand size={32} className="text-white fill-slate-900 stroke-[1.5]" />
+
+                            {/* Click Ripple Effect */}
+                            <motion.div
+                                animate={{ scale: [1, 2], opacity: [0.8, 0] }}
+                                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 3 }} // Simplified sync
+                                className="absolute -top-2 -left-2 w-12 h-12 bg-white/50 rounded-full"
+                            />
+                        </motion.div>
+                    </div>
+
+                    <div className="bg-white/5 p-4 rounded-xl text-center">
+                        <p className="text-xs text-slate-300">
+                            이메일, 전화번호, 닉네임 <span className="text-yellow-400 font-bold">일부만 입력해도</span>
+                            <br />친구를 쉽게 찾을 수 있습니다.
+                        </p>
+                    </div>
                 </div>
             )
         },
