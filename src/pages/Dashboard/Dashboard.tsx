@@ -11,6 +11,7 @@ export default function Dashboard() {
     const [goals, setGoals] = useState<any[]>([]);
     const [selectedGoalId, setSelectedGoalId] = useState<string | ('')>('');
     const [missions, setMissions] = useState<any[]>([]);
+    const [filterStatus, setFilterStatus] = useState<'active' | 'completed'>('active');
 
     // Coaching State
     const [coaching, setCoaching] = useState<{ insight: string; encouragement: string } | null>(null);
@@ -32,12 +33,48 @@ export default function Dashboard() {
     }, [selectedGoalId]);
 
     const fetchGoals = async () => {
-        const { data } = await supabase.from('user_goals').select('*').eq('user_id', user!.id);
-        if (data && data.length > 0) {
+        // Fetch ALL goals first
+        const { data } = await supabase.from('user_goals').select('*').eq('user_id', user!.id).order('created_at', { ascending: false });
+        if (data) {
             setGoals(data);
-            setSelectedGoalId(data[0].id);
         }
     };
+
+    // Filter Logic (Same as History.tsx)
+    const filteredGoals = useMemo(() => {
+        return goals.filter((goal: any) => {
+            const createdAt = new Date(goal.created_at);
+            const duration = goal.duration_months || 1;
+            const endDate = new Date(createdAt);
+
+            if (duration < 1) {
+                const d = duration === 0.25 ? 7 : duration === 0.5 ? 14 : Math.round(duration * 30);
+                endDate.setDate(endDate.getDate() + d);
+            } else {
+                endDate.setMonth(endDate.getMonth() + duration);
+            }
+
+            const now = new Date();
+            const isExpired = now > endDate;
+
+            if (filterStatus === 'completed') {
+                return isExpired || goal.is_completed === true;
+            } else {
+                return !isExpired && goal.is_completed !== true;
+            }
+        });
+    }, [goals, filterStatus]);
+
+    // Auto-select first goal when list changes
+    useEffect(() => {
+        if (filteredGoals.length > 0) {
+            if (!filteredGoals.find(g => g.id === selectedGoalId)) {
+                setSelectedGoalId(filteredGoals[0].id);
+            }
+        } else {
+            setSelectedGoalId('');
+        }
+    }, [filteredGoals, selectedGoalId]);
 
     const fetchMissionsAndCoach = async () => {
         const { data } = await supabase
@@ -50,7 +87,11 @@ export default function Dashboard() {
             // Filter by goal category
             const goal = goals.find(g => g.id === selectedGoalId);
             if (goal) {
-                const goalMissions = data.filter(m => m.category === goal.category);
+                const goalSeq = goal.seq || 1;
+                const goalMissions = data.filter(m =>
+                    m.category === goal.category &&
+                    (m.seq === goalSeq || (!m.seq && goalSeq === 1))
+                );
                 setMissions(goalMissions);
 
                 // Trigger AI Coach analysis
@@ -107,7 +148,7 @@ export default function Dashboard() {
         const recentHistory = goalMissions.slice(-5).map(m => ({ date: m.date, completed: m.is_completed }));
 
         // Check local storage / cache to avoid spamming API
-        const cacheKey = `coach_${goal.id}_${toYMD(new Date())}`;
+        const cacheKey = `coach_${goal.id}_${goal.seq || 1}_${toYMD(new Date())}`;
         const cached = localStorage.getItem(cacheKey);
 
         if (cached) {
@@ -232,23 +273,49 @@ export default function Dashboard() {
 
             {/* Header: Goal Selector */}
             <div className="mb-2 shrink-0">
-                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block tracking-wider">{t.analysisTarget}</label>
+                <div className="flex justify-between items-end mb-2">
+                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t.analysisTarget}</label>
+                    <div className="flex justify-end gap-2">
+                        <button
+                            onClick={() => setFilterStatus('active')}
+                            className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${filterStatus === 'active'
+                                ? 'bg-primary text-black border-primary'
+                                : 'bg-transparent text-slate-500 border-white/10 hover:border-white/30'
+                                }`}
+                        >
+                            {t.inProgress || 'Active'}
+                        </button>
+                        <button
+                            onClick={() => setFilterStatus('completed')}
+                            className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${filterStatus === 'completed'
+                                ? 'bg-secondary text-white border-secondary'
+                                : 'bg-transparent text-slate-500 border-white/10 hover:border-white/30'
+                                }`}
+                        >
+                            {t.complete || 'Completed'}
+                        </button>
+                    </div>
+                </div>
                 <div className="relative">
                     <select
                         value={selectedGoalId}
                         onChange={(e) => setSelectedGoalId(e.target.value)}
                         className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"
                     >
-                        {goals.map(g => {
-                            const enLabel = g.category.charAt(0).toUpperCase() + g.category.slice(1);
-                            const koLabel = t[g.category as keyof typeof t] || g.category;
-                            return (
-                                <option key={g.id} value={g.id} className="bg-slate-800 text-white">
-                                    {`✔ [${enLabel}] ${koLabel}`} {g.target_text ? `- ${g.target_text}` : ''}
-                                    {g.seq && g.seq > 1 ? ` (${t.challengeCount.replace('{n}', g.seq)})` : ''}
-                                </option>
-                            );
-                        })}
+                        {filteredGoals.length > 0 ? (
+                            filteredGoals.map(g => {
+                                const enLabel = g.category.charAt(0).toUpperCase() + g.category.slice(1);
+                                const koLabel = t[g.category as keyof typeof t] || g.category;
+                                return (
+                                    <option key={g.id} value={g.id} className="bg-slate-800 text-white">
+                                        {`✔ [${enLabel}] ${koLabel}`} {g.target_text ? `- ${g.target_text}` : ''}
+                                        {g.seq && g.seq > 1 ? ` (${t.challengeCount.replace('{n}', g.seq)})` : ''}
+                                    </option>
+                                );
+                            })
+                        ) : (
+                            <option value="" className="bg-slate-800 text-slate-500 italic">No {filterStatus} goals</option>
+                        )}
                     </select>
                     <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                         <ChevronDown size={20} />

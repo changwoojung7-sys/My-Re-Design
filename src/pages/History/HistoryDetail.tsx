@@ -37,6 +37,7 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
             .select('*')
             .eq('user_id', goal.user_id)
             .eq('category', goal.category)
+            .eq('seq', goal.seq || 1) // Strict Sequence Filter
             .eq('is_completed', true)
             .gte('date', startDate.toISOString().split('T')[0]) // Start Date
             .order('date', { ascending: true });

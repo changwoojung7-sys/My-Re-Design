@@ -41,6 +41,7 @@ export default function Today() {
     const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
     const [draftMissions, setDraftMissions] = useState<any[]>([]);
     const [refreshCount, setRefreshCount] = useState(0);
+    const [showChallengeComplete, setShowChallengeComplete] = useState(false);
 
     // Derived State
     const selectedGoal = userGoals.find(g => g.id === selectedGoalId);
@@ -106,6 +107,15 @@ export default function Today() {
             return;
         }
 
+        // Filter out completed goals (Handle NULL as active)
+        const activeGoals = goals.filter(g => g.is_completed !== true);
+
+        if (activeGoals.length === 0) {
+            setUserGoals([]);
+            setLoading(false);
+            return;
+        }
+
         // 2. Fetch Active Subscriptions to Prioritize
         const { data: subs } = await supabase
             .from('subscriptions')
@@ -115,7 +125,7 @@ export default function Today() {
             .gte('end_date', new Date().toISOString());
 
         // Sort Goals: Subscribed (Active) First, then by Seq
-        const sortedGoals = [...goals].sort((a, b) => {
+        const sortedGoals = [...activeGoals].sort((a, b) => {
             const isASub = subs?.some(s => s.type === 'all' || (s.type === 'mission' && s.target_id === a.category));
             const isBSub = subs?.some(s => s.type === 'all' || (s.type === 'mission' && s.target_id === b.category));
 
@@ -173,9 +183,14 @@ export default function Today() {
             .eq('date', selectedDate)
             .order('created_at');
 
-        // Filter by category client-side to ensure match
+        // Filter by category and SEQUENCE client-side to ensure match
         const goalCategory = selectedGoal?.category.toLowerCase();
-        const relevantMissions = existing?.filter(m => m.category.toLowerCase() === goalCategory) || [];
+        const goalSeq = selectedGoal?.seq || 1;
+
+        const relevantMissions = existing?.filter(m =>
+            m.category.toLowerCase() === goalCategory &&
+            (m.seq === goalSeq || (!m.seq && goalSeq === 1)) // Handle legacy data (null seq = 1)
+        ) || [];
 
         if (relevantMissions.length > 0) {
             setMissions(relevantMissions.slice(0, 3)); // Strict Limit 3
@@ -344,7 +359,14 @@ export default function Today() {
             const updated = missions.map(m => m.id === verifyingId ? { ...m, is_completed: true, image_url: publicUrl, proof_type: type } : m);
             setMissions(updated);
             setVerifyingId(null); // Close verification area on success
-            triggerConfetti();
+
+            const isFinished = checkChallengeCompletion(updated);
+            if (isFinished) {
+                setShowChallengeComplete(true);
+                triggerBigConfetti();
+            } else {
+                triggerConfetti();
+            }
         } catch (err) {
             // @ts-ignore
             alert(`Upload failed: ${err.message}`);
@@ -365,7 +387,14 @@ export default function Today() {
             const updated = missions.map(m => m.id === verifyingId ? { ...m, is_completed: true, proof_text: textInput, proof_type: 'text' } : m);
             setMissions(updated);
             setVerifyingId(null); // Close verification area on success
-            triggerConfetti();
+
+            const isFinished = checkChallengeCompletion(updated);
+            if (isFinished) {
+                setShowChallengeComplete(true);
+                triggerBigConfetti();
+            } else {
+                triggerConfetti();
+            }
         } catch (err) {
             console.error(err);
             alert('Failed to save text.');
@@ -376,6 +405,49 @@ export default function Today() {
 
     const triggerConfetti = () => {
         confetti({ particleCount: 150, spread: 80, colors: ['#8b5cf6', '#ec4899', '#ffffff'] });
+    };
+
+    const triggerBigConfetti = () => {
+        const duration = 3000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 };
+
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+        const interval: any = setInterval(function () {
+            const timeLeft = animationEnd - Date.now();
+
+            if (timeLeft <= 0) {
+                return clearInterval(interval);
+            }
+
+            const particleCount = 50 * (timeLeft / duration);
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+            confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+        }, 250);
+    };
+
+    const checkChallengeCompletion = (currentMissions: any[]) => {
+        if (!selectedGoal) return false;
+
+        // 1. Check if it's the LAST DAY
+        const durationMonths = selectedGoal.duration_months || 1;
+        let totalDays = 0;
+        if (durationMonths < 1) {
+            totalDays = durationMonths === 0.25 ? 7 : durationMonths === 0.5 ? 14 : Math.round(durationMonths * 30);
+        } else {
+            totalDays = durationMonths * 30;
+        }
+
+        const currentDay = getSelectedDayNum();
+
+        // Allow completion on or after the last day (in case they verify late)
+        if (currentDay < totalDays) return false;
+
+        // 2. Check if all missions for today are completed
+        const allCompleted = currentMissions.every(m => m.is_completed);
+
+        return allCompleted;
     };
 
     // --- Date Helpers ---
@@ -512,7 +584,11 @@ export default function Today() {
     // Logic: Free Limit is X days. So if Day >= X, it is paid.
     // Example: Limit 4. Day 1,2,3 Free. Day 4+ Paid.
     const paywallLimit = userCustomLimit ?? globalPaywallDay;
-    const isPaywallActive = !checkingSubs && currentDayNum >= paywallLimit && user?.subscription_tier !== 'premium' && !hasActiveSubscription && !isAdUnlocked;
+    // Updated Logic:
+    // 1. Must not be loading
+    // 2. Must not have confirmed missions (missions.length > 0 means they already paid/watched/subscribed)
+    const hasConfirmedMissions = missions.length > 0;
+    const isPaywallActive = !loading && !checkingSubs && currentDayNum >= paywallLimit && user?.subscription_tier !== 'premium' && !hasActiveSubscription && !isAdUnlocked && !hasConfirmedMissions;
 
     useEffect(() => {
         console.log('[Paywall Debug]', {
@@ -521,9 +597,11 @@ export default function Today() {
             isPaywallActive,
             tier: user?.subscription_tier,
             hasActiveSubscription,
-            isAdUnlocked
+            isAdUnlocked,
+            hasConfirmedMissions,
+            loading
         });
-    }, [currentDayNum, paywallLimit, isPaywallActive, user, hasActiveSubscription, isAdUnlocked]);
+    }, [currentDayNum, paywallLimit, isPaywallActive, user, hasActiveSubscription, isAdUnlocked, hasConfirmedMissions, loading]);
 
     const [paywallStep, setPaywallStep] = useState<'none' | 'warning' | 'payment'>('none');
 
@@ -630,6 +708,65 @@ export default function Today() {
             {isPaywallActive && paywallStep === 'payment' && (
                 <Paywall onClose={handlePaywallCancel} />
             )}
+
+            {/* Challenge Complete Modal */}
+            <AnimatePresence>
+                {showChallengeComplete && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.5, y: 50 }}
+                            animate={{ scale: 1, y: 0 }}
+                            className="bg-slate-900 border border-white/10 rounded-3xl p-8 max-w-sm w-full text-center relative overflow-hidden shadow-2xl"
+                        >
+                            {/* Glow Effect */}
+                            <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-primary/10 via-transparent to-accent/10 pointer-events-none" />
+
+                            <div className="relative z-10">
+                                <motion.div
+                                    animate={{
+                                        scale: [1, 1.2, 1],
+                                        rotate: [0, 10, -10, 0]
+                                    }}
+                                    transition={{ duration: 0.5, delay: 0.2 }}
+                                    className="w-20 h-20 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full mx-auto mb-6 flex items-center justify-center shadow-lg shadow-orange-500/30"
+                                >
+                                    <Sparkles size={40} className="text-white" />
+                                </motion.div>
+
+                                <h2 className="text-3xl font-bold text-white mb-2">Loop Closed!</h2>
+                                <p className="text-slate-400 mb-8">
+                                    Congratulations! You've successfully completed the <span className="text-primary font-bold">{selectedGoal?.category ? t[selectedGoal.category as keyof typeof t] : 'Challenge'}</span>.
+                                </p>
+
+                                <button
+                                    onClick={async () => {
+                                        if (selectedGoal?.id) {
+                                            // 1. Update DB
+                                            await supabase
+                                                .from('user_goals')
+                                                .update({ is_completed: true, completed_at: new Date() })
+                                                .eq('id', selectedGoal.id);
+
+                                            // 2. Update Local State (Remove from list immediately)
+                                            setUserGoals(prev => prev.filter(g => g.id !== selectedGoal.id));
+                                            setSelectedGoalId(null); // Reset selection
+                                        }
+                                        setShowChallengeComplete(false);
+                                    }}
+                                    className="w-full py-4 bg-gradient-to-r from-primary to-accent rounded-xl text-black font-bold text-lg hover:opacity-90 transition-opacity shadow-lg shadow-primary/25"
+                                >
+                                    Awesome!
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             <input
                 type="file"
                 ref={fileInputRef}
