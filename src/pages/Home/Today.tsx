@@ -329,8 +329,16 @@ export default function Today() {
         } else {
             setVerifyingId(mission.id);
             // Default mode based on mission type
-            setVerifyMode(mission.verification_type === 'text' ? 'text' : 'media');
-            setTextInput('');
+            // If already completed, pre-fill logic
+            if (mission.is_completed) {
+                setVerifyMode(mission.proof_type === 'text' ? 'text' : 'media');
+                if (mission.proof_type === 'text') {
+                    setTextInput(mission.proof_text || '');
+                }
+            } else {
+                setVerifyMode(mission.verification_type === 'text' ? 'text' : 'media');
+                setTextInput('');
+            }
         }
     };
 
@@ -928,10 +936,10 @@ export default function Today() {
                                         <div className="flex items-start gap-4">
                                             {/* Check Icon */}
                                             <button
-                                                onClick={() => !isPreview && !mission.is_completed && openVerify(mission)}
+                                                onClick={() => !isPreview && openVerify(mission)}
                                                 disabled={isPreview}
                                                 className={`mt-1 shrink-0 transition-all ${isPreview ? 'text-slate-600 cursor-default' :
-                                                    mission.is_completed ? 'text-green-500' : 'text-slate-500 hover:text-white'
+                                                    mission.is_completed ? 'text-green-500 hover:text-green-400' : 'text-slate-500 hover:text-white'
                                                     }`}
                                             >
                                                 {mission.is_completed ? <CheckCircle size={26} /> : <Circle size={26} />}
@@ -1017,8 +1025,8 @@ export default function Today() {
                                                 )}
 
                                                 {/* COMPLETED PROOF DISPLAY */}
-                                                {mission.is_completed && (
-                                                    <div className="mt-3">
+                                                {mission.is_completed && !isBeingVerified && (
+                                                    <div className="mt-3 relative group">
                                                         {mission.proof_type === 'text' ? (
                                                             <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5 text-sm text-slate-300 italic">
                                                                 " {mission.proof_text} "
@@ -1030,6 +1038,14 @@ export default function Today() {
                                                         ) : (
                                                             <img src={mission.image_url} alt="Proof" className="w-full h-32 object-cover rounded-xl border border-white/10" />
                                                         )}
+
+                                                        {/* Edit Overlay (Visible on Hover/Touch) */}
+                                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl cursor-pointer" onClick={() => openVerify(mission)}>
+                                                            <div className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/10">
+                                                                <PenTool size={12} />
+                                                                {t.edit || 'Edit'}
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
