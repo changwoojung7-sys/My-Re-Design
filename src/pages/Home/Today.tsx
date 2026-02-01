@@ -379,10 +379,17 @@ export default function Today() {
             await supabase.from('missions').update({
                 is_completed: true,
                 image_url: publicUrl, // Storing Media URL here
-                proof_type: type
+                proof_type: type,
+                proof_text: null // ✅ CLEAR TEXT when switching to Media
             }).eq('id', verifyingId);
 
-            const updated = missions.map(m => m.id === verifyingId ? { ...m, is_completed: true, image_url: publicUrl, proof_type: type } : m);
+            const updated = missions.map(m => m.id === verifyingId ? {
+                ...m,
+                is_completed: true,
+                image_url: publicUrl,
+                proof_type: type,
+                proof_text: null
+            } : m);
             setMissions(updated);
             setVerifyingId(null); // Close verification area on success
 
@@ -404,13 +411,37 @@ export default function Today() {
         if (!textInput.trim() || !verifyingId) return;
 
         try {
+            // 0. Cleanup old file if exists (switched to text)
+            const currentMission = missions.find(m => m.id === verifyingId);
+
+            // ✅ IMPROVED: Explicitly checking for image_url existence
+            if (currentMission?.image_url) {
+                try {
+                    const urlParts = currentMission.image_url.split('mission-proofs/');
+                    if (urlParts.length > 1) {
+                        const oldPath = decodeURIComponent(urlParts[1]);
+                        console.log("Deleting old proof (text switch):", oldPath);
+                        await supabase.storage.from('mission-proofs').remove([oldPath]);
+                    }
+                } catch (delError) {
+                    console.error("Failed to delete old proof:", delError);
+                }
+            }
+
             await supabase.from('missions').update({
                 is_completed: true,
                 proof_text: textInput,
-                proof_type: 'text'
+                proof_type: 'text',
+                image_url: null // ✅ CLEAR URL when switching to Text
             }).eq('id', verifyingId);
 
-            const updated = missions.map(m => m.id === verifyingId ? { ...m, is_completed: true, proof_text: textInput, proof_type: 'text' } : m);
+            const updated = missions.map(m => m.id === verifyingId ? {
+                ...m,
+                is_completed: true,
+                proof_text: textInput,
+                proof_type: 'text',
+                image_url: null
+            } : m);
             setMissions(updated);
             setVerifyingId(null); // Close verification area on success
 
