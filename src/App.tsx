@@ -105,6 +105,49 @@ function App() {
       }
     };
     checkVersion();
+
+    // --- NEW: Auth State Synchronization ---
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[Auth] Event: ${event}`, session?.user?.id);
+
+      if (event === 'SIGNED_OUT') {
+        // Clear global store if Supabase says we are logged out
+        useStore.getState().setUser(null);
+        // Optional: Clear persisted state manually if needed, but setUser(null) usually triggers UI update
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        // Ideally we might want to refresh the user profile here too to ensure data consistency
+        // But for now, ensure we at least have a user
+        if (!useStore.getState().user && session?.user) {
+          // We have a session but no store user? Fetch profile.
+          // This handles "Tab Refresh" cases well if persist didn't work, 
+          // BUT since we use persist, this is a fallback.
+          // Let's rely on the Login page to set the full user with profile data.
+        }
+      }
+    });
+
+    // Initial Check: Validate Session
+    const validateSession = async () => {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      const currentUser = useStore.getState().user;
+
+      if (!session && currentUser) {
+        console.warn("[Auth] Stale State Detected: User exists in Store but no active Supabase Session. Logging out.");
+        // We have a UI user, but no Supabase key. This causes the RLS errors.
+        // Action: Clear UI state to force re-login.
+        useStore.getState().setUser(null);
+        // supabase.auth.signOut(); // Just to be sure
+      } else if (error) {
+        console.error("[Auth] Session check error:", error);
+      } else if (session) {
+        console.log("[Auth] Session is valid.", session.user.email);
+      }
+    };
+    validateSession();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   return (

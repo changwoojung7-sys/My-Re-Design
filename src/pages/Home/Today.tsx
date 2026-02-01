@@ -348,6 +348,24 @@ export default function Today() {
         if (!file || !verifyingId) return;
 
         try {
+            // 0. Cleanup old file if exists
+            const currentMission = missions.find(m => m.id === verifyingId);
+            if (currentMission?.image_url) {
+                try {
+                    // Extract path from Public URL
+                    // Standard Supabase Public URL: .../mission-proofs/[path]
+                    const urlParts = currentMission.image_url.split('mission-proofs/');
+                    if (urlParts.length > 1) {
+                        const oldPath = decodeURIComponent(urlParts[1]);
+                        console.log("Deleting old proof:", oldPath);
+                        await supabase.storage.from('mission-proofs').remove([oldPath]);
+                    }
+                } catch (delError) {
+                    console.error("Failed to delete old proof:", delError);
+                    // Continue even if delete fails to ensure new upload succeeds
+                }
+            }
+
             const fileName = `${user!.id}/${verifyingId}_${Date.now()}`;
             const { error } = await supabase.storage.from('mission-proofs').upload(fileName, file);
             if (error) throw error;

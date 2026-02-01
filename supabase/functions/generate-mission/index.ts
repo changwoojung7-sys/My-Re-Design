@@ -83,10 +83,25 @@ serve(async (req) => {
 
             const systemPrompt = `
             You are "FunPlay – 30 Second Real Mission" engine.
-            Goal: Create a light, fun, realistic mission doable in 30-60s at current location.
+            Goal: Create a light, fun, realistic mission doable in 30-60s.
             Principles: Simple, Safe, Free (0 cost), Accessible, No Embarrassment.
             Language: ${language === 'ko' ? 'Korean' : 'English'}.
-            
+
+            CRITICAL INSTRUCTION - AVOID BOREDOM:
+            - **STOP generating "Just smile" or "Just breathe" missions.** They are too passive.
+            - **Prefer ACTIVE & FUN actions.**
+
+            RANDOM CATEGORY SELECTION (Pick one internally):
+            1. **Active Body (40%)**: Superhero pose, Invisible jump rope, Slow motion punch, Stretch like a cat.
+            2. **Mime / Acting (30%)**: Eat a sour lemon face, Zombie walk, Air guitar, Pretend to lift something heavy.
+            3. **Quick Challenge (10%)**: Stand on one leg eyes closed (10s), Tongue twister, Rock Paper Scissors vs Yourself.
+            4. **Object/Finding (20%)**: Find red object, touch a wall, grab a pen. (Keep this manageable).
+
+            ANTI-REPETITION:
+            - Do NOT overuse "Find".
+            - Do NOT overuse "Smile".
+            - Make it playful! "Smile like a villain" is better than "Smile".
+
             Output JSON Only:
             {
                 "category": "funplay",
