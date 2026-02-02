@@ -136,8 +136,12 @@ export default function Today() {
 
         setUserGoals(sortedGoals);
         // Default select the first one (which should be a subscribed one if exists)
+        // Default select the first one (which should be a subscribed one if exists), but preserve selection if valid
         if (sortedGoals.length > 0) {
-            setSelectedGoalId(sortedGoals[0].id);
+            const currentIsValid = selectedGoalId && sortedGoals.find(g => g.id === selectedGoalId);
+            if (!currentIsValid) {
+                setSelectedGoalId(sortedGoals[0].id);
+            }
         }
         setLoading(false);
     };
@@ -960,13 +964,16 @@ export default function Today() {
             )}
 
             {/* Mission List (Scrollable) */}
-            <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 no-scrollbar overscroll-y-contain">
-                {loading ? (
-                    <div className="text-center py-10 animate-pulse mt-10">
-                        <Sparkles className="mx-auto mb-3 text-primary" size={28} />
-                        <p className="text-sm text-slate-400 font-medium">Designing your loop...</p>
+            <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 no-scrollbar overscroll-y-contain relative">
+                {/* Loading Overlay */}
+                {loading && (
+                    <div className="absolute inset-0 z-10 bg-slate-950/50 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
+                        <Sparkles className="mx-auto mb-3 text-primary animate-pulse" size={28} />
+                        <p className="text-sm text-slate-400 font-medium animate-pulse">Designing your loop...</p>
                     </div>
-                ) : (
+                )}
+
+                {(
                     <AnimatePresence>
                         {activeList.map((mission) => {
                             const isBeingVerified = verifyingId === mission.id;

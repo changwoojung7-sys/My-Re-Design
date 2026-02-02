@@ -123,9 +123,11 @@ serve(async (req) => {
 
     } catch (error: any) {
         console.error('Verify Payment Error:', error);
+        // Return 200 OK with error details so the client can read the JSON body
+        // (Supabase functions.invoke throws on non-2xx without parsing body)
         return new Response(
             JSON.stringify({ error: error.message, details: error.toString() }),
-            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
 })

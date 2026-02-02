@@ -236,6 +236,7 @@ export default function SupportModal({ isOpen, onClose, initialView = 'main' }: 
                         <p>사업장 주소 : 경기도 용인시 기흥구 동백8로 87</p>
                         <p>고객센터 : yujinit2005@gmail.com</p>
                         <p>개인정보관리책임자 : 정창우</p>
+                        <p>연락처 : 010-6614-4561</p>
                     </div>
 
                     {/* Policy Links in Modal */}

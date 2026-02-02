@@ -28,7 +28,7 @@ interface PricingTier {
 }
 
 const MISSION_PRICING: PricingTier[] = [
-    { months: 1, price: 990, label: '1 Month' },
+    { months: 1, price: 1000, label: '1 Month' },
     { months: 3, price: 2500, label: '3 Months' },
     { months: 6, price: 3900, label: '6 Months' },
     { months: 12, price: 5900, label: '12 Months' },
@@ -353,10 +353,10 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
             const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
                 body: {
-                    imp_uid: paymentIdOrImpUid, // V1: imp_uid, V2: paymentId
-                    payment_id: paymentIdOrImpUid, // V2 preferred name
+                    imp_uid: mode === 'real' ? undefined : paymentIdOrImpUid, // V1 only
+                    payment_id: mode === 'real' ? paymentIdOrImpUid : undefined, // V2 only
                     merchant_uid: merchantUid || paymentIdOrImpUid,
-                    mode: mode // 'test' or 'real'
+                    mode: mode
                 }
             });
 
@@ -550,21 +550,21 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                             <div className="grid grid-cols-2 gap-3 mb-6">
                                 {(activeTab === 'mission' ? MISSION_PRICING : ALL_ACCESS_PRICING).map((tier) => {
                                     // Calculate Discount
-                                    // Default/Base Monthly Value. If 'All', it's 4 categories * 990 = 3960. If Mission, it's just 990.
+                                    // Default/Base Monthly Value. If 'All', it's 4 categories * 1000 = 4000. If Mission, it's just 1000.
 
-                                    // User Request: "Discount rate based on 990 KRW/mission/month * 4 for All Plan"
+                                    // User Request: "Discount rate based on 1000 KRW/mission/month * 4 for All Plan"
 
                                     let discountPercent = 0;
                                     if (activeTab === 'all') {
-                                        const referenceMonthly = 990 * 4; // 3960
+                                        const referenceMonthly = 1000 * 4; // 4000
                                         const totalReferencePrice = referenceMonthly * tier.months;
                                         if (totalReferencePrice > tier.price) {
                                             discountPercent = Math.round((1 - (tier.price / totalReferencePrice)) * 100);
                                         }
                                     } else {
                                         // Mission Plan Discount (Standard Logic: compare to 1 mo * months)
-                                        // 1 mo = 990.
-                                        const referenceMonthly = 990;
+                                        // 1 mo = 1000.
+                                        const referenceMonthly = 1000;
                                         const totalReferencePrice = referenceMonthly * tier.months;
                                         if (totalReferencePrice > tier.price) {
                                             discountPercent = Math.round((1 - (tier.price / totalReferencePrice)) * 100);

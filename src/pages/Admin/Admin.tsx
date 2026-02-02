@@ -486,7 +486,7 @@ export default function Admin() {
                                             <div className="flex-1 min-w-0 mr-2">
                                                 {user.subscriptions && user.subscriptions.length > 0 ? (
                                                     <div className="flex flex-wrap gap-1.5">
-                                                        {user.subscriptions.map((sub: any, idx: number) => (
+                                                        {user.subscriptions.filter((s: any) => s.status === 'active').map((sub: any, idx: number) => (
                                                             <span key={idx} className="inline-flex items-center gap-1 text-[10px] font-bold bg-white/5 text-slate-300 px-1.5 py-0.5 rounded border border-white/10 whitespace-nowrap">
                                                                 <span className={sub.type === 'all' ? "text-purple-400" : "text-emerald-400"}>
                                                                     {sub.type === 'all' ? '전체' : sub.target_id}
