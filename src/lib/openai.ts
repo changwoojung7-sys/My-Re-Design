@@ -43,9 +43,21 @@ export async function generateMissions(userProfile: any, language: string = 'en'
         goalsToProcess = userGoals;
     }
 
+
     const goalList = goalsToProcess.map((g: any) =>
         `- Category: ${g.category}\n  Goal: ${g.target_text}\n  Details: ${JSON.stringify(g.details)}`
     ).join('\n\n');
+
+    // Fetch Recent 3 Days Missions (for context awareness)
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const { data: recentMissionsData } = await supabase
+        .from('missions')
+        .select('content, category, date')
+        .eq('user_id', userProfile.id)
+        .gte('date', threeDaysAgo.toISOString().split('T')[0]);
+
+    const recentMissions = recentMissionsData?.map(m => `[${m.category}] ${m.content} (${m.date})`).join('\n') || "";
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-mission', {
@@ -55,7 +67,8 @@ export async function generateMissions(userProfile: any, language: string = 'en'
                     userProfile,
                     language,
                     excludedMissions,
-                    goalList
+                    goalList,
+                    recentMissions // Pass recent history
                 }
             }
         });
@@ -78,14 +91,27 @@ export async function generateFunPlayMission(
     options: { difficulty: string, time_limit: number, mood: string, place: string }
 ): Promise<MissionData> {
 
+    // Fetch Recent 3 Days Missions (for context awareness)
+    const threeDaysAgo = new Date();
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    const { data: recentMissionsData } = await supabase
+        .from('missions')
+        .select('content, category, date')
+        .eq('user_id', _userProfile.id)
+        .gte('date', threeDaysAgo.toISOString().split('T')[0]);
+
+    const recentMissions = recentMissionsData?.map(m => `[${m.category}] ${m.content} (${m.date})`).join('\n') || "";
+
     try {
         const { data, error } = await supabase.functions.invoke('generate-mission', {
             body: {
                 type: 'funplay',
                 payload: {
+                    userProfile: _userProfile,
                     options,
                     language,
-                    excludedKeywords
+                    excludedKeywords,
+                    recentMissions
                 }
             }
         });

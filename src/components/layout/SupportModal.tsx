@@ -232,7 +232,7 @@ export default function SupportModal({ isOpen, onClose, initialView = 'main' }: 
                     <div className="text-[10px] text-slate-500 text-center space-y-1 leading-relaxed">
                         <h4 className="font-bold text-slate-400 mb-2">사업자 정보</h4>
                         <p>상호 : 유진에이아이(YujinAI) | 대표자명 : 정창우</p>
-                        <p>사업자등록번호 : 519-77-00622 | 통신판매업 신고번호 : “신고예정”</p>
+                        <p>사업자등록번호 : 519-77-00622 | 통신판매업 신고번호 : 제 2026-용인기흥-00211 호</p>
                         <p>사업장 주소 : 경기도 용인시 기흥구 동백8로 87</p>
                         <p>고객센터 : yujinit2005@gmail.com</p>
                         <p>개인정보관리책임자 : 정창우</p>

@@ -30,8 +30,8 @@ interface PricingTier {
 const MISSION_PRICING: PricingTier[] = [
     { months: 1, price: 1000, label: '1 Month' },
     { months: 3, price: 2500, label: '3 Months' },
-    { months: 6, price: 3900, label: '6 Months' },
-    { months: 12, price: 5900, label: '12 Months' },
+    { months: 6, price: 4500, label: '6 Months' },
+    { months: 12, price: 7000, label: '12 Months' },
 ];
 
 const ALL_ACCESS_PRICING: PricingTier[] = [
@@ -41,7 +41,8 @@ const ALL_ACCESS_PRICING: PricingTier[] = [
     { months: 12, price: 18000, label: '12 Months' },
 ];
 
-const CATEGORIES: GoalCategory[] = ['body_wellness', 'growth_career', 'mind_connection', 'funplay'];
+// Funplay removed from paid categories list
+const CATEGORIES: GoalCategory[] = ['body_wellness', 'growth_career', 'mind_connection'];
 
 export default function SubscriptionManager({ onClose, initialCategory }: SubscriptionManagerProps) {
     const { t } = useLanguage();
@@ -556,7 +557,8 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
                                     let discountPercent = 0;
                                     if (activeTab === 'all') {
-                                        const referenceMonthly = 1000 * 4; // 4000
+                                        // 3 Paid Categories * 1000 KRW = 3000 KRW Base
+                                        const referenceMonthly = 1000 * 3;
                                         const totalReferencePrice = referenceMonthly * tier.months;
                                         if (totalReferencePrice > tier.price) {
                                             discountPercent = Math.round((1 - (tier.price / totalReferencePrice)) * 100);

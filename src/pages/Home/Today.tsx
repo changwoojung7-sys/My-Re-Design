@@ -8,7 +8,6 @@ import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, L
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
 import Paywall from './Paywall';
-// duplicate removed
 import PaywallWarning from './PaywallWarning';
 import AdWarning from './AdWarning';
 import RewardAd from '../../components/ads/RewardAd';
@@ -136,7 +135,6 @@ export default function Today() {
 
         setUserGoals(sortedGoals);
         // Default select the first one (which should be a subscribed one if exists)
-        // Default select the first one (which should be a subscribed one if exists), but preserve selection if valid
         if (sortedGoals.length > 0) {
             const currentIsValid = selectedGoalId && sortedGoals.find(g => g.id === selectedGoalId);
             if (!currentIsValid) {
@@ -153,7 +151,6 @@ export default function Today() {
         setVerifyingId(null); // Clear any active verification
 
         // Demo User Mock Missions
-        // Allow specific reviewer account to see demo data for AdSense/AppStore review
         const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
 
         if (isDemoOrReviewer) {
@@ -197,7 +194,50 @@ export default function Today() {
         ) || [];
 
         if (relevantMissions.length > 0) {
-            setMissions(relevantMissions.slice(0, 3)); // Strict Limit 3
+            // Logic for Mission Counts based on Trial Phase
+            // Funplay or Subscribed: 3 Missions
+            // Phase 1, 2: 3 Missions
+            // Phase 3: 1 Mission
+            // Phase 4: 0 Mission (Locked by Paywall view, but if bypassed, limit to 0 or 1?)
+            const isFunplay = selectedGoal?.category === 'funplay';
+            // We need to re-evaluate 'hasActiveSubscription' inside async context if possible, 
+            // but relying on state 'hasActiveSubscription' might be stale if called immediately on mount?
+            // Actually fetchMissions is called in useEffect dependent on goal/date. hasActiveSubscription updates in parallel.
+            // Let's assume standard 3 unless strictly Phase 3.
+
+            let limit = 3;
+            if (!isFunplay && !hasActiveSubscription && trialPhase === 3) {
+                limit = 1;
+            }
+
+            // FILTER LOGIC:
+            // ALWAYS show missions that are already COMPLETED, regardless of limit.
+            // THEN fill remaining slots with incomplete missions up to limit.
+
+            // 1. Separate completed and incomplete
+            const completedMissions = relevantMissions.filter(m => m.is_completed);
+            const incompleteMissions = relevantMissions.filter(m => !m.is_completed);
+
+            // 2. Decide how many incomplete we can show
+            // If completed count >= limit, we show ALL completed + 0 incomplete (or maybe 0? User wants to see history)
+            // Actually, usually we just want to limit the *generation* or *daily* view.
+            // If user has 3 completed missions from before Phase 3, show them all.
+            // If today is new, we want 1 mission total for Phase 3.
+
+            // User Issue: "Existing verified missions should represent history, new ones limited".
+            // So if I have 2 verified, and limit is 1... show 2 verified? Yes.
+
+            const showList = [...completedMissions];
+            const remainingSlots = Math.max(0, limit - showList.length);
+
+            if (remainingSlots > 0) {
+                showList.push(...incompleteMissions.slice(0, remainingSlots));
+            }
+
+            // Sort by seq or created_at to maintain order? created_at usually.
+            showList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+            setMissions(showList);
         } else {
             setMissions([]);
             // Logic for Draft Generation:
@@ -224,9 +264,6 @@ export default function Today() {
             .gte('date', sevenDaysStr);
 
         if (recentMissions) {
-            // Filter: Only exclude if NOT in (body_wellness)
-            // Meaning: Mindset, Social etc. should avoid repeats.
-            // Updated Logic: We generally want to avoid repeats for Re:Play too.
             const exceptions = ['body_wellness']; // Daily routines might repeat
             exclusionList = recentMissions
                 .filter(m => !exceptions.includes(m.category.toLowerCase()))
@@ -247,7 +284,7 @@ export default function Today() {
                     difficulty: details.difficulty || 'easy',
                     time_limit: details.time_limit || 30,
                     mood: details.mood || 'fun',
-                    place: 'unknown' // Could detect context or ask user, default unknown for now
+                    place: 'unknown'
                 }
             );
             // Wrap in array
@@ -255,12 +292,19 @@ export default function Today() {
 
         } else {
             // Standard Generation (3 Missions)
-            // Optimize: Pass selectedGoal to generate ONLY for this category
             newMissions = await generateMissions(user, language, exclusionList, selectedGoal);
 
             // Filter for CURRENT selected category just in case AI returns mixed
             const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());
-            newMissions = currentCategoryMissions.slice(0, 3);
+
+            // Phase 3 Limit check involved here too
+            let limit = 3;
+            // Note: trialPhase state is available here
+            if (!hasActiveSubscription && trialPhase === 3) {
+                limit = 1;
+            }
+
+            newMissions = currentCategoryMissions.slice(0, limit);
         }
 
         const mapped = newMissions.map((m: any, i: number) => ({
@@ -274,7 +318,6 @@ export default function Today() {
             date: selectedDate,
             is_completed: false,
             seq: selectedGoal?.seq || 1,
-            // Re:Play specific fields could be added here if needed, e.g. failing_comment
             details: m.details // if AI returns extra details
         }));
         setDraftMissions(mapped);
@@ -357,7 +400,6 @@ export default function Today() {
             if (currentMission?.image_url) {
                 try {
                     // Extract path from Public URL
-                    // Standard Supabase Public URL: .../mission-proofs/[path]
                     const urlParts = currentMission.image_url.split('mission-proofs/');
                     if (urlParts.length > 1) {
                         const oldPath = decodeURIComponent(urlParts[1]);
@@ -366,7 +408,6 @@ export default function Today() {
                     }
                 } catch (delError) {
                     console.error("Failed to delete old proof:", delError);
-                    // Continue even if delete fails to ensure new upload succeeds
                 }
             }
 
@@ -418,7 +459,6 @@ export default function Today() {
             // 0. Cleanup old file if exists (switched to text)
             const currentMission = missions.find(m => m.id === verifyingId);
 
-            // ✅ IMPROVED: Explicitly checking for image_url existence
             if (currentMission?.image_url) {
                 try {
                     const urlParts = currentMission.image_url.split('mission-proofs/');
@@ -557,37 +597,63 @@ export default function Today() {
     const isPastEmpty = missions.length === 0 && draftMissions.length === 0 && selectedDate < formatLocalYMD(new Date());
     const activeList = isPreview ? draftMissions : missions;
 
-    // --- Monetization Check ---
+    // --- Monetization & 3-Stage Trial Logic ---
     const currentDayNum = getSelectedDayNum();
-    const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
+
+    // Trial Phases (Days since signup)
+    // 0~7: Phase 1 (Free, Unlimited)
+    // 8~21: Phase 2 (Value Recognition - Ads for History/Refresh, 3 missions)
+    // 22~30: Phase 3 (Decision - 1 Mission Limit, Ads for History/Refresh)
+    // 31+: Phase 4 (Paywall Active)
+
+    const [accountAgeDays, setAccountAgeDays] = useState<number>(0);
+    const [trialPhase, setTrialPhase] = useState<1 | 2 | 3 | 4>(1);
+
     const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
-    const [userCustomLimit, setUserCustomLimit] = useState<number | null>(null);
     const [isAdUnlocked, setIsAdUnlocked] = useState(false); // Session-based Unlock
     const [showRewardAd, setShowRewardAd] = useState(false);
     const [adSlotId, setAdSlotId] = useState<string | undefined>(undefined);
     const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
     const [checkingSubs, setCheckingSubs] = useState(true);
 
+    // Initial Check
     useEffect(() => {
-        const fetchSettings = async () => {
+        const checkStatus = async () => {
             setCheckingSubs(true);
-            // 1. Fetch Global Setting
-            const { data: adminData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
-            if (adminData?.value) setGlobalPaywallDay(parseInt(adminData.value));
+
+            // 1. Calculate Trial Phase (Based on SELECTED GOAL)
+            let startDate = new Date();
+            if (selectedGoal?.created_at) {
+                startDate = new Date(selectedGoal.created_at);
+            } else if (user) {
+                // Fallback (e.g. no goal selected yet, or loading)
+                const { data: profile } = await supabase.from('profiles').select('created_at').eq('id', user.id).single();
+                if (profile?.created_at) {
+                    startDate = new Date(profile.created_at);
+                }
+            }
+
+            // Calculate Days
+            const now = new Date();
+            const diffTime = Math.abs(now.getTime() - startDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            setAccountAgeDays(diffDays);
+
+            // Determine Phase
+            if (diffDays <= 7) setTrialPhase(1);
+            else if (diffDays <= 21) setTrialPhase(2);
+            else if (diffDays <= 30) setTrialPhase(3);
+            else setTrialPhase(4);
+
+            // 2. Fetch Settings
+            const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
+            if (slotData?.value) setAdSlotId(slotData.value);
 
             const { data: modeData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_mode').single();
             if (modeData?.value) setPaywallMode(modeData.value as 'subscription' | 'ads');
 
-            const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
-            if (slotData?.value) setAdSlotId(slotData.value);
-
-            // 2. Fetch User Specific Setting (Fresh)
+            // 3. Check Subscription
             if (user) {
-                const { data: profileData } = await supabase.from('profiles').select('custom_free_trial_days').eq('id', user.id).single();
-                if (profileData) setUserCustomLimit(profileData.custom_free_trial_days);
-
-                // 2. Check Subscription
-                // Fetch ALL active subscriptions first, then filter in JS to avoid string comparison issues with timestamps
                 const { data: subData } = await supabase
                     .from('subscriptions')
                     .select('*')
@@ -595,66 +661,43 @@ export default function Today() {
                     .eq('status', 'active');
 
                 let hasSub = false;
-
                 if (subData && subData.length > 0) {
-                    console.log("[Debug] All Subs:", subData);
-                    console.log("[Debug] Current Goal Category:", selectedGoal?.category);
-
-                    // Filter: Must be Active Type AND (Started <= Now <= Ended)
-                    // Date-Only Comparison (Ignore Time) as per user request
                     const now = new Date();
-                    now.setHours(0, 0, 0, 0); // Normalize 'Now' to midnight
+                    now.setHours(0, 0, 0, 0);
 
                     const active = subData.find(s => {
                         const sStart = new Date(s.start_date);
                         sStart.setHours(0, 0, 0, 0);
-
                         const sEnd = new Date(s.end_date);
-                        sEnd.setHours(23, 59, 59, 999); // End of the day for expiration
+                        sEnd.setHours(23, 59, 59, 999);
 
-                        console.log(`[Debug] Checking Sub ${s.id}:`, {
-                            type: s.type,
-                            target: s.target_id,
-                            start: sStart.toLocaleString(),
-                            end: sEnd.toLocaleString(),
-                            now: now.toLocaleString(),
-                            validPeriod: sStart <= now && sEnd >= now,
-                            validTarget: s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase()
-                        });
-
-                        // Check validity period
                         if (sStart > now || sEnd < now) return false;
 
                         // Check Type/Target
-                        // Case-Insensitive Check
+                        if (s.type === 'all') return true;
+
                         const targetMatch = s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase();
-                        return s.type === 'all' || (s.type === 'mission' && targetMatch);
+                        return s.type === 'mission' && targetMatch;
                     });
 
                     if (active) hasSub = true;
-                    console.log("[Debug] Has Active Sub:", hasSub);
                 }
                 setHasActiveSubscription(hasSub);
             }
             setCheckingSubs(false);
         };
-        fetchSettings();
+        checkStatus();
     }, [user, selectedGoal?.category]);
 
-    // Priority: User Custom > Global Default
-    // Logic: Free Limit is X days. So if Day >= X, it is paid.
-    // Example: Limit 4. Day 1,2,3 Free. Day 4+ Paid.
-    const paywallLimit = userCustomLimit ?? globalPaywallDay;
-    // Updated Logic:
-    // 1. Must not be loading
-    // 2. Must not have confirmed missions (missions.length > 0 means they already paid/watched/subscribed)
+    // Paywall Active Condition
+    const isFunplay = selectedGoal?.category === 'funplay';
     const hasConfirmedMissions = missions.length > 0;
-    const isPaywallActive = !loading && !checkingSubs && currentDayNum >= paywallLimit && user?.subscription_tier !== 'premium' && !hasActiveSubscription && !isAdUnlocked && !hasConfirmedMissions;
+
+    const isPaywallActive = !loading && !checkingSubs && !hasActiveSubscription && !isFunplay && trialPhase === 4 && !isAdUnlocked && !hasConfirmedMissions;
 
     useEffect(() => {
         console.log('[Paywall Debug]', {
             currentDayNum,
-            paywallLimit,
             isPaywallActive,
             tier: user?.subscription_tier,
             hasActiveSubscription,
@@ -662,7 +705,7 @@ export default function Today() {
             hasConfirmedMissions,
             loading
         });
-    }, [currentDayNum, paywallLimit, isPaywallActive, user, hasActiveSubscription, isAdUnlocked, hasConfirmedMissions, loading]);
+    }, [currentDayNum, isPaywallActive, user, hasActiveSubscription, isAdUnlocked, hasConfirmedMissions, loading]);
 
     const [paywallStep, setPaywallStep] = useState<'none' | 'warning' | 'payment'>('none');
 
@@ -680,9 +723,13 @@ export default function Today() {
 
     const handlePaywallCancel = async () => {
         // Smart Fallback: Find any goal that is currently viewable
-        // Viewable = Active Subscription OR (Day < Limit)
+        // Viewable = Active Subscription OR Funplay OR (Trial Phase < 4)
 
-        // We need fresh subscription data or rely on what we have. 
+        // Since trialPhase is global (based on account age), if it is < 4, actually ALL goals are viewable (except logic phase 4).
+        // BUT isPaywallActive is true ONLY if trialPhase === 4.
+        // So if we are here, trialPhase IS likely 4 (unless state de-sync).
+
+        // We need to find a goal that has Subscription OR is Funplay.
         setLoading(true);
         const { data: subs } = await supabase
             .from('subscriptions')
@@ -692,21 +739,17 @@ export default function Today() {
             .gte('end_date', new Date().toISOString());
 
         const safeGoal = userGoals.find(g => {
-            // Check Subscription Coverage
+            // 1. Funplay is always safe
+            if (g.category === 'funplay') return true;
+
+            // 2. Check Subscription Coverage
             const isSubscribed = subs?.some(s =>
                 s.type === 'all' ||
                 (s.type === 'mission' && s.target_id === g.category)
             );
             if (isSubscribed) return true;
 
-            // Check Free Trial
-            const start = new Date(g.created_at);
-            start.setHours(0, 0, 0, 0);
-            const current = new Date();
-            const diffMs = current.getTime() - start.getTime();
-            const day = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1;
-
-            return day < paywallLimit;
+            return false;
         });
 
         setLoading(false);
@@ -844,6 +887,12 @@ export default function Today() {
                         <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
                             <ListTodo size={24} className="text-accent" />
                             Mission
+                            {/* Trial Phase Badge (Visible only to Free Users up to 30 Days) */}
+                            {!hasActiveSubscription && currentDayNum <= 30 && (
+                                <span className="text-[10px] bg-white/10 backdrop-blur-md text-white/70 px-2 py-0.5 border border-white/10 rounded-full font-medium ml-1">
+                                    D:{accountAgeDays}/P:{trialPhase}
+                                </span>
+                            )}
                         </h1>
                         {/* Sequence Badge */}
                         {selectedGoal?.seq && selectedGoal.seq > 1 && (

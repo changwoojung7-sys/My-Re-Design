@@ -160,7 +160,7 @@ export const PRIVACY_CONTENT = `
   <p>회사는 원활한 개인정보 업무처리를 위하여 다음과 같이 개인정보 처리업무를 위탁하고 있습니다.</p>
   
   <div class="box">
-    <p><b>결제 처리:</b> (추후 선정될 PG사, 예: 토스페이먼츠 등)</p>
+    <p><b>결제 처리:</b> KG 이니시스</p>
     <ul>
       <li>위탁 업무: 유료 서비스 결제 및 환불 처리</li>
     </ul>
@@ -168,7 +168,7 @@ export const PRIVACY_CONTENT = `
     <ul>
        <li>위탁 업무: 데이터 저장, 계정 인증 관리, 웹 호스팅 및 보안 네트워크 전송</li>
     </ul>
-    <p><b>AI 서비스:</b> (사용 예정인 AI 모델, 예: OpenAI 등)</p>
+    <p><b>AI 서비스:</b> OpenAI</p>
     <ul>
       <li>위탁 업무: 입력된 데이터의 분석 및 AI 답변 생성</li>
     </ul>

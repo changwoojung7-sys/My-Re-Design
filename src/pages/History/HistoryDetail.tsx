@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
 import MissionReel from '../../components/common/MissionReel';
 import RewardAd from '../../components/ads/RewardAd';
+import AdWarning from '../Home/AdWarning';
+import Paywall from '../Home/Paywall';
 import { useStore } from '../../lib/store';
 
 interface HistoryDetailProps {
@@ -20,8 +22,11 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [showReel, setShowReel] = useState(false);
     const [showAd, setShowAd] = useState(false);
+    const [showAdWarning, setShowAdWarning] = useState(false);
+    const [showPaywall, setShowPaywall] = useState(false);
     const [hasAccess, setHasAccess] = useState(false);
     const [stats, setStats] = useState<{ likes: number, comments: any[] }>({ likes: 0, comments: [] });
+    const [dayCount, setDayCount] = useState(0);
 
     useEffect(() => {
         fetchMissionHistory();
@@ -31,22 +36,22 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
     const checkSubscriptionAccess = async () => {
         if (!user) return;
 
-        // 1. Check Free Trial Days (Free Days Logic)
-        if (user.custom_free_trial_days && user.custom_free_trial_days > 0) {
-            // Assume logic: created_at + custom_free_trial_days > now ??
-            // OR simply having the value implies they are in a special state? 
-            // Usually trial is time-bound. Let's check time if created_at exists.
-            // If created_at is missing (legacy), maybe just grant?
-            // Safer: Check if within X days of account creation.
-            // If user data doesn't have created_at in store, we might need to fetch or assume it's fresh?
-            // Store interface doesn't strictly have created_at but typically Supabase user does.
-            // Let's assume user metadata or custom field. 
-            // Actually, let's treat `custom_free_trial_days` as a "Has Free Pass" flag for simplicity OR fetch user creation time.
-            // For now, I'll assume if it's set and > 0, they are in trial/vip mode, OR check DB for verified status.
-            // BETTER: Check subscriptions table first.
+        // ... (Free Trial Logic - Phase 1 etc) ... 
+        // Logic truncated for brevity in replace block, but need to preserve existing logic if not changing?
+        // Wait, replace_file_content replaces the whole block.
+        // I need to be careful not to delete the logic I just fixed.
+        // It's safer to just inject the imports and state first, then the render logic.
+        // Or re-implement the checkSubscriptionAccess carefully.
+
+        // Let's re-implement checkSubscriptionAccess with the recent fix (using goal.created_at) + day calculation
+
+        // Priority 1: Funplay
+        if (goal.category === 'funplay') {
+            setHasAccess(true);
+            return;
         }
 
-        // 2. Check Subscriptions
+        // Priority 2: Active Subscription
         const { data: subs } = await supabase
             .from('subscriptions')
             .select('*')
@@ -64,35 +69,58 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
             }
         }
 
-        // 3. Check Free Trial (Fallback if not subscribed)
-        // We need user creation date to verify "days". 
-        // We'll fetch user details to be sure or use store data if available.
-        // Since store user might not have created_at, let's fetch profile or just check the implementation expectation.
-        // User asked to "Check if free days criteria is also applied".
-        // Let's implement: If within 3 days of first mission? Or User creation?
-        // Let's stick to: If user.custom_free_trial_days > 0, we treat it as valid.
+        // Priority 3: Trial Phase 1 (0-7 Days)
+        let createdDate = new Date();
+        if (goal.created_at) {
+            createdDate = new Date(goal.created_at);
+        } else {
+            // Fallback
+            const { data: profile } = await supabase.from('profiles').select('created_at').eq('id', user.id).single();
+            if (profile?.created_at) {
+                createdDate = new Date(profile.created_at);
+            }
+        }
+
+        const now = new Date();
+        const diffTime = Math.abs(now.getTime() - createdDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setDayCount(diffDays);
+
+        if (diffDays <= 7) {
+            setHasAccess(true);
+            return;
+        }
+
+        // Use custom free trial days as override if present
         if (user.custom_free_trial_days && user.custom_free_trial_days > 0) {
             setHasAccess(true);
+            return;
         }
+
+        setHasAccess(false);
     };
 
     const handlePlayClick = () => {
         if (hasAccess) {
             setShowReel(true);
         } else {
-            setShowAd(true);
+            // Phase 2 (Day 8-21): Just Ad
+            if (dayCount <= 21) {
+                setShowAd(true);
+            } else {
+                // Phase 3+ (Day 22+): Warning First
+                setShowAdWarning(true);
+            }
         }
     };
 
+    // ... fetchMissionHistory (unchanged) ...
+
     const fetchMissionHistory = async () => {
         setLoading(true);
-        // ... (existing fetch logic)
-
-        // Calculate Date Range
         const startDate = new Date(goal.created_at);
         startDate.setDate(startDate.getDate() - 1);
 
-        // Query...
         let query = supabase.from('missions')
             .select('*')
             .eq('user_id', goal.user_id)
@@ -159,6 +187,27 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
                     </button>
                 </div>
             </div>
+
+            {/* Ad Warning Modal - Encourages Subscription */}
+            {showAdWarning && (
+                <AdWarning
+                    currentDay={dayCount}
+                    onWatchAd={() => {
+                        setShowAdWarning(false);
+                        setShowAd(true);
+                    }}
+                    onSubscribe={() => {
+                        setShowAdWarning(false);
+                        setShowPaywall(true);
+                    }}
+                    onClose={() => setShowAdWarning(false)}
+                />
+            )}
+
+            {/* Paywall Modal */}
+            {showPaywall && (
+                <Paywall onClose={() => setShowPaywall(false)} />
+            )}
 
             {/* Ad Modal */}
             {showAd && (
