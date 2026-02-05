@@ -107,13 +107,26 @@ export default function Today() {
         }
 
         // Filter out completed goals (Handle NULL as active)
-        const activeGoals = goals.filter(g => g.is_completed !== true);
+        const rawActiveGoals = goals.filter(g => g.is_completed !== true);
 
-        if (activeGoals.length === 0) {
+        if (rawActiveGoals.length === 0) {
             setUserGoals([]);
             setLoading(false);
             return;
         }
+
+        // 🚨 Filter: Keep ONLY the latest goal (highest seq) per category
+        const latestGoalsMap = new Map();
+        rawActiveGoals.forEach(g => {
+            const existing = latestGoalsMap.get(g.category);
+            // If new one has higher seq, replace. If same seq (shouldn't happen often), use created_at
+            if (!existing || g.seq > existing.seq || (g.seq === existing.seq && new Date(g.created_at) > new Date(existing.created_at))) {
+                latestGoalsMap.set(g.category, g);
+            }
+        });
+
+        // Convert map back to array
+        const activeGoals = Array.from(latestGoalsMap.values());
 
         // 2. Fetch Active Subscriptions to Prioritize
         const { data: subs } = await supabase
@@ -146,108 +159,108 @@ export default function Today() {
 
     const fetchMissions = async () => {
         if (!selectedGoalId) return;
-        setLoading(true);
-        setDraftMissions([]);
-        setVerifyingId(null); // Clear any active verification
 
-        // Demo User Mock Missions
-        const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
+        try {
+            setLoading(true);
+            setDraftMissions([]);
+            setVerifyingId(null); // Clear any active verification
 
-        if (isDemoOrReviewer) {
-            const today = formatLocalYMD(new Date());
-            if (selectedDate === today && selectedGoal?.category === 'body_wellness') {
-                const mockMissions = [
-                    {
-                        id: 'demo-m1', user_id: 'demo123', category: 'body_wellness',
-                        content: language === 'ko' ? '물 2L 마시기' : 'Drink 2L Water',
-                        is_completed: false, date: today, verification_type: 'image'
+            // Demo User Mock Missions
+            const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
+
+            if (isDemoOrReviewer) {
+                const today = formatLocalYMD(new Date());
+                if (selectedDate === today && selectedGoal?.category === 'body_wellness') {
+                    const mockMissions = [
+                        {
+                            id: 'demo-m1', user_id: 'demo123', category: 'body_wellness',
+                            content: language === 'ko' ? '물 2L 마시기' : 'Drink 2L Water',
+                            is_completed: false, date: today, verification_type: 'image'
+                        }
+                    ];
+                    setMissions(mockMissions);
+                } else {
+                    setMissions([]);
+                    // Allow generating drafts for Demo
+                    if (selectedDate >= today) {
+                        await generateDraftPlan();
                     }
-                ];
-                setMissions(mockMissions);
+                }
+                return;
+            }
+
+            // Note: 'date' column in DB is likely type DATE or TEXT (YYYY-MM-DD). 
+            // Passing the local YYYY-MM-DD string is correct for matching.
+            const { data: existing, error: fetchError } = await supabase
+                .from('missions')
+                .select('*')
+                .eq('user_id', user!.id)
+                .eq('date', selectedDate)
+                .order('created_at');
+
+            if (fetchError) throw fetchError;
+
+            // Filter by category and SEQUENCE client-side to ensure match
+            const goalCategory = selectedGoal?.category.toLowerCase();
+            const goalSeq = selectedGoal?.seq || 1;
+            // const isVirtual = selectedGoalId === 'funplay-virtual'; // Removed
+
+            const relevantMissions = existing?.filter(m =>
+                m.category.toLowerCase() === goalCategory &&
+                (m.seq === goalSeq || (!m.seq && goalSeq === 1)) // Handle legacy data (null seq = 1)
+            ) || [];
+
+            // 🚨 Auto-Correct Virtual Goal Sequence REMOVED
+
+            if (relevantMissions.length > 0) {
+                // Logic for Mission Counts based on Trial Phase
+                // Funplay or Subscribed: 3 Missions
+                // Phase 1, 2: 3 Missions
+                // Phase 3: 1 Mission
+                // Phase 4: 0 Mission (Locked by Paywall view, but if bypassed, limit to 0 or 1?)
+                const isFunplay = selectedGoal?.category === 'funplay';
+
+                let limit = 3;
+                if (!isFunplay && !hasActiveSubscription && trialPhase === 3) {
+                    limit = 1;
+                }
+
+                // FILTER LOGIC:
+                // ALWAYS show missions that are already COMPLETED, regardless of limit.
+                // THEN fill remaining slots with incomplete missions up to limit.
+
+                // 1. Separate completed and incomplete
+                const completedMissions = relevantMissions.filter(m => m.is_completed);
+                const incompleteMissions = relevantMissions.filter(m => !m.is_completed);
+
+                const showList = [...completedMissions];
+                const remainingSlots = Math.max(0, limit - showList.length);
+
+                if (remainingSlots > 0) {
+                    showList.push(...incompleteMissions.slice(0, remainingSlots));
+                }
+
+                // Sort by seq or created_at to maintain order? created_at usually.
+                showList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+                setMissions(showList);
             } else {
                 setMissions([]);
-                // Allow generating drafts for Demo
+                // Logic for Draft Generation:
+                const today = formatLocalYMD(new Date());
+                // Allow generation if selected date is Today or Future
                 if (selectedDate >= today) {
                     await generateDraftPlan();
                 }
             }
-            setLoading(false);
-            return;
-        }
-
-        // Note: 'date' column in DB is likely type DATE or TEXT (YYYY-MM-DD). 
-        // Passing the local YYYY-MM-DD string is correct for matching.
-        const { data: existing } = await supabase
-            .from('missions')
-            .select('*')
-            .eq('user_id', user!.id)
-            .eq('date', selectedDate)
-            .order('created_at');
-
-        // Filter by category and SEQUENCE client-side to ensure match
-        const goalCategory = selectedGoal?.category.toLowerCase();
-        const goalSeq = selectedGoal?.seq || 1;
-
-        const relevantMissions = existing?.filter(m =>
-            m.category.toLowerCase() === goalCategory &&
-            (m.seq === goalSeq || (!m.seq && goalSeq === 1)) // Handle legacy data (null seq = 1)
-        ) || [];
-
-        if (relevantMissions.length > 0) {
-            // Logic for Mission Counts based on Trial Phase
-            // Funplay or Subscribed: 3 Missions
-            // Phase 1, 2: 3 Missions
-            // Phase 3: 1 Mission
-            // Phase 4: 0 Mission (Locked by Paywall view, but if bypassed, limit to 0 or 1?)
-            const isFunplay = selectedGoal?.category === 'funplay';
-            // We need to re-evaluate 'hasActiveSubscription' inside async context if possible, 
-            // but relying on state 'hasActiveSubscription' might be stale if called immediately on mount?
-            // Actually fetchMissions is called in useEffect dependent on goal/date. hasActiveSubscription updates in parallel.
-            // Let's assume standard 3 unless strictly Phase 3.
-
-            let limit = 3;
-            if (!isFunplay && !hasActiveSubscription && trialPhase === 3) {
-                limit = 1;
-            }
-
-            // FILTER LOGIC:
-            // ALWAYS show missions that are already COMPLETED, regardless of limit.
-            // THEN fill remaining slots with incomplete missions up to limit.
-
-            // 1. Separate completed and incomplete
-            const completedMissions = relevantMissions.filter(m => m.is_completed);
-            const incompleteMissions = relevantMissions.filter(m => !m.is_completed);
-
-            // 2. Decide how many incomplete we can show
-            // If completed count >= limit, we show ALL completed + 0 incomplete (or maybe 0? User wants to see history)
-            // Actually, usually we just want to limit the *generation* or *daily* view.
-            // If user has 3 completed missions from before Phase 3, show them all.
-            // If today is new, we want 1 mission total for Phase 3.
-
-            // User Issue: "Existing verified missions should represent history, new ones limited".
-            // So if I have 2 verified, and limit is 1... show 2 verified? Yes.
-
-            const showList = [...completedMissions];
-            const remainingSlots = Math.max(0, limit - showList.length);
-
-            if (remainingSlots > 0) {
-                showList.push(...incompleteMissions.slice(0, remainingSlots));
-            }
-
-            // Sort by seq or created_at to maintain order? created_at usually.
-            showList.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
-            setMissions(showList);
-        } else {
+        } catch (err) {
+            console.error("fetchMissions Error:", err);
+            // Ensure we don't end up in infinite loading. 
+            // Potentially Set empty missions so user sees Empty State?
             setMissions([]);
-            // Logic for Draft Generation:
-            const today = formatLocalYMD(new Date());
-            // Allow generation if selected date is Today or Future
-            if (selectedDate >= today) {
-                await generateDraftPlan();
-            }
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     const generateDraftPlan = async () => {
@@ -425,18 +438,23 @@ export default function Today() {
                 is_completed: true,
                 image_url: publicUrl, // Storing Media URL here
                 proof_type: type,
-                proof_text: null // ✅ CLEAR TEXT when switching to Media
+                // proof_text: null // ❌ DO NOT CLEAR TEXT
             }).eq('id', verifyingId);
 
             const updated = missions.map(m => m.id === verifyingId ? {
                 ...m,
                 is_completed: true,
                 image_url: publicUrl,
-                proof_type: type,
-                proof_text: null
+                proof_type: type
+                // proof_text: null
             } : m);
             setMissions(updated);
-            setVerifyingId(null); // Close verification area on success
+            // setVerifyingId(null); // Keep open to allow mixed verification if needed, or close? User asked to allow both. Let's keep close for UX consistency, or maybe not? 
+            // Actually, if I upload photo, I might want to add text right away. But usually "Upload" is an action. 
+            // Let's keep it close for now as per original behavior, user can re-open to add text if they want.
+            // Wait, "사진등록 후 텍스트를 입력하면" implies sequential actions.
+            setVerifyingId(null);
+
 
             const isFinished = checkChallengeCompletion(updated);
             if (isFinished) {
@@ -456,27 +474,11 @@ export default function Today() {
         if (!textInput.trim() || !verifyingId) return;
 
         try {
-            // 0. Cleanup old file if exists (switched to text)
-            const currentMission = missions.find(m => m.id === verifyingId);
-
-            if (currentMission?.image_url) {
-                try {
-                    const urlParts = currentMission.image_url.split('mission-proofs/');
-                    if (urlParts.length > 1) {
-                        const oldPath = decodeURIComponent(urlParts[1]);
-                        console.log("Deleting old proof (text switch):", oldPath);
-                        await supabase.storage.from('mission-proofs').remove([oldPath]);
-                    }
-                } catch (delError) {
-                    console.error("Failed to delete old proof:", delError);
-                }
-            }
-
             await supabase.from('missions').update({
                 is_completed: true,
                 proof_text: textInput,
                 proof_type: 'text',
-                image_url: null // ✅ CLEAR URL when switching to Text
+                // image_url: null // ❌ DO NOT CLEAR URL
             }).eq('id', verifyingId);
 
             const updated = missions.map(m => m.id === verifyingId ? {
@@ -484,7 +486,7 @@ export default function Today() {
                 is_completed: true,
                 proof_text: textInput,
                 proof_type: 'text',
-                image_url: null
+                // image_url: null
             } : m);
             setMissions(updated);
             setVerifyingId(null); // Close verification area on success
@@ -499,6 +501,47 @@ export default function Today() {
         } catch (err) {
             console.error(err);
             alert('Failed to save text.');
+        }
+    };
+
+    const handleDeleteMedia = async () => {
+        if (!verifyingId) return;
+        const currentMission = missions.find(m => m.id === verifyingId);
+        if (!currentMission?.image_url) return;
+
+        if (!window.confirm(t.deleteConfirm || "Delete this image/video?")) return;
+
+        try {
+            // 1. Delete from Storage
+            const urlParts = currentMission.image_url.split('mission-proofs/');
+            if (urlParts.length > 1) {
+                const oldPath = decodeURIComponent(urlParts[1]);
+                await supabase.storage.from('mission-proofs').remove([oldPath]);
+            }
+
+            // 2. Update DB (Clear image_url, reset proof_type if text is present)
+            const newProofType = currentMission.proof_text ? 'text' : 'none'; // Or keep 'text' if text exists
+
+            await supabase.from('missions').update({
+                image_url: null,
+                proof_type: newProofType
+            }).eq('id', verifyingId);
+
+            // 3. Update Local State
+            const updated = missions.map(m => m.id === verifyingId ? {
+                ...m,
+                image_url: null,
+                proof_type: newProofType
+            } : m);
+            setMissions(updated);
+            // If no text and no image, maybe mark incomplet? No, user manual uncheck required usually, 
+            // but if they delete proof, maybe it's still 'done' if they consider it done? 
+            // Requirement says: "사진인증 기록은 삭제하지 않는다." -> "인증 수정시 사진 삭제기능 제공"
+            // Usually if I delete the ONLY proof, it might revert to incomplete, but let's stick to just deleting the media.
+
+        } catch (err) {
+            console.error("Failed to delete media:", err);
+            alert("Failed to delete media.");
         }
     };
 
@@ -1131,22 +1174,34 @@ export default function Today() {
 
                                                 {/* COMPLETED PROOF DISPLAY */}
                                                 {mission.is_completed && !isBeingVerified && (
-                                                    <div className="mt-3 relative group">
-                                                        {mission.proof_type === 'text' ? (
+                                                    <div className="mt-3 relative group space-y-3">
+                                                        {/* 1. Text Proof */}
+                                                        {mission.proof_text && (
                                                             <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5 text-sm text-slate-300 italic">
                                                                 " {mission.proof_text} "
                                                             </div>
-                                                        ) : mission.proof_type === 'video' ? (
-                                                            <video src={mission.image_url} controls className="w-full h-32 object-cover rounded-xl border border-white/10" />
-                                                        ) : mission.proof_type === 'audio' ? (
-                                                            <audio src={mission.image_url} controls className="w-full mt-2" />
-                                                        ) : (
-                                                            <img src={mission.image_url} alt="Proof" className="w-full h-32 object-cover rounded-xl border border-white/10" />
                                                         )}
 
-                                                        {/* Edit Overlay (Visible on Hover/Touch) */}
-                                                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl cursor-pointer" onClick={() => openVerify(mission)}>
-                                                            <div className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/10">
+                                                        {/* 2. Media Proof */}
+                                                        {mission.image_url && (
+                                                            <div>
+                                                                {mission.proof_type === 'video' || mission.image_url.endsWith('.mp4') ? (
+                                                                    <video src={mission.image_url} controls className="w-full h-32 object-cover rounded-xl border border-white/10" />
+                                                                ) : mission.proof_type === 'audio' || mission.image_url.endsWith('.mp3') ? (
+                                                                    <audio src={mission.image_url} controls className="w-full mt-2" />
+                                                                ) : (
+                                                                    <img src={mission.image_url} alt="Proof" className="w-full h-32 object-cover rounded-xl border border-white/10" />
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Edit Overlay (Visible on Hover/Touch) - Covers entire area? Or just append button? 
+                                                            Let's make it a floating action button or cover the media if exists.
+                                                            To avoid covering text, let's just make the whole container clickable or add an explicit Edit button.
+                                                            The original design had an overlay. Let's keep a subtle overlay if media exists, or just a button if only text.
+                                                        */}
+                                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/10 pointer-events-auto cursor-pointer shadow-xl" onClick={() => openVerify(mission)}>
                                                                 <PenTool size={12} />
                                                                 {t.edit || 'Edit'}
                                                             </div>
@@ -1204,17 +1259,52 @@ export default function Today() {
                                                             </button>
                                                         </div>
                                                     ) : (
-                                                        <div
-                                                            onClick={triggerFileClick}
-                                                            className="border-2 border-dashed border-white/20 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-white/5 transition-all group"
-                                                        >
-                                                            <div className="flex gap-4 mb-2 text-slate-400 group-hover:text-primary transition-colors">
-                                                                <Camera size={24} />
-                                                                <Video size={24} />
-                                                                <Mic size={24} />
-                                                            </div>
-                                                            <p className="text-sm font-medium text-slate-300">Tap to upload</p>
-                                                            <p className="text-[10px] text-slate-500">Photo, Video, or Audio</p>
+                                                        <div className="relative group">
+                                                            {/* If media exists, show preview with delete button */}
+                                                            {mission.image_url ? (
+                                                                <div className="relative">
+                                                                    {mission.proof_type === 'video' ? (
+                                                                        <video src={mission.image_url || undefined} controls className="w-full h-48 object-cover rounded-xl border border-white/10" />
+                                                                    ) : mission.proof_type === 'audio' ? (
+                                                                        <div className="w-full h-24 bg-slate-800 rounded-xl flex items-center justify-center border border-white/10">
+                                                                            <audio src={mission.image_url || undefined} controls className="w-full px-4" />
+                                                                        </div>
+                                                                    ) : (
+                                                                        <img src={mission.image_url || undefined} alt="Proof" className="w-full h-48 object-cover rounded-xl border border-white/10" />
+                                                                    )}
+
+                                                                    {/* Change/Delete Actions */}
+                                                                    <div className="absolute top-2 right-2 flex gap-2">
+                                                                        <button
+                                                                            onClick={triggerFileClick}
+                                                                            className="p-2 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors backdrop-blur-sm"
+                                                                            title="Replace"
+                                                                        >
+                                                                            <Camera size={16} />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={handleDeleteMedia}
+                                                                            className="p-2 bg-red-500/80 text-white rounded-full hover:bg-red-600 transition-colors backdrop-blur-sm"
+                                                                            title="Delete"
+                                                                        >
+                                                                            <X size={16} />
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div
+                                                                    onClick={triggerFileClick}
+                                                                    className="border-2 border-dashed border-white/20 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-white/5 transition-all group"
+                                                                >
+                                                                    <div className="flex gap-4 mb-2 text-slate-400 group-hover:text-primary transition-colors">
+                                                                        <Camera size={24} />
+                                                                        <Video size={24} />
+                                                                        <Mic size={24} />
+                                                                    </div>
+                                                                    <p className="text-sm font-medium text-slate-300">Tap to upload</p>
+                                                                    <p className="text-[10px] text-slate-500">Photo, Video, or Audio</p>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>

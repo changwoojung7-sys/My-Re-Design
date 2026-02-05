@@ -279,6 +279,7 @@ export const translations = {
         confirmDeletePlanWarning: "WARNING: This will permanently delete all your progress, daily missions, and social interactions for this goal. \n\nThis action cannot be undone. Do you really want to proceed?",
         alertPlanDeleted: "Plan deleted successfully.",
         alertDeletePlanFail: "Failed to delete plan: {error}",
+        deleteConfirm: "Delete this image/video?",
         language: "Language",
         viewMissionHistory: "View Mission History",
         requestMissionHistory: "Request to view History",
@@ -573,6 +574,7 @@ export const translations = {
         confirmDeletePlanWarning: "경고: 이 계획과 관련된 모든 진행 상황, 미션, 좋아요/댓글 기록이 영구적으로 삭제됩니다. 복구할 수 없습니다.\n\n계속하시겠습니까?",
         alertPlanDeleted: "계획이 삭제되었습니다.",
         alertDeletePlanFail: "계획 삭제 실패: {error}",
+        deleteConfirm: "이미지/비디오를 삭제하시겠습니까?",
         language: "언어",
         viewMissionHistory: "미션 히스토리 보기",
         requestMissionHistory: "미션 히스토리 보기 요청",
@@ -837,6 +839,7 @@ export const translations = {
         confirmDeletePlanWarning: "警告：このプランに関連するすべての進行状況、ミッション、いいね/コメント履歴が永久的に削除されます。復元できません。\n\n続行しますか？",
         alertPlanDeleted: "プランが削除されました。",
         alertDeletePlanFail: "プラン削除失敗: {error}",
+        deleteConfirm: "この画像/動画を削除しますか？",
         language: "言語",
         viewMissionHistory: "ミッション履歴を見る",
         requestMissionHistory: "履歴閲覧リクエスト",
@@ -1120,6 +1123,7 @@ export const translations = {
         confirmDeletePlanWarning: "警告：与此计划相关的所有进度、任务、点赞/评论记录将被永久删除。无法恢复。\n\n继续吗？",
         alertPlanDeleted: "计划已删除。",
         alertDeletePlanFail: "计划删除失败: {error}",
+        deleteConfirm: "删除此图片/视频？",
         language: "语言",
     },
     es: {
@@ -1364,6 +1368,7 @@ export const translations = {
         confirmDeletePlanWarning: "ADVERTENCIA: Se borrará todo el progreso y misiones.\n\n¿Continuar?",
         alertPlanDeleted: "Plan eliminado exitosamente.",
         alertDeletePlanFail: "Error al eliminar plan: {error}",
+        deleteConfirm: "¿Eliminar esta imagen/video?",
         language: "Idioma",
         // Login Errors & Forgot Password
         invalidCredentials: "Correo o contraseña incorrectos.",
@@ -1625,6 +1630,7 @@ export const translations = {
         confirmDeletePlanWarning: "ATTENTION : Tout progrès sera perdu.\n\nContinuer ?",
         alertPlanDeleted: "Plan supprimé.",
         alertDeletePlanFail: "Échec suppression plan : {error}",
+        deleteConfirm: "Supprimer cette image/vidéo ?",
         language: "Langue",
         // Login Errors & Forgot Password
         invalidCredentials: "Email ou mot de passe incorrect.",
@@ -1886,6 +1892,7 @@ export const translations = {
         confirmDeletePlanWarning: "WARNUNG: Fortschritt geht verloren.\n\nWeiter?",
         alertPlanDeleted: "Plan gelöscht.",
         alertDeletePlanFail: "Löschen fehlgeschlagen: {error}",
+        deleteConfirm: "Dieses Bild/Video löschen?",
         language: "Sprache",
         // Login Errors & Forgot Password
         invalidCredentials: "E-Mail oder Passwort falsch.",
@@ -2147,6 +2154,7 @@ export const translations = {
         confirmDeletePlanWarning: "ВНИМАНИЕ: Прогресс будет удален.\n\nПродолжить?",
         alertPlanDeleted: "План удален.",
         alertDeletePlanFail: "Ошибка удаления плана: {error}",
+        deleteConfirm: "Удалить это фото/видео?",
         language: "Язык",
         // Login Errors & Forgot Password
         invalidCredentials: "Неверный email или пароль.",

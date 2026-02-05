@@ -34,6 +34,12 @@ interface Mission {
         expected_impact?: string;
     };
     trust_score?: number;
+    // Verification & Execution
+    proof_text?: string | null;
+    proof_type?: string; // 'text' | 'image' | 'video' | 'audio' | 'none'
+    verification_type?: string; // 'text' | 'image' | 'checkbox'
+    seq?: number;
+    details?: any;
 }
 
 interface AppState {
