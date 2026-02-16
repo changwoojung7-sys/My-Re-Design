@@ -4,13 +4,14 @@ import { useStore } from '../../lib/store';
 import { generateMissions, generateFunPlayMission } from '../../lib/openai';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb, BarChart, ShieldCheck } from 'lucide-react';
+import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
 import Paywall from './Paywall';
 import PaywallWarning from './PaywallWarning';
 import AdWarning from './AdWarning';
 import RewardAd from '../../components/ads/RewardAd';
+import MissionLoading from '../../components/common/MissionLoading';
 
 // --- Helper: Check Goal Expiry (Module Level) ---
 const isGoalExpired = (goal: any) => {
@@ -425,7 +426,10 @@ export default function Today() {
             newMissions = await generateMissions(user, language, exclusionList, selectedGoal, isRefresh);
 
             // Filter for CURRENT selected category
-            const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());
+            const currentCategoryMissions = newMissions.filter(m =>
+                m?.category && selectedGoal?.category &&
+                m.category.toLowerCase() === selectedGoal.category.toLowerCase()
+            );
 
             // Phase 3 Limit check
             let limit = 3;
@@ -1095,12 +1099,19 @@ export default function Today() {
             {/* Mission List (Scrollable) */}
             <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 no-scrollbar overscroll-y-contain relative">
                 {/* Loading Overlay */}
-                {(loading || checkingSubs) && (
-                    <div className="absolute inset-0 z-10 bg-slate-950/50 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
-                        <Sparkles className="mx-auto mb-3 text-primary animate-pulse" size={28} />
-                        <p className="text-sm text-slate-400 font-medium animate-pulse">Designing your loop...</p>
-                    </div>
-                )}
+                <AnimatePresence>
+                    {(loading || checkingSubs) && (
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.5 }}
+                            className="absolute inset-0 z-50"
+                        >
+                            <MissionLoading />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {(
                     <AnimatePresence>
@@ -1169,43 +1180,24 @@ export default function Today() {
                                                             </div>
                                                         )}
 
-                                                        {/* 2. Insight Badge (Why?) - Expandable or inline context */}
-                                                        <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 backdrop-blur-sm">
-                                                            <div className="flex items-start gap-2">
-                                                                <Lightbulb size={14} className="text-yellow-400 mt-0.5 shrink-0" />
-                                                                <div className="space-y-1.5">
-                                                                    {/* User Context (Source) */}
-                                                                    {mission.reasoning.user_context && (
-                                                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                                                            <span className="text-[10px] text-slate-400 bg-slate-800/50 px-1.5 py-0.5 rounded border border-white/5 flex items-center gap-1">
-                                                                                <BarChart size={10} />
-                                                                                Source
-                                                                            </span>
-                                                                            <p className="text-xs text-slate-300 leading-snug">
-                                                                                "{mission.reasoning.user_context}"
+                                                        {/* 2. Insight Badge (Why?) - Simplified & Fast */}
+                                                        {(typeof mission.reasoning === 'string' || mission.reasoning?.expected_impact) && (
+                                                            <div className="mt-3 relative group">
+                                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/50 to-transparent rounded-l-xl" />
+                                                                <div className="p-3 pl-4 rounded-r-xl bg-white/5 border border-white/5 backdrop-blur-sm">
+                                                                    <div className="flex items-start gap-2.5">
+                                                                        <div className="mt-0.5 shrink-0 bg-primary/10 p-1 rounded-full">
+                                                                            <Lightbulb size={12} className="text-primary" />
+                                                                        </div>
+                                                                        <div className="space-y-1.5 min-w-0 flex-1">
+                                                                            <p className="text-xs text-slate-200 font-medium leading-relaxed">
+                                                                                {typeof mission.reasoning === 'string' ? mission.reasoning : mission.reasoning?.expected_impact}
                                                                             </p>
                                                                         </div>
-                                                                    )}
-
-                                                                    {/* Impact / Prediction */}
-                                                                    {mission.reasoning.expected_impact && (
-                                                                        <p className="text-xs text-primary font-medium">
-                                                                            ✨ {mission.reasoning.expected_impact}
-                                                                        </p>
-                                                                    )}
-
-                                                                    {/* Scientific Basis (Double Check) */}
-                                                                    {mission.reasoning.scientific_basis && (
-                                                                        <div className="pt-1.5 mt-1.5 border-t border-white/5 flex items-start gap-1.5">
-                                                                            <ShieldCheck size={12} className="text-blue-400 mt-0.5 shrink-0" />
-                                                                            <p className="text-[10px] text-slate-400 leading-tight">
-                                                                                {mission.reasoning.scientific_basis}
-                                                                            </p>
-                                                                        </div>
-                                                                    )}
+                                                                    </div>
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                        )}
                                                     </div>
                                                 )}
 

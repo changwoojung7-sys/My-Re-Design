@@ -29,7 +29,7 @@ interface Mission {
     image_url?: string | null;
     date?: string;
     // Personalization Fields
-    reasoning?: {
+    reasoning?: string | {
         user_context?: string;
         scientific_basis?: string;
         expected_impact?: string;

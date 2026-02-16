@@ -405,40 +405,59 @@ Context Knobs:
 History (Last 7 Days — avoid repeating):
 {recentMissionsJson}
 
-═══ PATTERN LIBRARY (METHOD HINT — these suggest HOW to approach, NOT what topic) ═══
-- body_wellness → method_hint: "{bwPattern.brief}" (type: {bwPattern.core_type})
-- growth_career → method_hint: "{gcPattern.brief}" (type: {gcPattern.core_type}) [LANGUAGE LEARNING MODE]
-- mind_connection → method_hint: "{mcPattern.brief}" (type: {mcPattern.core_type})
+═══ PATTERN LIBRARY (METHOD HINT — three options per category) ═══
+- body_wellness:
+  1) {bwPattern1}
+  2) {bwPattern2}
+  3) {bwPattern3}
+- growth_career:
+  1) {gcPattern1}
+  2) {gcPattern2}
+  3) {gcPattern3}
+- mind_connection:
+  1) {mcPattern1}
+  2) {mcPattern2}
+  3) {mcPattern3}
 
 ⚠️ GOAL vs PATTERN PRIORITY:
-- The GOAL determines the SUBJECT/TOPIC of the mission (e.g., "식단 조절" → mission is about food/diet).
-- The PATTERN is just a METHOD HINT for structure (e.g., "점수화" → apply scoring as a method TO the goal topic).
-- If the pattern seems unrelated to the goal, IGNORE the pattern and directly serve the goal.
-- Example: goal="식단 조절", pattern="비우세손으로 동작" → mission should be about diet (goal wins), NOT hand exercise.
+- The GOAL determines the SUBJECT/TOPIC.
+- The PATTERN is just a METHOD HINT. Use a DIFFERENT pattern for each of the 3 missions in a category.
 
 Hard Rules:
-1) Create exactly 1 mission per category (3 total).
-2) Each mission's TOPIC must come from the user's GOAL, not the pattern brief.
-3) The pattern brief is only a structural/creative METHOD suggestion — adapt or ignore if it conflicts with the goal.
-4) Doable within 120 seconds.
-5) Strict anti-repeat: No reuse of primary action verbs from history. No similar semantic intent.
-6) Forbidden: No "drink water/sleep", No "read book/lecture", No "preaching/meditation".
-7) [어학 모드 시 추가] growth_career mission MUST be a language learning exercise in the user's target language. Include target-language sentences in the content.
+1) Create exactly 3 missions per category (9 total).
+2) Each mission in a category MUST use a DIFFERENT pattern from the list provided above.
+3) Doable within 120 seconds.
+4) Strict anti-repeat: No reuse of primary action verbs from history.
+5) Forbidden: No "drink water/sleep", No "read book/lecture", No "preaching/meditation".
+
+User Rules:
+1) Language: Korean (Natural, encouraging tone).
+2) Structure: Action-oriented. specific.
+3) Constraints: 
+   - No "meditate" or generic advice.
+   - For 'mind_connection', establish specific scenarios.
+   - BAD: "오늘 대화 톤 설정하기" (Too vague)
+   - GOOD: "오늘 대화에서 사용할 ‘따뜻한’ 혹은 ‘단호한’ 톤 하나를 미리 정해보세요."
+   - BAD: "경청하기"
+   - GOOD: "대화 중 끼어들고 싶을 때 사용할 양해 문장('잠시만요, 다 듣고 말씀드릴게요')을 준비하세요."
+   - BAD: "감사하기"
+   - GOOD: "단순 감사 대신, 상대방의 구체적인 행동을 언급하며 인정하는 문장을 만들어보세요."
 
 Category Style Rules:
-- body_wellness: 1 "micro-body tune" OR "sensory calibration" OR "posture & breath with twist" (not meditation). MUST relate to "{bwGoal}".
-- growth_career: 1 "micro-experiment" producing a tiny artifact (1 line note, 1 decision rule, 1 mini plan). MUST relate to "{gcGoal}".
-- mind_connection: 1 "emotion labeling + micro-connection" OR "boundary/relationship micro-script". MUST relate to "{mcGoal}".
+- body_wellness: MUST relate to "{bwGoal}".
+- growth_career: MUST relate to "{gcGoal}".
+- mind_connection: MUST relate to "{mcGoal}".
 
 Output Schema:
 {
   "date": "YYYY-MM-DD",
   "missions": [
+    // 9 missions total (3 per category)
     {
       "category": "body_wellness|growth_career|mind_connection",
       "pattern_id": "string",
-      "title": "short",
-      "content": "1-2 sentences, specific, goal-connected",
+      "title": "Short title",
+      "content": "Direct action instruction (1-2 sentences). Do NOT include reasoning here.",
       "verification_type": "checkbox|text|photo",
       "success_criteria": ["step1"],
       "novelty_tags": ["action:verb", "place:loc", "tool:item"],
@@ -448,20 +467,20 @@ Output Schema:
           "place": "loc",
           "social_context": "type"
       },
-      "reasoning": {
-          "expected_impact": "1 sentence showing how this serves the user's goal"
-      }
+      "trust_score": 85 // integer 80-99
     }
   ]
 }
-```
 
 ### 5-3. AI 파라미터
 
 | 파라미터 | 값 | 설명 |
 |----------|-----|------|
 | `model` | `gpt-4o-mini` | 비용 효율적인 모델 |
-| `temperature` | `0.8` | 창의성과 안정성 균형 |
+| `temperature` | `0.7` | 창의성과 안정성 균형 (0.6 -> 0.7) |
+| `top_p` | `0.9` | 다양성 확보 |
+| `frequency_penalty` | `0.2` | 반복 억제 (완화) |
+| `presence_penalty` | `0.3` | 주제 전환 유도 (완화) |
 | `response_format` | `{ type: "json_object" }` | JSON 강제 |
 
 ---

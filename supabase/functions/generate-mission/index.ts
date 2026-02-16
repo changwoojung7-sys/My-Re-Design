@@ -105,7 +105,10 @@ serve(async (req: Request) => {
 
         let body: any = {
             model: "gpt-4o-mini",
-            temperature: 0.8,
+            temperature: 0.7,
+            top_p: 0.9,
+            frequency_penalty: 0.2,
+            presence_penalty: 0.3,
             response_format: { type: "json_object" }
         };
 
@@ -115,40 +118,69 @@ serve(async (req: Request) => {
         if (type === 'daily_missions') {
             const { userProfile } = payload;
 
-            // PRIORITY: Client-sent goal (from selected combo) > DB fallback > default
-            // The client sends the SPECIFIC goal the user is viewing, which must take priority
-            const bwGoal = payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리';
-            const gcGoal = payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발';
-            const mcGoal = payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정';
+            // Determine requested categories
+            const requested = payload.goalList && Object.keys(payload.goalList).length > 0
+                ? Object.keys(payload.goalList)
+                : ['body_wellness', 'growth_career', 'mind_connection'];
+
+            // Assign goals only if requested
+            const bwGoal = requested.includes('body_wellness') ? (payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리') : null;
+            const gcGoal = requested.includes('growth_career') ? (payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발') : null;
+            const mcGoal = requested.includes('mind_connection') ? (payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정') : null;
 
             // 🔍 DEBUG: Log goal resolution
             console.log('[DEBUG] Goal Resolution:', {
-                'payload.goalList': payload.goalList,
-                'goalMap (from DB)': goalMap,
-                'resolved': { bwGoal, gcGoal, mcGoal },
-                'isLanguageGoal(gcGoal)': isLanguageGoal(gcGoal)
+                'requested': requested,
+                'resolved': { bwGoal, gcGoal, mcGoal }
             });
 
-            // Pick random patterns (typed)
-            const bwPattern = pickRandom(patterns.body_wellness as Pattern[]);
-            const mcPattern = pickRandom(patterns.mind_connection as Pattern[]);
+            // Helper to pick N random items
+            const pickRandomN = (arr: any[], n: number) => {
+                const shuffled = [...arr].sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, n);
+            };
 
-            // For growth_career: detect language goal → use language patterns
-            let gcPattern: Pattern;
+            // Pick patterns only for active goals
+            const bwPatterns = bwGoal ? pickRandomN(patterns.body_wellness as Pattern[], 3) : [];
+            const mcPatterns = mcGoal ? pickRandomN(patterns.mind_connection as Pattern[], 3) : [];
+
+            let gcPatterns: Pattern[] = [];
             let gcPatternSource = 'growth_career';
-            if (isLanguageGoal(gcGoal)) {
-                gcPattern = pickRandom(patterns.growth_career_language as Pattern[]);
-                gcPatternSource = 'growth_career_language';
-            } else {
-                gcPattern = pickRandom(patterns.growth_career as Pattern[]);
+            if (gcGoal) {
+                if (isLanguageGoal(gcGoal)) {
+                    gcPatterns = pickRandomN(patterns.growth_career_language as Pattern[], 3);
+                    gcPatternSource = 'growth_career_language';
+                } else {
+                    gcPatterns = pickRandomN(patterns.growth_career as Pattern[], 3);
+                }
             }
 
-            // 🔍 DEBUG: Log pattern selection
-            console.log('[DEBUG] Pattern Selection:', {
-                bw: bwPattern.pattern_id,
-                gc: `${gcPattern.pattern_id} (source: ${gcPatternSource})`,
-                mc: mcPattern.pattern_id
-            });
+            // Construct User Goals Section
+            let goalsSection = '═══ USER GOALS (TOPIC — create missions ONLY for these) ═══\n';
+            if (bwGoal) goalsSection += `- body_wellness_goal: "${bwGoal}"\n`;
+            if (gcGoal) goalsSection += `- growth_career_goal: "${gcGoal}"\n`;
+            if (mcGoal) goalsSection += `- mind_connection_goal: "${mcGoal}"\n`;
+
+            // Construct Pattern Library Section
+            let patternsSection = '═══ PATTERN LIBRARY (METHOD HINT) ═══\n';
+            if (bwGoal) {
+                patternsSection += `- body_wellness:\n`;
+                patternsSection += `  1) ${bwPatterns[0].brief} (type: ${bwPatterns[0].core_type})\n`;
+                patternsSection += `  2) ${bwPatterns[1].brief} (type: ${bwPatterns[1].core_type})\n`;
+                patternsSection += `  3) ${bwPatterns[2].brief} (type: ${bwPatterns[2].core_type})\n`;
+            }
+            if (gcGoal) {
+                patternsSection += `- growth_career (source: ${gcPatternSource}):\n`;
+                patternsSection += `  1) ${gcPatterns[0].brief} (type: ${gcPatterns[0].core_type})\n`;
+                patternsSection += `  2) ${gcPatterns[1].brief} (type: ${gcPatterns[1].core_type})\n`;
+                patternsSection += `  3) ${gcPatterns[2].brief} (type: ${gcPatterns[2].core_type})\n`;
+            }
+            if (mcGoal) {
+                patternsSection += `- mind_connection:\n`;
+                patternsSection += `  1) ${mcPatterns[0].brief} (type: ${mcPatterns[0].core_type})\n`;
+                patternsSection += `  2) ${mcPatterns[1].brief} (type: ${mcPatterns[1].core_type})\n`;
+                patternsSection += `  3) ${mcPatterns[2].brief} (type: ${mcPatterns[2].core_type})\n`;
+            }
 
             const systemPrompt = `You are MyReDesign Mission Composer.
 
@@ -165,6 +197,7 @@ it is INVALID and must be rewritten internally before output.
 
 Do not produce generic productivity advice.
 Do not produce category-only missions ignoring the goal.
+Generate missions ONLY for the categories listed in USER GOALS.
 
 Output strictly valid JSON only.`;
 
@@ -174,10 +207,7 @@ User Profile:
 - gender: ${userProfile?.gender || 'any'}
 - language: ${payload.language || 'ko'}
 
-═══ USER GOALS (TOPIC — these determine WHAT each mission is about) ═══
-- body_wellness_goal: "${bwGoal}"
-- growth_career_goal: "${gcGoal}"
-- mind_connection_goal: "${mcGoal}"
+${goalsSection}
 
 Context Knobs:
 - time_budget_sec: 120
@@ -186,52 +216,65 @@ Context Knobs:
 History (Last 7 Days — avoid repeating):
 ${recentMissionsJson}
 
-═══ PATTERN LIBRARY (METHOD HINT — these suggest HOW to approach, NOT what topic) ═══
-- body_wellness → method_hint: "${bwPattern.brief}" (type: ${bwPattern.core_type})
-- growth_career → method_hint: "${gcPattern.brief}" (type: ${gcPattern.core_type})${gcPatternSource === 'growth_career_language' ? ' [LANGUAGE LEARNING MODE]' : ''}
-- mind_connection → method_hint: "${mcPattern.brief}" (type: ${mcPattern.core_type})
+${patternsSection}
+`;
 
+            const warning = `
 ⚠️ GOAL vs PATTERN PRIORITY:
-- The GOAL determines the SUBJECT/TOPIC of the mission (e.g., "식단 조절" → mission is about food/diet).
-- The PATTERN is just a METHOD HINT for structure (e.g., "점수화" → apply scoring as a method TO the goal topic).
-- If the pattern seems unrelated to the goal, IGNORE the pattern and directly serve the goal.
-- Example: goal="식단 조절", pattern="비우세손으로 동작" → mission should be about diet (goal wins), NOT hand exercise.
+- The GOAL determines the SUBJECT / TOPIC.
+- The PATTERN is just a METHOD HINT. Use a DIFFERENT pattern for each of the 3 missions in a category.
 
 Hard Rules:
-1) Create exactly 1 mission per category (3 total).
-2) Each mission's TOPIC must come from the user's GOAL, not the pattern brief.
-3) The pattern brief is only a structural/creative METHOD suggestion — adapt or ignore if it conflicts with the goal.
-4) Doable within 120 seconds.
-5) Strict anti-repeat: No reuse of primary action verbs from history. No similar semantic intent.
-6) Forbidden: No "drink water/sleep", No "read book/lecture", No "preaching/meditation".${gcPatternSource === 'growth_career_language' ? '\n7) growth_career mission MUST be a language learning exercise in the user\'s target language. Include target-language sentences in the content.' : ''}
+1) Create exactly 3 missions per REQUESTED category.
+2) Each mission in a category MUST use a DIFFERENT pattern from the list provided above.
+3) Doable within 120 seconds.
+4) Strict anti-repeat: No reuse of primary action verbs from history.
+5) Forbidden: No "drink water/sleep", No "read book/lecture", No "preaching/meditation".
+${gcPatternSource === 'growth_career_language' ? '6) growth_career missions MUST be language learning exercises in the user\'s target language.' : ''}
 
 Category Style Rules:
-- body_wellness: 1 "micro-body tune" OR "sensory calibration" OR "posture & breath with twist" (not meditation). MUST relate to "${bwGoal}".
-- growth_career: 1 "micro-experiment" producing a tiny artifact (1 line note, 1 decision rule, 1 mini plan). MUST relate to "${gcGoal}".
-- mind_connection: 1 "emotion labeling + micro-connection" OR "boundary/relationship micro-script". MUST relate to "${mcGoal}".
+${bwGoal ? `- body_wellness: MUST relate to "${bwGoal}".` : ''}
+${gcGoal ? `- growth_career: MUST relate to "${gcGoal}".` : ''}
+${mcGoal ? `- mind_connection: MUST relate to "${mcGoal}".` : ''}
 
+User Rules:
+1) Language: Korean (Natural, encouraging tone).
+2) Structure: Action-oriented, specific.
+3) Constraints: No "meditate" or generic advice.
+`;
+
+            const outputSchema = `
 Output Schema:
 {
-  "date": "${today}",
-  "missions": [
-    {
-      "category": "body_wellness|growth_career|mind_connection",
-      "pattern_id": "string",
-      "title": "short",
-      "content": "1-2 sentences, specific, goal-connected",
-      "verification_type": "checkbox|text|photo",
-      "success_criteria": ["step1"],
-      "novelty_tags": ["action:verb", "place:loc", "tool:item"],
-      "fingerprint": { "primary_action": "verb", "tool": "item", "place": "loc", "social_context": "type" },
-      "reasoning": { "expected_impact": "1 sentence showing how this serves the user's goal" }
-    }
-  ]
+    "date": "${today}",
+    "missions": [
+        // 3 missions per REQUESTED category
+        {
+            "category": "body_wellness|growth_career|mind_connection",
+            "pattern_id": "string",
+            "title": "Short title",
+            "content": "Direct action instruction (1-2 sentences). Do NOT include reasoning here.",
+            "reasoning": "Brief explanation of why this mission helps the goal (1 sentence).",
+            "verification_type": "checkbox|text|photo",
+            "success_criteria": ["step1"],
+            "novelty_tags": ["action:verb", "place:loc", "tool:item"],
+            "fingerprint": {
+                "primary_action": "verb",
+                "tool": "item",
+                "place": "loc",
+                "social_context": "type"
+            },
+            "trust_score": 85 // integer 80-99
+        }
+    ]
 }
-            `;
+`;
+
+            const finalUserPrompt = userPrompt + warning + outputSchema;
 
             body.messages = [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt }
+                { role: "user", content: finalUserPrompt }
             ];
         }
 
@@ -247,33 +290,33 @@ Output Schema:
             const twist = pickRandom(patterns.funplay.twist_modifiers as string[]);
 
             const systemPrompt = `Role: Ultimate Game Master Engine. Priority: UNEXPECTEDNESS, NOVELTY.
-Forbidden: ${patterns.funplay.forbidden.join('; ')}.
+    Forbidden: ${patterns.funplay.forbidden.join('; ')}.
 If the last mission used the same archetype, STRICTLY pick a different one.`;
 
             const userPrompt = `
 User: ${userProfile?.age || 25}y ${userProfile?.gender || 'any'}.
-Req: Diff ${options.difficulty}, Time ${options.time_limit}s, Place ${options.place}, Mood ${options.mood || 'fun'}.
+Req: Diff ${options.difficulty}, Time ${options.time_limit} s, Place ${options.place}, Mood ${options.mood || 'fun'}.
 History: ${recentMissionsJson}
 
 Selected Setup:
 - Archetype: "${archetype.name}" — ${archetype.description}
 - Mechanic: "${mechanic}"
-- Twist Modifier: "${twist}"
+    - Twist Modifier: "${twist}"
 
 Task: Generate 1 FunPlay mission using the above archetype + mechanic + twist.
 Ensure it is COMPLETELY different from History.
-Language: ${payload.language || 'ko'}.
+    Language: ${payload.language || 'ko'}.
 
 Output JSON:
 {
-  "category": "funplay",
-  "archetype": "${archetype.id}",
-  "content": "Mission instruction with twist included (1-2 sentences)",
-  "verification_type": "checkbox",
-  "fingerprint": { "primary_action": "verb", "mechanic": "${mechanic}", "place": "loc" },
-  "reasoning": { "expected_impact": "Why this is fun (1 sentence)" }
+    "category": "funplay",
+        "archetype": "${archetype.id}",
+            "content": "Mission instruction with twist included (1-2 sentences)",
+                "verification_type": "checkbox",
+                    "fingerprint": { "primary_action": "verb", "mechanic": "${mechanic}", "place": "loc" },
+    "reasoning": { "expected_impact": "Why this is fun (1 sentence)" }
 }
-            `;
+`;
 
             body.messages = [
                 { role: "system", content: systemPrompt },
@@ -288,9 +331,9 @@ Output JSON:
         else if (type === 'coaching') {
             const { goal, stats } = payload;
             const systemPrompt = `Expert performance coach. Concise JSON output.`;
-            const userPrompt = `Goal: "${goal?.target_text}" (${goal?.category}). Success: ${stats?.successRate || 0}%, Streak: ${stats?.streak || 0}d.
-Task: Provide 1 short "insight" (tactical, max 15 words) and 1 short "encouragement" (max 10 words).
-Language: ${payload.language || 'ko'}. JSON: { "insight", "encouragement" }`;
+            const userPrompt = `Goal: "${goal?.target_text}"(${goal?.category}). Success: ${stats?.successRate || 0}%, Streak: ${stats?.streak || 0} d.
+    Task: Provide 1 short "insight" (tactical, max 15 words) and 1 short "encouragement" (max 10 words).
+        Language: ${payload.language || 'ko'}. JSON: { "insight", "encouragement" } `;
 
             body.messages = [
                 { role: "system", content: systemPrompt },
