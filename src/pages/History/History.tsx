@@ -311,6 +311,10 @@ export default function History() {
                     <HistoryDetail
                         goal={selectedGoal}
                         onClose={() => setSelectedGoal(null)}
+                        onMissionsChanged={() => {
+                            fetchCompletedCounts();
+                            fetchGlobalHistory();
+                        }}
                     />
                 )}
             </AnimatePresence>

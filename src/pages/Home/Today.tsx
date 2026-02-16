@@ -393,25 +393,10 @@ export default function Today() {
         }
     };
 
-    const generateDraftPlan = async () => {
-        // 1. Fetch recent missions for exclusion logic
-        let exclusionList: string[] = [];
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const sevenDaysStr = formatLocalYMD(sevenDaysAgo);
-
-        const { data: recentMissions } = await supabase
-            .from('missions')
-            .select('category, content')
-            .eq('user_id', user!.id)
-            .gte('date', sevenDaysStr);
-
-        if (recentMissions) {
-            const exceptions = ['body_wellness']; // Daily routines might repeat
-            exclusionList = recentMissions
-                .filter(m => !exceptions.includes(m.category.toLowerCase()))
-                .map(m => m.content);
-        }
+    const generateDraftPlan = async (isRefresh: boolean = false) => {
+        // 1. Fetch recent missions logic removed from client side as it is now handled server-side via Fingerprints
+        // Keeping an empty list for param compatibility if still needed by other parts, but mostly it's internal now.
+        const exclusionList: string[] = [];
 
         let newMissions: any[] = [];
 
@@ -428,21 +413,22 @@ export default function Today() {
                     time_limit: details.time_limit || 30,
                     mood: details.mood || 'fun',
                     place: 'unknown'
-                }
+                },
+                isRefresh
             );
             // Wrap in array
             newMissions = [funplayMission];
 
         } else {
             // Standard Generation (3 Missions)
-            newMissions = await generateMissions(user, language, exclusionList, selectedGoal);
+            // Note: generateMissions now handles history lookup internally
+            newMissions = await generateMissions(user, language, exclusionList, selectedGoal, isRefresh);
 
-            // Filter for CURRENT selected category just in case AI returns mixed
+            // Filter for CURRENT selected category
             const currentCategoryMissions = newMissions.filter(m => m.category.toLowerCase() === selectedGoal?.category.toLowerCase());
 
-            // Phase 3 Limit check involved here too
+            // Phase 3 Limit check
             let limit = 3;
-            // Note: trialPhase state is available here
             if (!hasActiveSubscription && trialPhase === 3) {
                 limit = 1;
             }
@@ -455,13 +441,13 @@ export default function Today() {
             user_id: user!.id,
             content: m.content,
             category: m.category,
-            verification_type: m.verification_type || 'checkbox', // Default to checkbox for Re:Play if unspecified
+            verification_type: m.verification_type || 'checkbox',
             reasoning: m.reasoning,
             trust_score: m.trust_score,
             date: selectedDate,
             is_completed: false,
             seq: selectedGoal?.seq || 1,
-            details: m.details // if AI returns extra details
+            details: m.details
         }));
         setDraftMissions(mapped);
     };
@@ -471,8 +457,6 @@ export default function Today() {
     const handleRefresh = async () => {
         if (refreshCount >= 3) return;
 
-        // Forced Ad Logic for Refresh (Ignore Free Trial)
-        // If not premium/subscribed, MUST watch ad to refresh
         if (user?.subscription_tier !== 'premium' && !hasActiveSubscription) {
             setPendingRefresh(true);
             setShowRewardAd(true);
@@ -484,7 +468,9 @@ export default function Today() {
 
     const executeRefresh = async () => {
         setLoading(true);
-        await generateDraftPlan();
+        // Clear existing missions so new drafts become visible (isPreview = true)
+        setMissions([]);
+        await generateDraftPlan(true); // Pass true for refresh
 
         const newCount = refreshCount + 1;
         setRefreshCount(newCount);

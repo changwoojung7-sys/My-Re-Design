@@ -24,6 +24,7 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
 
     useEffect(() => {
         let listeners: any[] = [];
+        let rewarded = false; // Guard against duplicate reward
 
         const setupAdMob = async () => {
             if (Capacitor.isNativePlatform()) {
@@ -34,13 +35,16 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                 // Setup Listeners
                 const onRewarded = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
                     console.log('User rewarded', reward);
-                    onReward();
-                    onClose();
+                    if (!rewarded) {
+                        rewarded = true;
+                        onReward(); // Grant the reward
+                    }
+                    // Do NOT close here — let Dismissed handle UI teardown
                 });
 
                 const onDismissed = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
-                    console.log('Ad dismissed');
-                    onClose();
+                    console.log('Ad dismissed, was rewarded:', rewarded);
+                    onClose(); // Always close the overlay
                 });
 
                 const onFailed = await AdMob.addListener(RewardAdPluginEvents.FailedToLoad, (error) => {

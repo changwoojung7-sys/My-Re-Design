@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell, Globe, HelpCircle } from 'lucide-react';
+import { Trash2, Save, LogOut, ChevronDown, Settings, X, Mail, Phone, Lock, ChevronRight, CreditCard, Sparkles, Camera, Bell, Globe, HelpCircle, Pencil } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import SubscriptionManager from './SubscriptionManager';
@@ -72,6 +72,11 @@ export default function MyPage() {
     // UI State
     const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('body_wellness');
     const [goals, setGoals] = useState<Record<GoalCategory, UserGoal>>(JSON.parse(JSON.stringify(INITIAL_GOALS)));
+    const [goalViewMode, setGoalViewMode] = useState<'active' | 'completed'>('active');
+    const [allGoals, setAllGoals] = useState<any[]>([]);
+    const [selectedCompletedGoal, setSelectedCompletedGoal] = useState<any | null>(null);
+    const [completedEditMode, setCompletedEditMode] = useState(false);
+    const [deletingGoalId, setDeletingGoalId] = useState<string | null>(null);
 
     // Request Approval State
     const [incomingRequests, setIncomingRequests] = useState<any[]>([]);
@@ -266,24 +271,25 @@ export default function MyPage() {
 
     const fetchUserGoals = async () => {
         if (!user) return;
-        // Fetch all, we need to sort client side or use a clever query
-        // Simple approach: Fetch all, then find max seq per category
         const { data } = await supabase
             .from('user_goals')
             .select('*')
-            .eq('user_id', user.id);
+            .eq('user_id', user.id)
+            .order('created_at', { ascending: false });
 
         if (data) {
+            // Store all goals for completed view
+            setAllGoals(data);
+
             const newGoals = JSON.parse(JSON.stringify(INITIAL_GOALS));
             const maxSeqMap: Record<string, number> = {};
 
-            // 1. Find max seq for each category
+            // Find max seq for each category (active view)
             data.forEach((g: any) => {
                 const cat = g.category;
                 const seq = g.seq || 1;
                 if (!maxSeqMap[cat] || seq > maxSeqMap[cat]) {
                     maxSeqMap[cat] = seq;
-                    // For now, load the LATEST sequential goal into the slot
                     if (newGoals[cat as GoalCategory]) {
                         newGoals[cat as GoalCategory] = g;
                     }
@@ -723,9 +729,82 @@ export default function MyPage() {
         }));
     };
 
+    // Helper: check if a goal is expired
+    const isGoalItemExpired = (g: any) => {
+        if (!g.created_at) return false;
+        const start = new Date(g.created_at);
+        start.setHours(0, 0, 0, 0);
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        let totalDays = 0;
+        if (g.category?.toLowerCase() === 'funplay') {
+            totalDays = 7;
+        } else if (g.duration_months < 1) {
+            totalDays = g.duration_months === 0.25 ? 7 : g.duration_months === 0.5 ? 14 : Math.round(g.duration_months * 30);
+        } else {
+            totalDays = (g.duration_months || 1) * 30;
+        }
+        const diffMs = now.getTime() - start.getTime();
+        const daysPassed = Math.round(diffMs / (1000 * 60 * 60 * 24));
+        return daysPassed >= totalDays;
+    };
+
+    // Computed: completed goals (expired or explicitly completed)
+    const completedGoals = allGoals.filter(g => isGoalItemExpired(g) || g.is_completed === true);
+
+    // Handler: delete a completed goal and its associated data
+    const handleDeleteCompletedGoal = async (goalToDelete: any) => {
+        if (!goalToDelete?.id) return;
+        const confirmed = window.confirm('이 완료된 목표와 관련된 모든 미션 데이터를 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.');
+        if (!confirmed) return;
+
+        setDeletingGoalId(goalToDelete.id);
+        try {
+            // Delete associated data
+            await supabase.from('friend_history_permissions').delete().eq('goal_id', goalToDelete.id);
+            await supabase.from('goal_likes').delete().eq('goal_id', goalToDelete.id);
+            await supabase.from('goal_comments').delete().eq('goal_id', goalToDelete.id);
+
+            // Delete mission storage files
+            const { data: goalMissions } = await supabase
+                .from('missions')
+                .select('image_url')
+                .eq('user_id', user!.id)
+                .eq('category', goalToDelete.category)
+                .eq('seq', goalToDelete.seq || 1)
+                .not('image_url', 'is', null);
+
+            const urlsToDelete = goalMissions?.map((m: any) => m.image_url) || [];
+            if (urlsToDelete.length > 0) {
+                await deleteFilesFromStorage(urlsToDelete);
+            }
+
+            // Delete missions
+            await supabase.from('missions').delete()
+                .eq('user_id', user!.id)
+                .eq('category', goalToDelete.category)
+                .eq('seq', goalToDelete.seq || 1);
+
+            // Delete the goal itself
+            await supabase.from('user_goals').delete().eq('id', goalToDelete.id);
+
+            // Refresh
+            if (selectedCompletedGoal?.id === goalToDelete.id) {
+                setSelectedCompletedGoal(null);
+            }
+            await fetchUserGoals();
+            alert('삭제되었습니다.');
+        } catch (err) {
+            console.error('Delete completed goal error:', err);
+            alert('삭제에 실패했습니다.');
+        } finally {
+            setDeletingGoalId(null);
+        }
+    };
+
     if (!user) return null;
 
-    const currentGoal = goals[selectedCategory];
+    const currentGoal = goalViewMode === 'completed' && selectedCompletedGoal ? selectedCompletedGoal : goals[selectedCategory];
     const hasGoal = (cat: GoalCategory) => !!goals[cat].id;
 
     const handleDeleteGoal = async () => {
@@ -923,261 +1002,349 @@ export default function MyPage() {
 
                     {/* Category Selector */}
                     <div className="relative mb-6 z-10">
-                        <label className="text-xs font-bold text-slate-400 uppercase mb-2 block">{t.focusArea}</label>
-                        <div className="relative">
-                            <select
-                                value={selectedCategory}
-                                onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
-                                className="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary font-bold capitalize"
-                            >
-                                {Object.keys(goals).map(cat => {
-                                    const g = goals[cat as GoalCategory];
-                                    const has = hasGoal(cat as GoalCategory);
-                                    const seqLabel = (has && g.seq && g.seq > 1) ? ` (${t.challengeCount.replace('{n}', String(g.seq))})` : '';
-
-                                    // Check if this specific goal is expired
-                                    let isExpired = false;
-                                    if (has && g.created_at) {
-                                        const start = new Date(g.created_at);
-                                        start.setHours(0, 0, 0, 0);
-                                        const now = new Date();
-                                        now.setHours(0, 0, 0, 0);
-                                        let totalDays = 0;
-                                        if (cat.toLowerCase() === 'funplay') {
-                                            totalDays = 7;
-                                        } else if (g.duration_months < 1) {
-                                            totalDays = g.duration_months === 0.25 ? 7 : g.duration_months === 0.5 ? 14 : Math.round(g.duration_months * 30);
-                                        } else {
-                                            totalDays = g.duration_months * 30;
-                                        }
-                                        const diffMs = now.getTime() - start.getTime();
-                                        const daysPassed = Math.round(diffMs / (1000 * 60 * 60 * 24));
-                                        isExpired = daysPassed >= totalDays;
-                                    }
-
-                                    const prefix = has ? (isExpired ? '⏰ ' : '✔ ') : '';
-
-                                    return (
-                                        <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
-                                            {prefix + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel + (isExpired ? ` - ${t.expired || 'Expired'}` : '')}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                        {/* Label + Status Toggle Row */}
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-bold text-slate-400 uppercase">{t.focusArea}</label>
+                            <div className="flex gap-1.5">
+                                <button
+                                    onClick={() => { setGoalViewMode('active'); setCompletedEditMode(false); setSelectedCompletedGoal(null); }}
+                                    className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${goalViewMode === 'active'
+                                        ? 'bg-primary text-black border-primary'
+                                        : 'bg-transparent text-slate-500 border-white/10 hover:border-white/30'
+                                        }`}
+                                >
+                                    진행중인 미션
+                                </button>
+                                <button
+                                    onClick={() => { setGoalViewMode('completed'); setIsEditing(false); }}
+                                    className={`text-[10px] font-bold px-3 py-1 rounded-full border transition-all ${goalViewMode === 'completed'
+                                        ? 'bg-secondary text-white border-secondary'
+                                        : 'bg-transparent text-slate-500 border-white/10 hover:border-white/30'
+                                        }`}
+                                >
+                                    완료된 미션 {completedGoals.length > 0 ? `(${completedGoals.length})` : ''}
+                                </button>
+                            </div>
                         </div>
-                    </div >
 
-                    {/* Dynamic Form Area */}
-                    <div className="bg-black/20 rounded-2xl p-3 border border-white/5 relative overflow-hidden">
-                        {/* Lock Overlay */}
-                        {!isCategoryUnlocked(selectedCategory) && (
-                            <div className="absolute inset-0 z-20 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
-                                <Lock size={48} className="text-slate-500 mb-4" />
-                                <h3 className="text-xl font-bold text-white mb-2">{t[selectedCategory as GoalCategory]} {t.locked}</h3>
-                                <p className="text-sm text-slate-400 mb-6 max-w-xs">{t.subscribeToUnlock || "Subscribe to unlock this mission category and start your journey."}</p>
-                                <button
-                                    onClick={() => setIsSubManagerOpen(true)}
-                                    className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2 mb-3"
+                        {/* Dropdown - Active Mode */}
+                        {goalViewMode === 'active' && (
+                            <div className="relative">
+                                <select
+                                    value={selectedCategory}
+                                    onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
+                                    className="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary font-bold capitalize"
                                 >
-                                    <Sparkles size={18} />
-                                    {t.unlockNow || "Unlock Now"}
-                                </button>
-                                {/* Allow Deletion even if Locked */}
-                                <button
-                                    onClick={handleDeleteGoal}
-                                    className="text-xs text-red-500 font-bold hover:text-red-400 transition-colors flex items-center gap-1 opacity-80 hover:opacity-100"
-                                >
-                                    <Trash2 size={14} />
-                                    {t.deletePlan || "Delete Plan"}
-                                </button>
+                                    {Object.keys(goals).map(cat => {
+                                        const g = goals[cat as GoalCategory];
+                                        const has = hasGoal(cat as GoalCategory);
+                                        const seqLabel = (has && g.seq && g.seq > 1) ? ` (${t.challengeCount.replace('{n}', String(g.seq))})` : '';
+                                        const isExpired = has ? isGoalItemExpired(g) : false;
+                                        const prefix = has ? (isExpired ? '⏰ ' : '✔ ') : '';
+
+                                        return (
+                                            <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
+                                                {prefix + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel + (isExpired ? ` - ${t.expired || 'Expired'}` : '')}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
                             </div>
                         )}
 
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
-                                {t[selectedCategory as GoalCategory]} {t.plan}
-                                {/* Show next seq (#3) if expired and editing, else show current seq */}
-                                {isEditing && isGoalExpired() ? (
-                                    <span className="text-[10px] bg-accent/20 px-2 py-0.5 rounded-full text-accent">#{(currentGoal.seq || 1) + 1}</span>
-                                ) : currentGoal.seq && currentGoal.seq > 1 && (
-                                    <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white">#{currentGoal.seq}</span>
-                                )}
-                            </h3>
-                            <div className="flex items-center gap-2">
-                                {currentGoal.created_at && !isGoalExpired() && (
-                                    <span className="text-[10px] text-slate-500">
-                                        {t.started}: {new Date(currentGoal.created_at).toLocaleDateString()}
-                                    </span>
-                                )}
-                                {isGoalExpired() && (
-                                    <span className="text-[10px] text-amber-400 font-bold">
-                                        ⏰ {t.expired || 'Expired'}
-                                    </span>
-                                )}
-                                <button
-                                    onClick={() => {
-                                        const willEdit = !isEditing;
-                                        setIsEditing(willEdit);
-                                        // If entering edit mode on expired goal, reset form for new challenge
-                                        if (willEdit && isGoalExpired()) {
-                                            setGoals(prev => ({
-                                                ...prev,
-                                                [selectedCategory]: {
-                                                    ...INITIAL_GOALS[selectedCategory as GoalCategory],
-                                                    seq: (currentGoal.seq || 1) + 1, // Increment sequence
-                                                    category: selectedCategory,
-                                                }
-                                            }));
-                                        }
-                                    }}
-                                    className={`text-xs px-2 py-1 rounded-lg transition-colors font-bold ${isEditing ? 'bg-primary text-black' : 'text-primary hover:bg-primary/10'}`}
-                                >
-                                    {isEditing ? t.editing : t.viewOnly}
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            {/* Main Goal Input */}
+                        {/* Dropdown - Completed Mode */}
+                        {goalViewMode === 'completed' && (
                             <div>
-                                <label className="text-xs text-slate-400 block mb-1">{t.mainGoal}</label>
-                                <textarea
-                                    disabled={!isEditing}
-                                    value={currentGoal.target_text}
-                                    onChange={e => updateGoal('target_text', e.target.value)}
-                                    placeholder={
-                                        selectedCategory === 'mind_connection'
-                                            ? "무엇을 이루고 싶으신가요?\n예: 우울감 극복, 자존감 회복, 부모님과 가까워지기 등"
-                                            : selectedCategory === 'growth_career'
-                                                ? "이루고 싶은 성장은 무엇인가요?\n예: 영어 회화 마스터, 승진, 자격증 취득 등"
-                                                : selectedCategory === 'body_wellness'
-                                                    ? "무엇을 이루고 싶으신가요?\n예: 5kg 감량, 규칙적인 생활 습관 만들기 등"
-                                                    : t.whatToAchieve
-                                    }
-                                    className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all resize-none h-12"
-                                />
-                            </div>
+                                {/* Edit Mode Toggle */}
+                                <div className="flex justify-end mb-2">
+                                    <button
+                                        onClick={() => setCompletedEditMode(!completedEditMode)}
+                                        className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all ${completedEditMode
+                                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                            : 'bg-white/10 text-slate-400 hover:bg-white/20'
+                                            }`}
+                                    >
+                                        <Pencil size={10} />
+                                        {completedEditMode ? '완료' : '수정'}
+                                    </button>
+                                </div>
 
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div>
-                                        <label className="text-xs text-slate-400 block mb-1">{t.duration}</label>
-                                        <select
-                                            disabled={!isEditing}
-                                            value={currentGoal.duration_months}
-                                            onChange={e => updateGoal('duration_months', Number(e.target.value))}
-                                            className="w-full bg-white/5 rounded-lg px-2 py-2 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
-                                        >
-                                            <option value={0.25} className="bg-slate-800 text-white">{t.oneWeek}</option>
-                                            <option value={0.5} className="bg-slate-800 text-white">{t.twoWeeks}</option>
-                                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                                                <option key={m} value={m} className="bg-slate-800 text-white">{m} {m > 1 ? t.months : t.month}</option>
-                                            ))}
-                                        </select>
+                                {completedGoals.length === 0 ? (
+                                    <div className="text-center py-6 text-slate-500 text-sm">
+                                        완료된 미션이 없습니다.
                                     </div>
+                                ) : (
+                                    <div className="space-y-2 max-h-60 overflow-y-auto no-scrollbar">
+                                        {completedGoals.map((cg: any) => {
+                                            const catLabel = t[cg.category as GoalCategory] || cg.category;
+                                            const startDate = cg.created_at ? new Date(cg.created_at).toLocaleDateString() : '';
+                                            const isSelected = selectedCompletedGoal?.id === cg.id;
+                                            const isDeleting = deletingGoalId === cg.id;
+
+                                            return (
+                                                <motion.div
+                                                    key={cg.id}
+                                                    initial={{ opacity: 0, y: 10 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${isSelected
+                                                        ? 'bg-secondary/10 border-secondary/30'
+                                                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                                        } ${isDeleting ? 'opacity-50 pointer-events-none' : ''}`}
+                                                    onClick={() => !completedEditMode && setSelectedCompletedGoal(cg)}
+                                                >
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <span className="text-[9px] font-bold text-slate-500 uppercase bg-white/5 px-1.5 py-0.5 rounded">
+                                                                {cg.category}
+                                                            </span>
+                                                            {cg.seq && cg.seq > 1 && (
+                                                                <span className="text-[9px] font-bold text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                                                                    #{cg.seq}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-sm font-bold text-white truncate">
+                                                            {cg.target_text || catLabel}
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-500 mt-0.5">
+                                                            {startDate} ~ | {catLabel}
+                                                        </p>
+                                                    </div>
+
+                                                    {completedEditMode ? (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteCompletedGoal(cg); }}
+                                                            disabled={isDeleting}
+                                                            className="flex items-center gap-1 px-2.5 py-1.5 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg text-[10px] font-bold transition-all shrink-0"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                            {isDeleting ? '삭제중...' : '삭제'}
+                                                        </button>
+                                                    ) : (
+                                                        <ChevronRight size={16} className="text-slate-500 shrink-0" />
+                                                    )}
+                                                </motion.div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Dynamic Form Area - Show in active mode, OR when a completed goal is selected */}
+                    {(goalViewMode === 'active' || selectedCompletedGoal) && (
+                        <div className="bg-black/20 rounded-2xl p-3 border border-white/5 relative overflow-hidden">
+                            {/* Lock Overlay */}
+                            {!isCategoryUnlocked(selectedCategory) && (
+                                <div className="absolute inset-0 z-20 bg-slate-900/80 backdrop-blur-sm flex flex-col items-center justify-center text-center p-6">
+                                    <Lock size={48} className="text-slate-500 mb-4" />
+                                    <h3 className="text-xl font-bold text-white mb-2">{t[selectedCategory as GoalCategory]} {t.locked}</h3>
+                                    <p className="text-sm text-slate-400 mb-6 max-w-xs">{t.subscribeToUnlock || "Subscribe to unlock this mission category and start your journey."}</p>
+                                    <button
+                                        onClick={() => setIsSubManagerOpen(true)}
+                                        className="bg-accent text-black font-bold py-3 px-8 rounded-xl hover:bg-accent/90 transition-colors flex items-center gap-2 mb-3"
+                                    >
+                                        <Sparkles size={18} />
+                                        {t.unlockNow || "Unlock Now"}
+                                    </button>
+                                    {/* Allow Deletion even if Locked */}
+                                    <button
+                                        onClick={handleDeleteGoal}
+                                        className="text-xs text-red-500 font-bold hover:text-red-400 transition-colors flex items-center gap-1 opacity-80 hover:opacity-100"
+                                    >
+                                        <Trash2 size={14} />
+                                        {t.deletePlan || "Delete Plan"}
+                                    </button>
+                                </div>
+                            )}
+
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
+                                    {t[selectedCategory as GoalCategory]} {t.plan}
+                                    {/* Show next seq (#3) if expired and editing, else show current seq */}
+                                    {isEditing && isGoalExpired() ? (
+                                        <span className="text-[10px] bg-accent/20 px-2 py-0.5 rounded-full text-accent">#{(currentGoal.seq || 1) + 1}</span>
+                                    ) : currentGoal.seq && currentGoal.seq > 1 && (
+                                        <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white">#{currentGoal.seq}</span>
+                                    )}
+                                </h3>
+                                <div className="flex items-center gap-2">
+                                    {currentGoal.created_at && !isGoalExpired() && (
+                                        <span className="text-[10px] text-slate-500">
+                                            {t.started}: {new Date(currentGoal.created_at).toLocaleDateString()}
+                                        </span>
+                                    )}
+                                    {isGoalExpired() && (
+                                        <span className="text-[10px] text-amber-400 font-bold">
+                                            ⏰ {t.expired || 'Expired'}
+                                        </span>
+                                    )}
+                                    <button
+                                        onClick={() => {
+                                            const willEdit = !isEditing;
+                                            setIsEditing(willEdit);
+                                            // If entering edit mode on expired goal, reset form for new challenge
+                                            if (willEdit && isGoalExpired()) {
+                                                setGoals(prev => ({
+                                                    ...prev,
+                                                    [selectedCategory]: {
+                                                        ...INITIAL_GOALS[selectedCategory as GoalCategory],
+                                                        seq: (currentGoal.seq || 1) + 1, // Increment sequence
+                                                        category: selectedCategory,
+                                                    }
+                                                }));
+                                            }
+                                        }}
+                                        className={`text-xs px-2 py-1 rounded-lg transition-colors font-bold ${isEditing ? 'bg-primary text-black' : 'text-primary hover:bg-primary/10'}`}
+                                    >
+                                        {isEditing ? t.editing : t.viewOnly}
+                                    </button>
                                 </div>
                             </div>
 
-                            {/* Details Section */}
-                            <div className="pt-4 border-t border-white/5 space-y-4">
-                                {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
-                                {selectedCategory === 'body_wellness' && (
-                                    <div className="space-y-3">
+                            <div className="space-y-3">
+                                {/* Main Goal Input */}
+                                <div>
+                                    <label className="text-xs text-slate-400 block mb-1">{t.mainGoal}</label>
+                                    <textarea
+                                        disabled={!isEditing}
+                                        value={currentGoal.target_text}
+                                        onChange={e => updateGoal('target_text', e.target.value)}
+                                        placeholder={
+                                            selectedCategory === 'mind_connection'
+                                                ? "무엇을 이루고 싶으신가요?\n예: 우울감 극복, 자존감 회복, 부모님과 가까워지기 등"
+                                                : selectedCategory === 'growth_career'
+                                                    ? "이루고 싶은 성장은 무엇인가요?\n예: 영어 회화 마스터, 승진, 자격증 취득 등"
+                                                    : selectedCategory === 'body_wellness'
+                                                        ? "무엇을 이루고 싶으신가요?\n예: 5kg 감량, 규칙적인 생활 습관 만들기 등"
+                                                        : t.whatToAchieve
+                                        }
+                                        className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all resize-none h-12"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
                                         <div>
-                                            <label className="text-xs text-slate-400 block mb-1">{t.currentStatusGoal}</label>
+                                            <label className="text-xs text-slate-400 block mb-1">{t.duration}</label>
+                                            <select
+                                                disabled={!isEditing}
+                                                value={currentGoal.duration_months}
+                                                onChange={e => updateGoal('duration_months', Number(e.target.value))}
+                                                className="w-full bg-white/5 rounded-lg px-2 py-2 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
+                                            >
+                                                <option value={0.25} className="bg-slate-800 text-white">{t.oneWeek}</option>
+                                                <option value={0.5} className="bg-slate-800 text-white">{t.twoWeeks}</option>
+                                                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                                    <option key={m} value={m} className="bg-slate-800 text-white">{m} {m > 1 ? t.months : t.month}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Details Section */}
+                                <div className="pt-4 border-t border-white/5 space-y-4">
+                                    {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
+                                    {selectedCategory === 'body_wellness' && (
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">{t.currentStatusGoal}</label>
+                                                <textarea
+                                                    disabled={!isEditing}
+                                                    value={currentGoal.details.current_status || ''}
+                                                    onChange={e => updateGoal('current_status', e.target.value, true)}
+                                                    placeholder={t.healthPlaceholder}
+                                                    className="w-full h-12 bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none"
+                                                />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
+                                                    <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
+                                                    <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-xs text-slate-400 block mb-1">{t.hobby}</label>
+                                                <textarea
+                                                    disabled={!isEditing}
+                                                    value={currentGoal.details.hobby || ''}
+                                                    onChange={e => updateGoal('hobby', e.target.value, true)}
+                                                    placeholder="취미나 루틴을 입력해주세요."
+                                                    className="w-full h-12 bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedCategory === 'growth_career' && (
+                                        <div className="space-y-2">
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                        </div>
+                                    )}
+
+                                    {selectedCategory === 'mind_connection' && (
+                                        <div className="space-y-2">
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                             <textarea
                                                 disabled={!isEditing}
-                                                value={currentGoal.details.current_status || ''}
-                                                onChange={e => updateGoal('current_status', e.target.value, true)}
-                                                placeholder={t.healthPlaceholder}
-                                                className="w-full h-12 bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none"
+                                                value={currentGoal.details.affirmation || ''}
+                                                onChange={e => updateGoal('affirmation', e.target.value, true)}
+                                                placeholder={"나에게 해줄 말 (확언)"}
+                                                className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none h-12"
                                             />
+                                            <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
-                                                <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
-                                                <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label className="text-xs text-slate-400 block mb-1">{t.hobby}</label>
-                                            <textarea
-                                                disabled={!isEditing}
-                                                value={currentGoal.details.hobby || ''}
-                                                onChange={e => updateGoal('hobby', e.target.value, true)}
-                                                placeholder="취미나 루틴을 입력해주세요."
-                                                className="w-full h-12 bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                    )}
 
-                                {selectedCategory === 'growth_career' && (
-                                    <div className="space-y-2">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.topic || ''} onChange={e => updateGoal('topic', e.target.value, true)} placeholder={t.growthTopic} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_level || ''} onChange={e => updateGoal('current_level', e.target.value, true)} placeholder={t.currentLevel} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.target_level || ''} onChange={e => updateGoal('target_level', e.target.value, true)} placeholder={t.targetLevel} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                    </div>
-                                )}
-
-                                {selectedCategory === 'mind_connection' && (
-                                    <div className="space-y-2">
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.current_mood || ''} onChange={e => updateGoal('current_mood', e.target.value, true)} placeholder={t.currentMood} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                        <textarea
-                                            disabled={!isEditing}
-                                            value={currentGoal.details.affirmation || ''}
-                                            onChange={e => updateGoal('affirmation', e.target.value, true)}
-                                            placeholder={"나에게 해줄 말 (확언)"}
-                                            className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50 resize-none h-12"
-                                        />
-                                        <input type="text" disabled={!isEditing} value={currentGoal.details.people || ''} onChange={e => updateGoal('people', e.target.value, true)} placeholder={t.socialActivity} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
-                                    </div>
-                                )}
-
-                                {selectedCategory === 'funplay' && (
-                                    <div className="space-y-3">
-                                        <div className="p-3 bg-accent/10 rounded-xl border border-accent/20">
-                                            <p className="text-xs text-accent font-bold mb-1">FunPlay Mode</p>
-                                            <p className="text-[10px] text-slate-300">30초 안에 실행할 수 있는 미션 게임! 지금 바로 시작해보세요.</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <div>
-                                                <label className="text-xs text-slate-400 block mb-1">{t.funplayDifficulty}</label>
-                                                <select
-                                                    disabled={!isEditing}
-                                                    value={currentGoal.details.difficulty}
-                                                    onChange={e => updateGoal('difficulty', e.target.value, true)}
-                                                    className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50"
-                                                >
-                                                    <option value="easy" className="bg-slate-800">{t.funplayEasy}</option>
-                                                    <option value="normal" className="bg-slate-800">{t.funplayNormal}</option>
-                                                    <option value="hard" className="bg-slate-800">{t.funplayHard}</option>
-                                                </select>
+                                    {selectedCategory === 'funplay' && (
+                                        <div className="space-y-3">
+                                            <div className="p-3 bg-accent/10 rounded-xl border border-accent/20">
+                                                <p className="text-xs text-accent font-bold mb-1">FunPlay Mode</p>
+                                                <p className="text-[10px] text-slate-300">30초 안에 실행할 수 있는 미션 게임! 지금 바로 시작해보세요.</p>
                                             </div>
-                                            <div>
-                                                <label className="text-xs text-slate-400 block mb-1">{t.funplayMood}</label>
-                                                <select
-                                                    disabled={!isEditing}
-                                                    value={currentGoal.details.mood}
-                                                    onChange={e => updateGoal('mood', e.target.value, true)}
-                                                    className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50"
-                                                >
-                                                    <option value="fun" className="bg-slate-800">{t.funplayFun}</option>
-                                                    <option value="calm" className="bg-slate-800">{t.funplayCalm}</option>
-                                                    <option value="focus" className="bg-slate-800">{t.funplayFocus}</option>
-                                                </select>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">{t.funplayDifficulty}</label>
+                                                    <select
+                                                        disabled={!isEditing}
+                                                        value={currentGoal.details.difficulty}
+                                                        onChange={e => updateGoal('difficulty', e.target.value, true)}
+                                                        className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+                                                    >
+                                                        <option value="easy" className="bg-slate-800">{t.funplayEasy}</option>
+                                                        <option value="normal" className="bg-slate-800">{t.funplayNormal}</option>
+                                                        <option value="hard" className="bg-slate-800">{t.funplayHard}</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-xs text-slate-400 block mb-1">{t.funplayMood}</label>
+                                                    <select
+                                                        disabled={!isEditing}
+                                                        value={currentGoal.details.mood}
+                                                        onChange={e => updateGoal('mood', e.target.value, true)}
+                                                        className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50"
+                                                    >
+                                                        <option value="fun" className="bg-slate-800">{t.funplayFun}</option>
+                                                        <option value="calm" className="bg-slate-800">{t.funplayCalm}</option>
+                                                        <option value="focus" className="bg-slate-800">{t.funplayFocus}</option>
+                                                    </select>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
-                        </div>
-                    </div >
+                        </div >
+                    )}
                 </div >
 
                 {isEditing && (

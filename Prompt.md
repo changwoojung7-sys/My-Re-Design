@@ -1,91 +1,769 @@
-# Mission Prompts Documentation
+# 🎯 MyReDesign — 미션 생성 프로세스 전체 문서
 
-## 1. Daily Missions (Batch Generation)
-Currently, **Body & Wellness**, **Growth & Career**, and **Mind & Connection** are generated together in a single API call to ensure coherence and optimize costs.
-
-### System Prompt
-> Personalized habit coach. Output strictly valid JSON.
-
-### User Prompt Structure
-```text
-Context: {User Age}y {User Gender}. Goals: {Goal List}
-History (3 Days): {Recent Missions}
-Task: Create 3 quick missions (<3 mins) per category. Focus on achievement and fun.
-Language: {Korean/English}
-
-Rules:
-1. body_wellness: Focus on [Active Goal]. 2 action missions, 1 awareness mission. NO "Drink Water/Sleep".
-2. growth_career: Micro-growth experiments. Focus on perspective shift. NO "Read book/Lecture".
-3. mind_connection: Emotion/Relationship focus. NO preaching or heavy meditation.
-
-Format: { "missions": [{ "category", "content", "verification_type", "reasoning": { "expected_impact": "1 short sentence" }, "trust_score" }] }
-```
+> **최종 업데이트: 2026-02-16**
+> 
+> 이 문서는 MyReDesign 앱의 미션 생성 파이프라인을 **클라이언트 호출 → Edge Function → AI 프롬프트 → 응답 처리 → DB 저장**까지 전 과정을 상세히 기술합니다.
 
 ---
 
-## 2. FunPlay Mission
-FunPlay missions are generated separately with a distinct "Game Engine" persona.
+## 📌 목차
 
-### System Prompt
-> Role: Ultimate Game Master Engine. Priority: UNEXPECTEDNESS, NOVELTY.
->
-> The 5 Fun Archetypes (Rotate these):
->
-> Stealth/Spy: Actions done secretly without being noticed by others.
->
-> Physical/Challenge: Mini-dexterity or balance tasks (using body parts in weird ways).
->
-> Absurdity/Surreal: Doing something completely illogical or acting out a character.
->
-> Observation/Hunter: Finding very specific visual patterns or objects in the environment.
->
-> Speed/Reflex: Tasks that must be done instantly or within a tight count.
->
-> Negative Constraints:
->
-> NO standard exercises (e.g., "Do a squat").
->
-> NO generic advice (e.g., "Smile at someone").
->
-> NO "Look at the sky/tree" unless it has a twist.
->
-> History Logic:
->
-> Analyze History. If the last mission was "Physical", strictly AVOID "Physical" today.
->
-> Pick a contrasting Archetype from yesterday.
+1. [아키텍처 개요](#1-아키텍처-개요)
+2. [클라이언트 호출 (openai.ts)](#2-클라이언트-호출)
+3. [Edge Function 처리 (index.ts)](#3-edge-function-처리)
+4. [패턴 라이브러리 (mission-patterns.json)](#4-패턴-라이브러리)
+5. [Daily Missions 프롬프트](#5-daily-missions-프롬프트)
+6. [FunPlay 미션 프롬프트](#6-funplay-미션-프롬프트)
+7. [Coaching 프롬프트](#7-coaching-프롬프트)
+8. [응답 처리 & 저장](#8-응답-처리--저장)
+9. [어학 목표 자동 감지](#9-어학-목표-자동-감지)
+10. [디버깅 & 배포 가이드](#10-디버깅--배포-가이드)
 
-### User Prompt Structure
-```text
-User: {User Age}y {User Gender}. 
-Req: Diff {Difficulty}, Time {Time Limit}s, Place {Place}, Mood {Mood}.
-History (3 Days): {Recent Missions}
-Excludes: {Excluded Keywords}. Language: {Korean/English}.
+---
 
-**Task:**
-Generate 1 FunPlay mission based on a **randomly selected Archetype** different from History.
-Apply a **"Twist Modifier"** (e.g., "Use non-dominant hand", "Hold breath", "Do it in slow motion", "While making a specific face").
+## 1. 아키텍처 개요
 
-Output JSON: { 
-  "category": "funplay",
-  "archetype": "{Selected Archetype}", 
-  "content": "Mission instruction with the twist included (1-2 sentences)", 
-  "verification_type": "checkbox", 
-  "reasoning": { "expected_impact": "Why this is fun (1 short sentence)" } 
+```
+┌──────────────────────────────────────────────────────────────┐
+│                     Client (React App)                       │
+│                                                              │
+│  Today.tsx → openai.ts → supabase.functions.invoke()         │
+│        ↓              ↓                                      │
+│  generateMissions()   generateFunPlayMission()               │
+│  generateCoaching()                                          │
+└────────────────────────────┬─────────────────────────────────┘
+                             │ HTTP POST (JWT Auth)
+                             ▼
+┌──────────────────────────────────────────────────────────────┐
+│              Supabase Edge Function                          │
+│              generate-mission/index.ts                       │
+│                                                              │
+│  1. JWT 인증                                                 │
+│  2. Refresh 횟수 확인 (max 3/day)                            │
+│  3. 히스토리 조회 (mission_fingerprint, 7일)                 │
+│  4. 사용자 목표 조회 (user_goals)                            │
+│  5. 패턴 라이브러리에서 랜덤 선택                            │
+│  6. 프롬프트 조립 (System + User)                            │
+│  7. OpenAI API 호출 (gpt-4o-mini)                            │
+│  8. 응답 파싱 → Fingerprint 저장 → 클라이언트 반환           │
+└──────────────────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    OpenAI API                                │
+│              Model: gpt-4o-mini                              │
+│         Response Format: JSON Object                         │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 핵심 파일 위치
+
+| 파일 | 경로 | 역할 |
+|------|------|------|
+| 클라이언트 호출 | `src/lib/openai.ts` | Edge Function 호출 + 폴백 처리 |
+| Edge Function | `supabase/functions/generate-mission/index.ts` | 프롬프트 조립 + AI 호출 |
+| 패턴 라이브러리 | `supabase/functions/generate-mission/mission-patterns.json` | 카테고리별 패턴 정의 |
+| 미션 화면 | `src/pages/Home/Today.tsx` | 생성된 미션 표시/관리 |
+
+---
+
+## 2. 클라이언트 호출
+
+### 파일: `src/lib/openai.ts`
+
+클라이언트는 3가지 함수로 Edge Function을 호출합니다:
+
+### 2-1. `generateMissions()` — Daily Missions (3개 배치)
+
+```typescript
+export async function generateMissions(
+    userProfile: any,       // { age, gender, id }
+    language: string,       // 'ko' | 'en'
+    _excludedMissions: [],  // 미사용 (서버에서 fingerprint로 관리)
+    targetGoal: any,        // 현재 선택된 목표 { category, target_text }
+    refresh: boolean        // 새로고침 여부
+): Promise<MissionData[]>
+```
+
+**호출 body:**
+```json
+{
+    "type": "daily_missions",
+    "payload": {
+        "userProfile": { "age": 25, "gender": "male", "id": "uuid" },
+        "language": "ko",
+        "goalList": { "body_wellness": "런닝 실력 향상" },
+        "refresh": false
+    }
+}
+```
+
+**goalList 생성 규칙:**
+- `targetGoal`이 있으면 → `{ [category]: target_text }` 형태로 전송
+- `null`이면 → `{}` (Edge Function이 DB에서 직접 조회)
+
+**실패 시 폴백 (MOCK_MISSIONS):**
+```typescript
+const MOCK_MISSIONS = [
+    { category: 'body_wellness', content: 'Do 10 squats.' },
+    { category: 'growth_career', content: 'Read one page of a book.' },
+    { category: 'mind_connection', content: 'Takes 3 deep breaths.' }
+];
+```
+
+### 2-2. `generateFunPlayMission()` — FunPlay (1개)
+
+```typescript
+export async function generateFunPlayMission(
+    userProfile: any,
+    language: string,
+    _excludedKeywords: [],
+    options: { difficulty: string, time_limit: number, mood: string, place: string },
+    refresh: boolean
+): Promise<MissionData>
+```
+
+**호출 body:**
+```json
+{
+    "type": "funplay",
+    "payload": {
+        "userProfile": { "age": 25, "gender": "any" },
+        "options": { "difficulty": "normal", "time_limit": 30, "mood": "fun", "place": "anywhere" },
+        "language": "ko",
+        "refresh": false
+    }
+}
+```
+
+### 2-3. `generateCoaching()` — 코칭 피드백
+
+```typescript
+export async function generateCoaching(
+    user: any,
+    goal: any,       // { category, target_text }
+    stats: any,      // { successRate, streak }
+    language: string
+)
+```
+
+**호출 body:**
+```json
+{
+    "type": "coaching",
+    "payload": {
+        "goal": { "category": "body_wellness", "target_text": "5kg 감량" },
+        "stats": { "successRate": 80, "streak": 5 },
+        "language": "ko"
+    }
 }
 ```
 
 ---
 
-## 3. Coaching (Feedback)
-Used for providing feedback on user progress.
+## 3. Edge Function 처리
 
-### System Prompt
-> Expert performance coach. Concise JSON output.
+### 파일: `supabase/functions/generate-mission/index.ts`
 
-### User Prompt Structure
-```text
-Goal: "{Target Goal}" ({Category}). Success: {Success Rate}%, Streak: {Streak}d.
+Edge Function은 요청을 받아 다음 순서로 처리합니다:
+
+### Step 1: 인증
+
+```typescript
+const authHeader = req.headers.get('Authorization')!;
+const { data: { user } } = await supabase.auth.getUser(
+    authHeader.replace('Bearer ', '')
+);
+```
+- Supabase 게이트웨이 JWT 검증은 `--no-verify-jwt`로 비활성화
+- Edge Function 내부에서 직접 `getUser()`로 인증 처리
+
+### Step 2: Refresh 횟수 제한
+
+```typescript
+// 하루 3회 갱신 제한
+const { data: refreshLog } = await supabase
+    .from('mission_refresh_log')
+    .select('refresh_count')
+    .eq('user_id', userId)
+    .eq('mission_date', today)
+    .eq('category', type)
+    .maybeSingle();
+
+if (refreshLog && refreshLog.refresh_count >= 3) {
+    return Response(JSON.stringify({ error: 'Refresh limit reached' }), { status: 429 });
+}
+```
+
+### Step 3: 히스토리 조회 (Fingerprint)
+
+```typescript
+const { data: fingerprints } = await supabase
+    .from('mission_fingerprint')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('mission_date', /* 7일 전 */);
+
+const recentMissionsJson = JSON.stringify(fingerprints || []);
+```
+
+`mission_fingerprint` 테이블 구조:
+| 컬럼 | 설명 |
+|------|------|
+| `user_id` | 사용자 UUID |
+| `mission_date` | 미션 날짜 |
+| `category` | 카테고리 |
+| `pattern_id` | 사용된 패턴 ID |
+| `primary_action` | 주 동작 동사 |
+| `tool` | 사용 도구 |
+| `place` | 장소 |
+| `social_context` | 사회적 맥락 |
+| `mechanic` | (FunPlay용) 메카닉 |
+
+### Step 4: 사용자 목표 조회
+
+```typescript
+const { data: userGoals } = await supabase
+    .from('user_goals')
+    .select('category, target_text, details')
+    .eq('user_id', userId)
+    .eq('is_completed', false);
+
+// category → target_text 맵 생성
+const goalMap = {};
+userGoals?.forEach(g => { goalMap[g.category] = g.target_text; });
+```
+
+### Step 5: 목표 우선순위 결정
+
+```
+클라이언트 goalList (선택된 콤보) > DB goalMap > 기본값
+```
+
+```typescript
+const bwGoal = payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리';
+const gcGoal = payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발';
+const mcGoal = payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정';
+```
+
+### Step 6: 패턴 랜덤 선택
+
+```typescript
+const bwPattern = pickRandom(patterns.body_wellness);  // BW01~BW40 중 1개
+const mcPattern = pickRandom(patterns.mind_connection); // MC01~MC50 중 1개
+
+// Growth Career: 어학 감지 분기
+if (isLanguageGoal(gcGoal)) {
+    gcPattern = pickRandom(patterns.growth_career_language);  // GC_EN01~GC_EN30
+    gcPatternSource = 'growth_career_language';
+} else {
+    gcPattern = pickRandom(patterns.growth_career);           // GC01~GC30
+}
+```
+
+### Step 7: 프롬프트 조립 → OpenAI 호출
+
+(상세 프롬프트는 [Section 5](#5-daily-missions-프롬프트) 참조)
+
+```typescript
+body = {
+    model: "gpt-4o-mini",
+    temperature: 0.8,    // Daily: 0.8 | FunPlay: 0.9 | Coaching: 0.6
+    response_format: { type: "json_object" },
+    messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+    ]
+};
+
+const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${openAiKey}` },
+    body: JSON.stringify(body)
+});
+```
+
+---
+
+## 4. 패턴 라이브러리
+
+### 파일: `supabase/functions/generate-mission/mission-patterns.json`
+
+패턴 라이브러리는 AI에게 **방법론적 힌트**를 제공하여 미션의 다양성을 보장합니다.
+
+### 패턴 구조
+
+```json
+{
+    "pattern_id": "BW16",
+    "brief": "오늘 섭취한 음식 1개 칼로리 추정해보기",
+    "core_type": "diet_awareness",
+    "default_artifact_type": "text",
+    "primary_action": "estimate",
+    "tool": "phone",
+    "place": "anywhere"
+}
+```
+
+| 필드 | 설명 |
+|------|------|
+| `pattern_id` | 고유 식별자 (BW01, GC_EN05, MC10 등) |
+| `brief` | AI에게 전달되는 방법론 힌트 (한국어) |
+| `core_type` | 패턴의 핵심 유형 |
+| `primary_action` | 주 동작 동사 (fingerprint용) |
+| `tool` | 필요 도구 (none, phone, paper) |
+| `place` | 적합 장소 (anywhere, home, outdoor, office) |
+| `language_skill` | (어학 전용) 언어 학습 여부 |
+
+### 카테고리별 패턴 수
+
+| 카테고리 | 패턴 ID 범위 | 패턴 수 | 설명 |
+|----------|-------------|---------|------|
+| `body_wellness` | BW01 ~ BW40 | **40개** | 감각, 자세, 운동, 식단 등 |
+| `growth_career` | GC01 ~ GC30 | **30개** | 의사결정, 학습, 자기계발 등 |
+| `growth_career_language` | GC_EN01 ~ GC_EN30 | **30개** | 영어/외국어 회화 연습 |
+| `mind_connection` | MC01 ~ MC50 | **50개** | 감정, 관계, 소통 스킬 |
+| `funplay` | Archetypes 5 + Mechanics 12 + Twists 10 | **27개 요소** | 게임/도전 미션 |
+
+### FunPlay 패턴 구조 (특수)
+
+FunPlay는 배열이 아닌 객체 구조로 3개 요소를 조합합니다:
+
+```json
+{
+    "funplay": {
+        "archetypes": [
+            { "id": "stealth_spy",        "name": "Stealth / Spy",         "description": "..." },
+            { "id": "physical_challenge", "name": "Physical / Challenge",  "description": "..." },
+            { "id": "absurdity_surreal",  "name": "Absurdity / Surreal",   "description": "..." },
+            { "id": "observation_hunter", "name": "Observation / Hunter",  "description": "..." },
+            { "id": "speed_reflex",       "name": "Speed / Reflex",        "description": "..." }
+        ],
+        "mechanics": [
+            "countdown", "non_dominant", "silent_mode", "reverse_order",
+            "tiny_target", "disguise_acting", "one_breath", "freeze_frame",
+            "mirror_mode", "stealth_rule", "constraint_object", "speed_combo"
+        ],
+        "twist_modifiers": [
+            "Use non-dominant hand", "Hold breath while doing it",
+            "Do it in slow motion", "While making a specific face", ...
+        ],
+        "forbidden": [
+            "standard exercises (squats, push-ups, etc.)",
+            "generic advice (smile at someone)",
+            "look at the sky/tree without a twist"
+        ]
+    }
+}
+```
+
+**FunPlay 조합 공식:** `Archetype (5) × Mechanic (12) × Twist (10) = 600가지 조합`
+
+---
+
+## 5. Daily Missions 프롬프트
+
+### 5-1. System Prompt
+
+```
+You are MyReDesign Mission Composer.
+
+CRITICAL RULE:
+User goal is NOT context. It is a NON-NEGOTIABLE CONSTRAINT.
+
+Every mission MUST:
+1) Directly reflect the user-defined goal.
+2) Produce a tangible micro-output or action aligned with that goal.
+3) Clearly show how the mission advances the goal.
+
+If the mission could exist without referencing the goal,
+it is INVALID and must be rewritten internally before output.
+
+Do not produce generic productivity advice.
+Do not produce category-only missions ignoring the goal.
+
+Output strictly valid JSON only.
+```
+
+### 5-2. User Prompt
+
+```
+User Profile:
+- age: {age}
+- gender: {gender}
+- language: {ko|en}
+
+═══ USER GOALS (TOPIC — these determine WHAT each mission is about) ═══
+- body_wellness_goal: "{bwGoal}"
+- growth_career_goal: "{gcGoal}"
+- mind_connection_goal: "{mcGoal}"
+
+Context Knobs:
+- time_budget_sec: 120
+- constraint_seed: "{random_hex}"
+
+History (Last 7 Days — avoid repeating):
+{recentMissionsJson}
+
+═══ PATTERN LIBRARY (METHOD HINT — these suggest HOW to approach, NOT what topic) ═══
+- body_wellness → method_hint: "{bwPattern.brief}" (type: {bwPattern.core_type})
+- growth_career → method_hint: "{gcPattern.brief}" (type: {gcPattern.core_type}) [LANGUAGE LEARNING MODE]
+- mind_connection → method_hint: "{mcPattern.brief}" (type: {mcPattern.core_type})
+
+⚠️ GOAL vs PATTERN PRIORITY:
+- The GOAL determines the SUBJECT/TOPIC of the mission (e.g., "식단 조절" → mission is about food/diet).
+- The PATTERN is just a METHOD HINT for structure (e.g., "점수화" → apply scoring as a method TO the goal topic).
+- If the pattern seems unrelated to the goal, IGNORE the pattern and directly serve the goal.
+- Example: goal="식단 조절", pattern="비우세손으로 동작" → mission should be about diet (goal wins), NOT hand exercise.
+
+Hard Rules:
+1) Create exactly 1 mission per category (3 total).
+2) Each mission's TOPIC must come from the user's GOAL, not the pattern brief.
+3) The pattern brief is only a structural/creative METHOD suggestion — adapt or ignore if it conflicts with the goal.
+4) Doable within 120 seconds.
+5) Strict anti-repeat: No reuse of primary action verbs from history. No similar semantic intent.
+6) Forbidden: No "drink water/sleep", No "read book/lecture", No "preaching/meditation".
+7) [어학 모드 시 추가] growth_career mission MUST be a language learning exercise in the user's target language. Include target-language sentences in the content.
+
+Category Style Rules:
+- body_wellness: 1 "micro-body tune" OR "sensory calibration" OR "posture & breath with twist" (not meditation). MUST relate to "{bwGoal}".
+- growth_career: 1 "micro-experiment" producing a tiny artifact (1 line note, 1 decision rule, 1 mini plan). MUST relate to "{gcGoal}".
+- mind_connection: 1 "emotion labeling + micro-connection" OR "boundary/relationship micro-script". MUST relate to "{mcGoal}".
+
+Output Schema:
+{
+  "date": "YYYY-MM-DD",
+  "missions": [
+    {
+      "category": "body_wellness|growth_career|mind_connection",
+      "pattern_id": "string",
+      "title": "short",
+      "content": "1-2 sentences, specific, goal-connected",
+      "verification_type": "checkbox|text|photo",
+      "success_criteria": ["step1"],
+      "novelty_tags": ["action:verb", "place:loc", "tool:item"],
+      "fingerprint": {
+          "primary_action": "verb",
+          "tool": "item",
+          "place": "loc",
+          "social_context": "type"
+      },
+      "reasoning": {
+          "expected_impact": "1 sentence showing how this serves the user's goal"
+      }
+    }
+  ]
+}
+```
+
+### 5-3. AI 파라미터
+
+| 파라미터 | 값 | 설명 |
+|----------|-----|------|
+| `model` | `gpt-4o-mini` | 비용 효율적인 모델 |
+| `temperature` | `0.8` | 창의성과 안정성 균형 |
+| `response_format` | `{ type: "json_object" }` | JSON 강제 |
+
+---
+
+## 6. FunPlay 미션 프롬프트
+
+### 6-1. System Prompt
+
+```
+Role: Ultimate Game Master Engine. Priority: UNEXPECTEDNESS, NOVELTY.
+Forbidden: standard exercises (squats, push-ups, etc.); generic advice (smile at someone); look at the sky/tree without a twist.
+If the last mission used the same archetype, STRICTLY pick a different one.
+```
+
+### 6-2. User Prompt
+
+```
+User: {age}y {gender}.
+Req: Diff {difficulty}, Time {time_limit}s, Place {place}, Mood {mood}.
+History: {recentMissionsJson}
+
+Selected Setup:
+- Archetype: "{archetype.name}" — {archetype.description}
+- Mechanic: "{mechanic}"
+- Twist Modifier: "{twist}"
+
+Task: Generate 1 FunPlay mission using the above archetype + mechanic + twist.
+Ensure it is COMPLETELY different from History.
+Language: {ko|en}.
+
+Output JSON:
+{
+  "category": "funplay",
+  "archetype": "{archetype.id}",
+  "content": "Mission instruction with twist included (1-2 sentences)",
+  "verification_type": "checkbox",
+  "fingerprint": { "primary_action": "verb", "mechanic": "{mechanic}", "place": "loc" },
+  "reasoning": { "expected_impact": "Why this is fun (1 sentence)" }
+}
+```
+
+### 6-3. AI 파라미터
+
+| 파라미터 | 값 | 설명 |
+|----------|-----|------|
+| `model` | `gpt-4o-mini` | 동일 |
+| `temperature` | `0.9` | 더 높은 창의성 |
+
+---
+
+## 7. Coaching 프롬프트
+
+### 7-1. System Prompt
+
+```
+Expert performance coach. Concise JSON output.
+```
+
+### 7-2. User Prompt
+
+```
+Goal: "{target_text}" ({category}).
+Success: {successRate}%, Streak: {streak}d.
 Task: Provide 1 short "insight" (tactical, max 15 words) and 1 short "encouragement" (max 10 words).
-Language: {Korean/English}. JSON: { "insight", "encouragement" }
+Language: {ko|en}.
+JSON: { "insight", "encouragement" }
+```
+
+### 7-3. AI 파라미터
+
+| 파라미터 | 값 | 설명 |
+|----------|-----|------|
+| `model` | `gpt-4o-mini` | 동일 |
+| `temperature` | `0.6` | 안정적 응답 |
+
+---
+
+## 8. 응답 처리 & 저장
+
+### 8-1. OpenAI 응답 파싱
+
+```typescript
+const aiData = await response.json();
+const content = JSON.parse(aiData.choices[0].message.content);
+```
+
+### 8-2. Fingerprint 저장
+
+각 미션의 `fingerprint` 객체를 `mission_fingerprint` 테이블에 저장하여 7일간 반복 방지에 사용합니다:
+
+```typescript
+const missions = content.missions || [content]; // daily는 배열, funplay는 단일 객체
+
+for (const m of missions) {
+    if (m.fingerprint) {
+        await supabase.from('mission_fingerprint').upsert({
+            user_id: userId,
+            mission_date: today,
+            category: m.category,
+            pattern_id: m.pattern_id,
+            primary_action: m.fingerprint.primary_action,
+            tool: m.fingerprint.tool,
+            place: m.fingerprint.place,
+            social_context: m.fingerprint.social_context,
+            mechanic: m.fingerprint.mechanic   // FunPlay 전용
+        }, { onConflict: 'user_id,mission_date,category' });
+    }
+}
+```
+
+### 8-3. Refresh 횟수 업데이트
+
+```typescript
+if (payload.refresh) {
+    // RPC 호출 시도 → 실패 시 fallback upsert
+    await supabase.rpc('increment_refresh_count', {
+        p_user_id: userId,
+        p_date: today,
+        p_category: type
+    });
+}
+```
+
+### 8-4. 관련 DB 테이블
+
+| 테이블 | 역할 |
+|--------|------|
+| `user_goals` | 사용자 설정 목표 (category별) |
+| `missions` | 완료된 미션 기록 |
+| `mission_fingerprint` | 미션 중복 방지용 지문 (7일 보존) |
+| `mission_refresh_log` | 일일 갱신 횟수 추적 (최대 3회) |
+
+---
+
+## 9. 어학 목표 자동 감지
+
+### 감지 함수
+
+```typescript
+function isLanguageGoal(goalText: string): boolean {
+    const keywords = [
+        '영어', '어학', 'english', 'conversation', '외국어',
+        '일본어', '중국어', 'japanese', 'chinese', 'french',
+        '프랑스어', 'language', '회화', '말하기', 'speaking', '언어'
+    ];
+    return keywords.some(k => goalText.toLowerCase().includes(k));
+}
+```
+
+### 동작 흐름
+
+```
+사용자 목표: "영어 회화 일상적인 대화수준까지 습득하기"
+                    ↓
+         isLanguageGoal() = true ✅
+                    ↓
+         패턴 풀: growth_career_language (GC_EN01~GC_EN30) 사용
+                    ↓
+         프롬프트에 [LANGUAGE LEARNING MODE] 플래그 추가
+                    ↓
+         Hard Rules에 추가:
+         "growth_career mission MUST be a language learning exercise
+          in the user's target language. Include target-language
+          sentences in the content."
+```
+
+### 예시 (GC_EN05 선택 시)
+
+**프롬프트 주입:**
+```
+- growth_career → method_hint: "일상 상황(마트/지하철/병원) 랜덤 1개로 대화 3줄"
+  (type: situation_card) [LANGUAGE LEARNING MODE]
+```
+
+**AI 생성 결과 예시:**
+```json
+{
+    "category": "growth_career",
+    "pattern_id": "GC_EN05",
+    "title": "🏥 병원 접수 대화",
+    "content": "병원 접수 상황을 영어 3줄 대화로 연습하세요.\n  A: Hi, I'd like to make an appointment.\n  B: Sure, what seems to be the problem?\n  A: I've been having headaches for a few days.",
+    "verification_type": "text"
+}
+```
+
+---
+
+## 10. 디버깅 & 배포 가이드
+
+### 10-1. 디버그 로그
+
+Edge Function에 디버그 로그가 내장되어 있습니다:
+
+```typescript
+// 목표 해석 추적
+console.log('[DEBUG] Goal Resolution:', {
+    'payload.goalList': payload.goalList,
+    'goalMap (from DB)': goalMap,
+    'resolved': { bwGoal, gcGoal, mcGoal },
+    'isLanguageGoal(gcGoal)': isLanguageGoal(gcGoal)
+});
+
+// 패턴 선택 추적
+console.log('[DEBUG] Pattern Selection:', {
+    bw: bwPattern.pattern_id,
+    gc: `${gcPattern.pattern_id} (source: ${gcPatternSource})`,
+    mc: mcPattern.pattern_id
+});
+```
+
+**로그 확인 방법:**
+```bash
+supabase functions logs generate-mission --follow
+```
+
+### 10-2. 배포
+
+```bash
+# Edge Function 배포
+supabase functions deploy generate-mission --no-verify-jwt
+
+# ⚠️ 주의: mission-patterns.json이 같은 폴더에 있어야 합니다
+# Deno의 JSON import assertion 사용:
+# import patterns from "./mission-patterns.json" assert { type: "json" };
+```
+
+### 10-3. 환경 변수
+
+| 변수 | 설명 |
+|------|------|
+| `SUPABASE_URL` | Supabase 프로젝트 URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | 서비스 역할 키 (관리자 권한) |
+| `OPENAI_API_KEY` | OpenAI API 키 |
+
+### 10-4. 에러 처리
+
+```
+클라이언트 (openai.ts)
+├── Edge Function 호출 실패 → MOCK_MISSIONS 반환
+├── error 응답 → throw → catch → MOCK_MISSIONS
+└── missions 비어있음 → MOCK_MISSIONS
+
+Edge Function (index.ts)
+├── 인증 실패 → 401 Unauthorized
+├── Refresh 초과 → 429 Refresh limit reached
+├── OpenAI 에러 → 500 + 에러 메시지
+└── JSON 파싱 실패 → 500 + 에러 메시지
+```
+
+---
+
+## 📊 전체 흐름 요약
+
+```
+[사용자가 Today 탭 진입]
+         │
+         ▼
+[generateMissions() 호출]
+  - userProfile, language, goalList 준비
+         │
+         ▼
+[Edge Function 수신]
+  - JWT 인증 ✓
+  - Refresh 제한 확인 (≤3/day) ✓
+         │
+         ▼
+[데이터 수집]
+  - mission_fingerprint (7일) → 히스토리 JSON
+  - user_goals (is_completed=false) → 목표 맵
+         │
+         ▼
+[목표 결정]
+  Client goalList > DB goalMap > 기본값
+  - body_wellness: "{bwGoal}"
+  - growth_career: "{gcGoal}" → isLanguageGoal() 판별
+  - mind_connection: "{mcGoal}"
+         │
+         ▼
+[패턴 선택]
+  - BW: BW01~BW40 중 랜덤 1개
+  - GC: 어학이면 GC_EN01~30, 아니면 GC01~30
+  - MC: MC01~MC50 중 랜덤 1개
+         │
+         ▼
+[프롬프트 조립]
+  System: "미션 작곡가, 목표=절대적 제약"
+  User: 목표(TOPIC) + 패턴(METHOD) + 히스토리 + 규칙
+         │
+         ▼
+[OpenAI API 호출]
+  Model: gpt-4o-mini / Temp: 0.8 / JSON Mode
+         │
+         ▼
+[응답 처리]
+  - JSON 파싱
+  - Fingerprint 저장 (upsert)
+  - Refresh 카운트 증가
+         │
+         ▼
+[클라이언트 반환]
+  { "date": "2026-02-16", "missions": [...] }
+         │
+         ▼
+[Today.tsx에서 카드로 표시]
 ```

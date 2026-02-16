@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User, Clapperboard } from 'lucide-react';
+import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User, Clapperboard, Trash2, Pencil } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
 import MissionReel from '../../components/common/MissionReel';
@@ -12,9 +12,10 @@ import { useStore } from '../../lib/store';
 interface HistoryDetailProps {
     goal: any;
     onClose: () => void;
+    onMissionsChanged?: () => void;
 }
 
-export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
+export default function HistoryDetail({ goal, onClose, onMissionsChanged }: HistoryDetailProps) {
     const { user } = useStore();
     const { t } = useLanguage();
     const [missions, setMissions] = useState<any[]>([]);
@@ -27,6 +28,9 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
     const [hasAccess, setHasAccess] = useState(false);
     const [stats, setStats] = useState<{ likes: number, comments: any[] }>({ likes: 0, comments: [] });
     const [dayCount, setDayCount] = useState(0);
+    const [editMode, setEditMode] = useState(false);
+    const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     useEffect(() => {
         fetchMissionHistory();
@@ -153,6 +157,40 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
         setLoading(false);
     };
 
+    const handleDeleteMission = async (mission: any) => {
+        setDeleting(true);
+        try {
+            // Delete associated storage file if exists
+            if (mission.image_url) {
+                try {
+                    const url = new URL(mission.image_url);
+                    const pathMatch = url.pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+                    if (pathMatch) {
+                        const [, bucket, filePath] = pathMatch;
+                        await supabase.storage.from(bucket).remove([filePath]);
+                    }
+                } catch { /* storage cleanup is best-effort */ }
+            }
+
+            // Delete mission from DB
+            const { error } = await supabase
+                .from('missions')
+                .delete()
+                .eq('id', mission.id);
+
+            if (error) {
+                console.error('Failed to delete mission:', error);
+                alert('삭제에 실패했습니다.');
+            } else {
+                setMissions(prev => prev.filter(m => m.id !== mission.id));
+                onMissionsChanged?.();
+            }
+        } finally {
+            setDeleting(false);
+            setDeleteTarget(null);
+        }
+    };
+
     // Stats
     const totalVerified = missions.length;
 
@@ -170,14 +208,28 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
                 </div>
                 <div className="flex gap-2">
                     {missions.length > 0 && (
-                        <button
-                            onClick={handlePlayClick}
-                            className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold shadow-lg hover:shadow-purple-500/30 transition-all animate-pulse"
-                        >
-                            <Clapperboard size={16} />
-                            Play Movie
-                            {!hasAccess && <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded ml-1">AD</span>}
-                        </button>
+                        <>
+                            <button
+                                onClick={() => setEditMode(!editMode)}
+                                className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition-all ${editMode
+                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                        : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                    }`}
+                            >
+                                <Pencil size={14} />
+                                {editMode ? '완료' : '수정'}
+                            </button>
+                            {!editMode && (
+                                <button
+                                    onClick={handlePlayClick}
+                                    className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold shadow-lg hover:shadow-purple-500/30 transition-all animate-pulse"
+                                >
+                                    <Clapperboard size={16} />
+                                    Play Movie
+                                    {!hasAccess && <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded ml-1">AD</span>}
+                                </button>
+                            )}
+                        </>
                     )}
                     <button
                         onClick={onClose}
@@ -295,13 +347,26 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
                                 key={m.id}
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, x: -100 }}
                                 transition={{ delay: i * 0.05 }}
-                                className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden"
+                                className={`bg-white/5 border rounded-2xl overflow-hidden transition-all ${editMode ? 'border-red-500/20' : 'border-white/10'
+                                    }`}
                             >
                                 {/* Date Header */}
                                 <div className="bg-white/5 px-4 py-2 border-b border-white/5 flex items-center justify-between">
                                     <span className="text-xs font-mono text-primary font-bold">{m.date}</span>
-                                    {m.proof_type === 'image' && <ImageIcon size={14} className="text-slate-500" />}
+                                    <div className="flex items-center gap-2">
+                                        {m.proof_type === 'image' && <ImageIcon size={14} className="text-slate-500" />}
+                                        {editMode && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDeleteTarget(m); }}
+                                                className="flex items-center gap-1 px-2 py-1 bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-lg text-[10px] font-bold transition-all"
+                                            >
+                                                <Trash2 size={12} />
+                                                삭제
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Content Body */}
@@ -352,6 +417,45 @@ export default function HistoryDetail({ goal, onClose }: HistoryDetailProps) {
                     )}
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {deleteTarget && (
+                <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
+                    <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="bg-slate-900 border border-white/10 rounded-2xl p-6 max-w-sm w-full shadow-2xl"
+                    >
+                        <div className="text-center mb-4">
+                            <Trash2 size={32} className="text-red-500 mx-auto mb-3" />
+                            <h3 className="text-lg font-bold text-white mb-2">미션 삭제</h3>
+                            <p className="text-sm text-slate-400">
+                                이 미션을 삭제하시겠습니까?<br />
+                                <span className="text-red-400 text-xs">삭제된 미션은 복구할 수 없습니다.</span>
+                            </p>
+                        </div>
+                        <p className="text-xs text-slate-500 bg-white/5 rounded-lg p-3 mb-4 line-clamp-2">
+                            {deleteTarget.content}
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setDeleteTarget(null)}
+                                disabled={deleting}
+                                className="flex-1 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-sm transition-all"
+                            >
+                                취소
+                            </button>
+                            <button
+                                onClick={() => handleDeleteMission(deleteTarget)}
+                                disabled={deleting}
+                                className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                            >
+                                {deleting ? '삭제 중...' : '삭제'}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
 
             {/* Lightbox / Image Modal */}
             {

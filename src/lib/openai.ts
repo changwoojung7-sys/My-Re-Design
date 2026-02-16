@@ -21,125 +21,90 @@ export interface MissionData {
     details?: any; // For flexible extra data like FunPlay difficulty
 }
 
-export async function generateMissions(userProfile: any, language: string = 'en', excludedMissions: string[] = [], targetGoal: any = null): Promise<MissionData[]> {
-    // Note: We no longer check for strict API Key on client side since we use Edge Function.
-    // However, if Edge Function requires it, it manages it securely.
+export async function generateMissions(
+    userProfile: any,
+    language: string = 'en',
+    _excludedMissions: string[] = [],
+    targetGoal: any = null,
+    refresh: boolean = false
+): Promise<MissionData[]> {
 
-    let goalsToProcess = [];
-
-    if (targetGoal) {
-        goalsToProcess = [targetGoal];
-    } else {
-        // Fetch User Goals from DB if no target provided
-        const { data: userGoals } = await supabase
-            .from('user_goals')
-            .select('*')
-            .eq('user_id', userProfile.id);
-
-        if (!userGoals || userGoals.length === 0) {
-            console.log("No detailed goals found, using mocks");
-            return MOCK_MISSIONS;
-        }
-        goalsToProcess = userGoals;
-    }
-
-
-    const goalList = goalsToProcess.map((g: any) =>
-        `- Category: ${g.category}\n  Goal: ${g.target_text}\n  Details: ${JSON.stringify(g.details)}`
-    ).join('\n\n');
-
-    // Fetch Recent 3 Days Missions (for context awareness)
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    const { data: recentMissionsData } = await supabase
-        .from('missions')
-        .select('content, category, date')
-        .eq('user_id', userProfile.id)
-        .gte('date', threeDaysAgo.toISOString().split('T')[0]);
-
-    const recentMissions = recentMissionsData?.map(m => `[${m.category}] ${m.content} (${m.date})`).join('\n') || "";
+    // We only need the categories/goals structure. Detailed history is now fetched server-side via Fingerprints.
+    const goalList = targetGoal ? {
+        [targetGoal.category]: targetGoal.target_text
+    } : {}; // If null, the Edge Function will fallback to default profile goals
 
     try {
+        console.log('[DEBUG openai.ts] Calling generate-mission Edge Function...');
         const { data, error } = await supabase.functions.invoke('generate-mission', {
             body: {
                 type: 'daily_missions',
                 payload: {
-                    userProfile,
+                    userProfile: {
+                        age: userProfile.age,
+                        gender: userProfile.gender,
+                        id: userProfile.id
+                    },
                     language,
-                    excludedMissions,
                     goalList,
-                    recentMissions // Pass recent history
+                    refresh
                 }
             }
         });
 
+        console.log('[DEBUG openai.ts] Edge Function response:', { data, error });
+
         if (error) throw error;
-        // Edge Function returns { missions: [...] }
-        const missions = data?.missions || [];
-        return Array.isArray(missions) ? missions : MOCK_MISSIONS;
+
+        // The Edge Function returns the 'missions' array directly or within the object
+        const missions = data?.missions || (Array.isArray(data) ? data : []);
+        return missions.length > 0 ? missions : MOCK_MISSIONS;
 
     } catch (e) {
-        console.error("AI Generation (Edge) Failed", e);
+        console.error("AI Generation (Edge) Failed - FULL ERROR:", e);
+        console.error("Error type:", typeof e, "Error keys:", e && typeof e === 'object' ? Object.keys(e) : 'N/A');
         return MOCK_MISSIONS;
     }
 }
 
 export async function generateFunPlayMission(
-    _userProfile: any,
+    userProfile: any,
     language: string = 'en',
-    excludedKeywords: string[] = [],
-    options: { difficulty: string, time_limit: number, mood: string, place: string }
+    _excludedKeywords: string[] = [],
+    options: { difficulty: string, time_limit: number, mood: string, place: string },
+    refresh: boolean = false
 ): Promise<MissionData> {
-
-    // Fetch Recent 3 Days Missions (for context awareness)
-    const threeDaysAgo = new Date();
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    const { data: recentMissionsData } = await supabase
-        .from('missions')
-        .select('content, category, date, details')
-        .eq('user_id', _userProfile.id)
-        .gte('date', threeDaysAgo.toISOString().split('T')[0]);
-
-    const recentMissions = recentMissionsData?.map(m => {
-        const archetype = m.details?.archetype ? ` (Archetype: ${m.details.archetype})` : '';
-        return `[${m.category}] ${m.content}${archetype} (${m.date})`;
-    }).join('\n') || "";
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-mission', {
             body: {
                 type: 'funplay',
                 payload: {
-                    userProfile: _userProfile,
+                    userProfile,
                     options,
                     language,
-                    excludedKeywords,
-                    recentMissions,
-                    randomSeed: Math.random() // Force variety
+                    refresh
                 }
             }
         });
 
         if (error) throw error;
 
-        // Normalize response from Edge Function
-        // Edge returns pure JSON object from OpenAI
-        const parsed = data;
-
+        // Normalize response
         return {
             category: 'funplay',
-            content: parsed.content || parsed.mission || "Mission Generation Failed",
+            content: data.content || data.mission || "Mission Generation Failed",
             verification_type: 'checkbox',
-            reasoning: parsed.reasoning || { expected_impact: "Instant Refresh" },
-            trust_score: parsed.trust_score || 90,
-            details: parsed // Store extra fields if needed
+            reasoning: data.reasoning || { expected_impact: "Instant Fun" },
+            trust_score: data.trust_score || 95,
+            details: data // Store fingerprint and other fields
         };
 
     } catch (e) {
         console.error("FunPlay Generation (Edge) Failed", e);
         return {
             category: 'funplay',
-            content: language === 'ko' ? "30초 동안 제자리 뛰기" : "Jump in place for 30 seconds",
+            content: language === 'ko' ? "비우세손으로 30초 동안 그림 그리기" : "Draw with non-dominant hand for 30s",
             verification_type: 'checkbox'
         };
     }

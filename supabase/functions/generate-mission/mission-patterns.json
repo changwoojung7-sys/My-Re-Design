@@ -1,0 +1,1450 @@
+{
+    "body_wellness": [
+        {
+            "pattern_id": "BW01",
+            "brief": "손/발 감각 스캐닝 + 3초 미세조절",
+            "core_type": "sensory_scan",
+            "default_artifact_type": "self_check",
+            "primary_action": "scan",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW02",
+            "brief": "자세 리셋(어깨/턱/혀 위치) + 체크",
+            "core_type": "posture_reset",
+            "default_artifact_type": "self_check",
+            "primary_action": "reset",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW03",
+            "brief": "시선/초점 전환(near→far) + 두통/긴장 체크",
+            "core_type": "eye_focus",
+            "default_artifact_type": "self_check",
+            "primary_action": "shift_focus",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW04",
+            "brief": "한쪽만 사용(비우세손)로 생활 동작 20초",
+            "core_type": "non_dominant",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "use_non_dominant",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW05",
+            "brief": "균형(발가락/뒤꿈치) 10초×2 + 느낌 기록",
+            "core_type": "balance_check",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "balance",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW06",
+            "brief": "소리/진동 감각 집중(주변 3개 소리 분리)",
+            "core_type": "auditory_focus",
+            "default_artifact_type": "self_check",
+            "primary_action": "listen",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW07",
+            "brief": "호흡 '템포 게임'(3-2-4) 명상 느낌 안 나게",
+            "core_type": "breath_tempo",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "breathe",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW08",
+            "brief": "미세 스트레스 해제(손가락 관절 3곳 2초 압박)",
+            "core_type": "micro_release",
+            "default_artifact_type": "self_check",
+            "primary_action": "press",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW09",
+            "brief": "미각/후각 리셋(향 1개 찾아 구분)",
+            "core_type": "smell_taste",
+            "default_artifact_type": "self_check",
+            "primary_action": "smell",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW10",
+            "brief": "30초 '몸 상태 점수화'(0~10) + 원인 한 단어",
+            "core_type": "body_score",
+            "default_artifact_type": "self_check",
+            "primary_action": "rate",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW11",
+            "brief": "통증 부위 1곳 미세 가동 범위 비교",
+            "core_type": "pain_mobility",
+            "default_artifact_type": "self_check",
+            "primary_action": "compare_range",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW12",
+            "brief": "오늘 걸음 수 목표 1줄 설정",
+            "core_type": "activity_target",
+            "default_artifact_type": "goal_set",
+            "primary_action": "set_target",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW13",
+            "brief": "스쿼트 5회 후 무릎 안정성 체크",
+            "core_type": "strength_micro",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "squat",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW14",
+            "brief": "런닝 전 발목 회전 10초×2",
+            "core_type": "running_prep",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "rotate",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW15",
+            "brief": "러닝 보폭을 10걸음만 의식적으로 조정",
+            "core_type": "running_form",
+            "default_artifact_type": "micro_adjust",
+            "primary_action": "adjust_stride",
+            "tool": "none",
+            "place": "outdoor"
+        },
+        {
+            "pattern_id": "BW16",
+            "brief": "오늘 섭취한 음식 1개 칼로리 추정해보기",
+            "core_type": "diet_awareness",
+            "default_artifact_type": "text",
+            "primary_action": "estimate",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW17",
+            "brief": "물 대신 당 음료 1회 줄이기 계획 세우기",
+            "core_type": "diet_swap",
+            "default_artifact_type": "goal_set",
+            "primary_action": "replace",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW18",
+            "brief": "복부 힘 주고 10초 유지 3회",
+            "core_type": "core_activation",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "engage_core",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW19",
+            "brief": "식사 속도 절반으로 줄여 3입 먹기",
+            "core_type": "eating_speed",
+            "default_artifact_type": "self_check",
+            "primary_action": "slow_eat",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW20",
+            "brief": "오늘 단백질 식품 1가지 추가 계획",
+            "core_type": "nutrition_focus",
+            "default_artifact_type": "goal_set",
+            "primary_action": "add_protein",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW21",
+            "brief": "종아리 근육 긴장도 0~10 점수화",
+            "core_type": "muscle_awareness",
+            "default_artifact_type": "self_check",
+            "primary_action": "rate",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW22",
+            "brief": "런닝 30초 가볍게 제자리 뛰기",
+            "core_type": "running_activation",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "jog",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW23",
+            "brief": "허벅지 스트렝스 테스트 5초 유지",
+            "core_type": "strength_hold",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "hold",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW24",
+            "brief": "식사 전 배고픔 점수(0~10) 기록",
+            "core_type": "hunger_awareness",
+            "default_artifact_type": "text",
+            "primary_action": "rate_hunger",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW25",
+            "brief": "어제보다 오늘 체중 변화 예상해보기",
+            "core_type": "weight_awareness",
+            "default_artifact_type": "text",
+            "primary_action": "predict",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW26",
+            "brief": "팔굽혀펴기 3회만 정확하게",
+            "core_type": "upper_strength",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "push_up",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW27",
+            "brief": "식단에서 탄수화물 1개 줄이기 계획",
+            "core_type": "carb_adjust",
+            "default_artifact_type": "goal_set",
+            "primary_action": "reduce",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW28",
+            "brief": "러닝 후 호흡 회복 시간 측정",
+            "core_type": "recovery_time",
+            "default_artifact_type": "self_check",
+            "primary_action": "measure",
+            "tool": "phone",
+            "place": "outdoor"
+        },
+        {
+            "pattern_id": "BW29",
+            "brief": "오늘 간식 대신 과일 1개 선택",
+            "core_type": "diet_swap",
+            "default_artifact_type": "checkbox",
+            "primary_action": "choose",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW30",
+            "brief": "등 자세 20초 펴고 유지",
+            "core_type": "posture_strength",
+            "default_artifact_type": "micro_challenge",
+            "primary_action": "extend",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW31",
+            "brief": "오늘 러닝 거리 목표 1줄 설정",
+            "core_type": "running_goal",
+            "default_artifact_type": "goal_set",
+            "primary_action": "set_distance",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW32",
+            "brief": "하루 활동 시간 1분 늘릴 방법 생각",
+            "core_type": "activity_extension",
+            "default_artifact_type": "text",
+            "primary_action": "plan",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW33",
+            "brief": "식사 전 3초 멈추고 선택 이유 생각",
+            "core_type": "mindful_eating",
+            "default_artifact_type": "self_check",
+            "primary_action": "pause",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW34",
+            "brief": "계단 1층 오르기",
+            "core_type": "micro_cardio",
+            "default_artifact_type": "checkbox",
+            "primary_action": "climb",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW35",
+            "brief": "오늘 단 음식 충동 점수화",
+            "core_type": "craving_awareness",
+            "default_artifact_type": "text",
+            "primary_action": "rate_craving",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW36",
+            "brief": "종아리 10초 늘림 테스트",
+            "core_type": "mobility_check",
+            "default_artifact_type": "self_check",
+            "primary_action": "stretch_test",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW37",
+            "brief": "러닝 시 팔 흔들림 의식하기 20초",
+            "core_type": "running_form",
+            "default_artifact_type": "micro_adjust",
+            "primary_action": "adjust_arm",
+            "tool": "none",
+            "place": "outdoor"
+        },
+        {
+            "pattern_id": "BW38",
+            "brief": "체지방 목표 숫자 다시 확인",
+            "core_type": "goal_review",
+            "default_artifact_type": "text",
+            "primary_action": "review",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW39",
+            "brief": "운동 후 근육 뻐근함 위치 기록",
+            "core_type": "recovery_log",
+            "default_artifact_type": "text",
+            "primary_action": "log",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW40",
+            "brief": "오늘 운동 시간 1분만 확보",
+            "core_type": "habit_anchor",
+            "default_artifact_type": "checkbox",
+            "primary_action": "schedule",
+            "tool": "phone",
+            "place": "anywhere"
+        }
+    ],
+    "growth_career": [
+        {
+            "pattern_id": "GC01",
+            "brief": "오늘의 '결정 규칙 1줄' 만들기",
+            "core_type": "decision_rule",
+            "default_artifact_type": "micro_script",
+            "primary_action": "define",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC02",
+            "brief": "업무/삶 문제를 '가설 1개'로 재정의",
+            "core_type": "hypothesis",
+            "default_artifact_type": "micro_script",
+            "primary_action": "redefine",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC03",
+            "brief": "30초 '리스크 1개/완화 1개' 짝짓기",
+            "core_type": "risk_mitigation",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "pair",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC04",
+            "brief": "'하지 않을 것 리스트 1개' 만들기",
+            "core_type": "not_to_do",
+            "default_artifact_type": "micro_script",
+            "primary_action": "eliminate",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC05",
+            "brief": "3단어로 목표 압축 후 한 단어 제거",
+            "core_type": "goal_compression",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "compress",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC06",
+            "brief": "내일을 위한 '첫 30초 행동' 정의",
+            "core_type": "first_action",
+            "default_artifact_type": "micro_script",
+            "primary_action": "define_action",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC07",
+            "brief": "1문장 피드백 요청 템플릿 만들기",
+            "core_type": "feedback_template",
+            "default_artifact_type": "micro_script",
+            "primary_action": "ask",
+            "tool": "phone",
+            "place": "office"
+        },
+        {
+            "pattern_id": "GC08",
+            "brief": "나의 강점 1개를 '사용 시점'으로 번역",
+            "core_type": "strength_timing",
+            "default_artifact_type": "micro_script",
+            "primary_action": "translate_strength",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC09",
+            "brief": "미루는 이유를 '마찰 요소 1개'로 쓰기",
+            "core_type": "friction_find",
+            "default_artifact_type": "micro_script",
+            "primary_action": "identify_friction",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC10",
+            "brief": "'성공 조건'을 숫자/측정으로 바꾸기",
+            "core_type": "measurable_goal",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "quantify",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC11",
+            "brief": "오늘 배운 것 1개를 '한 문장 요약'으로 정리",
+            "core_type": "learning_summary",
+            "default_artifact_type": "micro_script",
+            "primary_action": "summarize",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC12",
+            "brief": "읽은/본 콘텐츠에서 '핵심 통찰 1개' 기록",
+            "core_type": "insight_capture",
+            "default_artifact_type": "micro_script",
+            "primary_action": "extract",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC13",
+            "brief": "오늘 목표를 '왜?' 1번 더 묻고 재작성",
+            "core_type": "purpose_clarity",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "clarify",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC14",
+            "brief": "지금 하고 있는 일의 '진짜 목적' 1줄 정의",
+            "core_type": "intent_definition",
+            "default_artifact_type": "micro_script",
+            "primary_action": "define",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC15",
+            "brief": "하루 루틴 중 '자동화 가능한 1개' 찾기",
+            "core_type": "automation_thinking",
+            "default_artifact_type": "micro_script",
+            "primary_action": "identify",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC16",
+            "brief": "오늘 3분 투자할 '미니 학습 주제 1개' 정하기",
+            "core_type": "micro_learning",
+            "default_artifact_type": "goal_set",
+            "primary_action": "select",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC17",
+            "brief": "미루는 일 1개를 '2단계 이하'로 쪼개기",
+            "core_type": "task_breakdown",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "split",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC18",
+            "brief": "오늘 한 일 중 '잘한 점 1개' 명확히 기록",
+            "core_type": "self_feedback",
+            "default_artifact_type": "micro_script",
+            "primary_action": "acknowledge",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC19",
+            "brief": "나의 '시간 낭비 1요소' 정의 후 대안 1개",
+            "core_type": "time_awareness",
+            "default_artifact_type": "micro_script",
+            "primary_action": "analyze",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC20",
+            "brief": "오늘 목표를 '행동형 동사'로 다시 쓰기",
+            "core_type": "action_rewrite",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "rewrite",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC21",
+            "brief": "새로 배우는 주제의 '용어 1개' 정의하기",
+            "core_type": "concept_define",
+            "default_artifact_type": "micro_script",
+            "primary_action": "define",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC22",
+            "brief": "내 습관 1개를 '트리거-행동-보상'으로 분석",
+            "core_type": "habit_loop",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "analyze",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC23",
+            "brief": "오늘 할 일 중 '삭제 가능한 1개' 제거",
+            "core_type": "priority_cut",
+            "default_artifact_type": "checkbox",
+            "primary_action": "eliminate",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC24",
+            "brief": "'지금 가장 중요한 1가지'만 남기기",
+            "core_type": "focus_filter",
+            "default_artifact_type": "micro_script",
+            "primary_action": "filter",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC25",
+            "brief": "최근 실수 1개를 '교훈 1줄'로 바꾸기",
+            "core_type": "mistake_reframe",
+            "default_artifact_type": "micro_script",
+            "primary_action": "reframe",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC26",
+            "brief": "오늘 배운 내용을 '누군가에게 설명하듯' 1문장",
+            "core_type": "teach_back",
+            "default_artifact_type": "micro_script",
+            "primary_action": "explain",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC27",
+            "brief": "자기계발 목표를 '숫자 1개'로 구체화",
+            "core_type": "metric_upgrade",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "quantify",
+            "tool": "paper",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC28",
+            "brief": "지금 하는 일의 '중단 기준' 1개 정의",
+            "core_type": "stop_rule",
+            "default_artifact_type": "micro_script",
+            "primary_action": "define",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC29",
+            "brief": "오늘 1번은 '집중 2분' 타이머 실행 계획",
+            "core_type": "focus_block",
+            "default_artifact_type": "goal_set",
+            "primary_action": "schedule",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "GC30",
+            "brief": "장기 목표를 '이번 주 행동 1개'로 변환",
+            "core_type": "longterm_to_week",
+            "default_artifact_type": "micro_script",
+            "primary_action": "convert",
+            "tool": "paper",
+            "place": "anywhere"
+        }
+    ],
+    "growth_career_language": [
+        {
+            "pattern_id": "GC_EN01",
+            "brief": "카페 주문 3턴 역할극",
+            "core_type": "roleplay_dialogue",
+            "default_artifact_type": "dialogue",
+            "primary_action": "roleplay",
+            "tool": "phone",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN02",
+            "brief": "오늘 하루 3문장 요약(현재형)",
+            "core_type": "daily_summary",
+            "default_artifact_type": "micro_script",
+            "primary_action": "summarize",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN03",
+            "brief": "자주 쓰는 한국어 문장 1개 → 목표언어 3버전",
+            "core_type": "translation_variants",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "translate",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN04",
+            "brief": "스몰톡 2턴 만들기(인사→질문→답)",
+            "core_type": "smalltalk",
+            "default_artifact_type": "dialogue",
+            "primary_action": "converse",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN05",
+            "brief": "일상 상황(마트/지하철/병원) 랜덤 1개로 대화 3줄",
+            "core_type": "situation_card",
+            "default_artifact_type": "dialogue",
+            "primary_action": "simulate",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN06",
+            "brief": "연결 표현 1개(Actually/I mean/By the way) 포함 대화 3줄",
+            "core_type": "connector_phrase",
+            "default_artifact_type": "dialogue",
+            "primary_action": "connect",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN07",
+            "brief": "질문 2개 만들기(What/How/When 중 택)",
+            "core_type": "question_making",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "ask_question",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN08",
+            "brief": "거절/양해 2문장(soft refusal) 만들기",
+            "core_type": "polite_refusal",
+            "default_artifact_type": "micro_script",
+            "primary_action": "refuse_politely",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN09",
+            "brief": "감정 1개를 영어로 말하기 + 이유 1문장",
+            "core_type": "emotion_expression",
+            "default_artifact_type": "micro_script",
+            "primary_action": "express_emotion",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN10",
+            "brief": "전화 통화 3턴(예약/문의) 스크립트",
+            "core_type": "phone_script",
+            "default_artifact_type": "dialogue",
+            "primary_action": "phone_call",
+            "tool": "phone",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN11",
+            "brief": "오늘 있었던 일 1개를 과거형 3문장으로 말하기",
+            "core_type": "past_tense_story",
+            "default_artifact_type": "micro_script",
+            "primary_action": "narrate",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN12",
+            "brief": "같은 문장을 '긍정/부정/의문' 3형태로 바꾸기",
+            "core_type": "sentence_variation",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "transform",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN13",
+            "brief": "하루 일정 3문장을 미래형으로 말하기",
+            "core_type": "future_expression",
+            "default_artifact_type": "micro_script",
+            "primary_action": "predict",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN14",
+            "brief": "'Because/So/But' 포함 문장 3개 만들기",
+            "core_type": "conjunction_use",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "combine",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN15",
+            "brief": "같은 상황을 2가지 다른 표현으로 말하기",
+            "core_type": "paraphrasing",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "paraphrase",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN16",
+            "brief": "오늘 감정에 대해 'I feel…' 문장 2개 만들기",
+            "core_type": "emotion_pattern",
+            "default_artifact_type": "micro_script",
+            "primary_action": "express",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN17",
+            "brief": "30초 동안 말할 자기소개 스크립트 만들기",
+            "core_type": "self_introduction",
+            "default_artifact_type": "micro_script",
+            "primary_action": "introduce",
+            "tool": "phone",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN18",
+            "brief": "상대의 말에 '리액션 문장' 3개 만들기",
+            "core_type": "reaction_response",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "react",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN19",
+            "brief": "'I think / I guess / I believe' 차이 활용 문장 3개",
+            "core_type": "opinion_variation",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "differentiate",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN20",
+            "brief": "일상 상황을 'If' 조건문 2개로 말하기",
+            "core_type": "conditional_use",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "conditionalize",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN21",
+            "brief": "오늘 뉴스/콘텐츠 1개를 영어 2문장으로 요약",
+            "core_type": "content_summary",
+            "default_artifact_type": "micro_script",
+            "primary_action": "summarize",
+            "tool": "phone",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN22",
+            "brief": "동의/비동의 표현 2가지씩 만들어보기",
+            "core_type": "agreement_variation",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "agree_disagree",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN23",
+            "brief": "시간 표현(ago/last/next) 활용 문장 3개",
+            "core_type": "time_expression",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "describe_time",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN24",
+            "brief": "전화 대신 문자 상황 2문장 작성",
+            "core_type": "text_message_style",
+            "default_artifact_type": "micro_script",
+            "primary_action": "compose",
+            "tool": "phone",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN25",
+            "brief": "길 묻기/설명하기 대화 3턴 만들기",
+            "core_type": "direction_dialogue",
+            "default_artifact_type": "dialogue",
+            "primary_action": "explain",
+            "tool": "none",
+            "place": "outdoor",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN26",
+            "brief": "'should/must/have to' 비교 문장 3개",
+            "core_type": "modal_comparison",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "compare",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN27",
+            "brief": "같은 문장을 더 공손하게 바꿔쓰기 2개",
+            "core_type": "politeness_upgrade",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "upgrade",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN28",
+            "brief": "3문장 스토리 만들기(시작-중간-끝)",
+            "core_type": "mini_story",
+            "default_artifact_type": "micro_script",
+            "primary_action": "create_story",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN29",
+            "brief": "오늘 경험을 비교급/최상급으로 표현 2문장",
+            "core_type": "comparison_expression",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "compare",
+            "tool": "none",
+            "place": "anywhere",
+            "language_skill": true
+        },
+        {
+            "pattern_id": "GC_EN30",
+            "brief": "30초 자유 말하기 후 1문장 다시 정리",
+            "core_type": "free_speaking_refine",
+            "default_artifact_type": "voice",
+            "primary_action": "speak",
+            "tool": "phone",
+            "place": "anywhere",
+            "language_skill": true
+        }
+    ],
+    "mind_connection": [
+        {
+            "pattern_id": "MC01",
+            "brief": "감정 라벨 1개 + 몸 반응 1개 연결",
+            "core_type": "emotion_body_link",
+            "default_artifact_type": "self_check",
+            "primary_action": "label",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC02",
+            "brief": "경계선 문장 1개(부드럽게 거절)",
+            "core_type": "boundary_setting",
+            "default_artifact_type": "micro_script",
+            "primary_action": "set_boundary",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC03",
+            "brief": "관계에서 원하는 것 1개를 '요청 문장'으로",
+            "core_type": "request_making",
+            "default_artifact_type": "micro_script",
+            "primary_action": "request",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC04",
+            "brief": "오늘 대화에서 쓰고 싶은 '한 문장 톤' 정하기",
+            "core_type": "tone_setting",
+            "default_artifact_type": "micro_script",
+            "primary_action": "set_tone",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC05",
+            "brief": "나를 안심시키는 말 1문장(과장 금지)",
+            "core_type": "self_reassurance",
+            "default_artifact_type": "micro_script",
+            "primary_action": "reassure",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC06",
+            "brief": "감사가 아닌 '인정 문장' 1개 만들기",
+            "core_type": "acknowledgment",
+            "default_artifact_type": "micro_script",
+            "primary_action": "acknowledge",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC07",
+            "brief": "화가 났을 때 '지연 문장' 1개",
+            "core_type": "anger_delay",
+            "default_artifact_type": "micro_script",
+            "primary_action": "delay_response",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC08",
+            "brief": "상대 입장 가정 1개 + 확인 질문 1개",
+            "core_type": "perspective_taking",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "assume_perspective",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC09",
+            "brief": "지금 필요한 도움 1개를 '구체 요청'으로",
+            "core_type": "help_request",
+            "default_artifact_type": "micro_script",
+            "primary_action": "ask_help",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC10",
+            "brief": "오늘 관계 에너지(0~10) + 올리는 행동 1개",
+            "core_type": "relationship_energy",
+            "default_artifact_type": "self_check",
+            "primary_action": "rate_energy",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC11",
+            "brief": "오늘 ‘인사+질문’ 한 줄 스몰톡 스크립트 만들기",
+            "core_type": "smalltalk_script",
+            "default_artifact_type": "micro_script",
+            "primary_action": "draft_smalltalk",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC12",
+            "brief": "대화 시작용 ‘가벼운 관찰’ 문장 1개 만들기",
+            "core_type": "conversation_opener",
+            "default_artifact_type": "micro_script",
+            "primary_action": "compose_opener",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC13",
+            "brief": "오늘 누군가에게 보낼 ‘짧은 안부 메시지’ 1개 작성",
+            "core_type": "checkin_message",
+            "default_artifact_type": "micro_script",
+            "primary_action": "write_message",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC14",
+            "brief": "관계에서 ‘고마움’ 대신 ‘구체 인정’ 1문장 보내기",
+            "core_type": "specific_praise",
+            "default_artifact_type": "micro_script",
+            "primary_action": "praise",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC15",
+            "brief": "‘부탁’ 문장을 ‘선택권 포함’ 문장으로 바꿔쓰기 1개",
+            "core_type": "request_with_choice",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "rewrite",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC16",
+            "brief": "대화 중 끼어들기 방지용 ‘양해 문장’ 1개 준비",
+            "core_type": "polite_interrupt",
+            "default_artifact_type": "micro_script",
+            "primary_action": "prepare_phrase",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC17",
+            "brief": "대화가 어색할 때 쓸 ‘연결 질문’ 1개 만들기",
+            "core_type": "bridge_question",
+            "default_artifact_type": "micro_script",
+            "primary_action": "ask_question",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC18",
+            "brief": "상대 말 요약 1문장 + 확인 질문 1개 세트 만들기",
+            "core_type": "reflective_listening",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "reflect",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC19",
+            "brief": "오늘 ‘칭찬’이 아니라 ‘관찰+느낌’으로 말하는 문장 1개",
+            "core_type": "observation_feeling",
+            "default_artifact_type": "micro_script",
+            "primary_action": "express",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC20",
+            "brief": "불편한 요청을 받았을 때 ‘완곡 거절’ 문장 1개 만들기",
+            "core_type": "soft_refusal",
+            "default_artifact_type": "micro_script",
+            "primary_action": "refuse",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC21",
+            "brief": "‘나’ 메시지(I-message)로 바꾼 문장 1개 만들기",
+            "core_type": "i_message",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "rewrite",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC22",
+            "brief": "오늘 관계에서 지키고 싶은 ‘금지선’ 1개를 문장으로",
+            "core_type": "boundary_define",
+            "default_artifact_type": "micro_script",
+            "primary_action": "define_boundary",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC23",
+            "brief": "대화 중 ‘감정 단어’ 1개를 정확히 골라 표현하기",
+            "core_type": "emotion_precision",
+            "default_artifact_type": "self_check",
+            "primary_action": "choose_word",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC24",
+            "brief": "내 기분을 ‘날씨 비유’로 1문장 표현하기",
+            "core_type": "metaphor_expression",
+            "default_artifact_type": "micro_script",
+            "primary_action": "metaphor",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC25",
+            "brief": "오늘 ‘대화 종료’ 문장 1개(자연스럽게 끝내기)",
+            "core_type": "conversation_close",
+            "default_artifact_type": "micro_script",
+            "primary_action": "close_conversation",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC26",
+            "brief": "오늘 ‘다음 약속’으로 이어지는 문장 1개 만들기",
+            "core_type": "followup_invite",
+            "default_artifact_type": "micro_script",
+            "primary_action": "invite",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC27",
+            "brief": "상대에게 ‘도움 제안’ 문장 1개(부담 없게)",
+            "core_type": "offer_help",
+            "default_artifact_type": "micro_script",
+            "primary_action": "offer",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC28",
+            "brief": "가벼운 농담 대신 ‘공감 리액션’ 1개 준비하기",
+            "core_type": "empathy_reaction",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "prepare_reaction",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC29",
+            "brief": "‘칭찬’ 1개를 ‘근거 포함’ 칭찬으로 고쳐쓰기",
+            "core_type": "evidence_praise",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "rewrite",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC30",
+            "brief": "오늘 내 말버릇 1개를 ‘대체 문장’으로 바꾸기",
+            "core_type": "speech_habit_swap",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "replace_phrase",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC31",
+            "brief": "어색한 침묵을 깨는 ‘선택형 질문’ 1개 만들기",
+            "core_type": "choice_question",
+            "default_artifact_type": "micro_script",
+            "primary_action": "ask_question",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC32",
+            "brief": "오늘 ‘감사’ 대신 ‘배운 점’ 1문장 전하기",
+            "core_type": "learning_ack",
+            "default_artifact_type": "micro_script",
+            "primary_action": "acknowledge",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC33",
+            "brief": "상대 말에 ‘재질문’ 1개 만들기(깊게 묻기)",
+            "core_type": "deep_question",
+            "default_artifact_type": "micro_script",
+            "primary_action": "ask_deeper",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC34",
+            "brief": "불편했던 상황을 ‘사실-느낌-요청’ 3단으로 재작성",
+            "core_type": "fnr_script",
+            "default_artifact_type": "micro_script",
+            "primary_action": "rewrite",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC35",
+            "brief": "오늘 ‘나를 지키는’ 한 문장(단호하지만 부드럽게)",
+            "core_type": "self_protection_line",
+            "default_artifact_type": "micro_script",
+            "primary_action": "declare",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC36",
+            "brief": "상대에게 ‘확인’받고 싶은 한 가지를 질문으로 만들기",
+            "core_type": "clarify_ask",
+            "default_artifact_type": "micro_script",
+            "primary_action": "clarify",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC37",
+            "brief": "오늘 ‘오해 방지’ 문장 1개(내 의도 설명하기)",
+            "core_type": "intent_clarify",
+            "default_artifact_type": "micro_script",
+            "primary_action": "clarify_intent",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC38",
+            "brief": "대화 중 ‘경청 신호’ 리액션 2개 정하기(짧게)",
+            "core_type": "listening_signals",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "select",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC39",
+            "brief": "오늘 ‘단체 대화’에서 쓸 한 줄 참여 문장 만들기",
+            "core_type": "group_chat_line",
+            "default_artifact_type": "micro_script",
+            "primary_action": "compose",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC40",
+            "brief": "관계 에너지를 올리는 ‘작은 행동’ 1개를 구체화",
+            "core_type": "micro_social_action",
+            "default_artifact_type": "self_check",
+            "primary_action": "plan",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC41",
+            "brief": "오늘 ‘먼저 사과’ 대신 ‘책임 1줄’ 표현하기",
+            "core_type": "responsibility_line",
+            "default_artifact_type": "micro_script",
+            "primary_action": "own",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC42",
+            "brief": "대화에서 ‘상대 이름’ 한 번 더 불러보기 계획",
+            "core_type": "name_calling",
+            "default_artifact_type": "self_check",
+            "primary_action": "use_name",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC43",
+            "brief": "오늘 ‘친절’ 대신 ‘구체 도움’ 한 가지 제안 문장 만들기",
+            "core_type": "concrete_help_offer",
+            "default_artifact_type": "micro_script",
+            "primary_action": "offer",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC44",
+            "brief": "가까운 사람에게 ‘요즘 나’를 1문장 공유하기",
+            "core_type": "self_disclosure",
+            "default_artifact_type": "micro_script",
+            "primary_action": "share",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC45",
+            "brief": "상대의 좋은 점 1개를 ‘구체 상황’과 함께 말하기",
+            "core_type": "situational_praise",
+            "default_artifact_type": "micro_script",
+            "primary_action": "praise",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC46",
+            "brief": "오늘 ‘질문 1개’로 대화 주도권 넘겨보기",
+            "core_type": "give_floor",
+            "default_artifact_type": "self_check",
+            "primary_action": "ask",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC47",
+            "brief": "갈등 상황을 ‘원하는 결과 1개’로만 정리하기",
+            "core_type": "conflict_goal",
+            "default_artifact_type": "text",
+            "primary_action": "define",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC48",
+            "brief": "오늘 ‘내 감정’ 1개를 ‘필요’로 번역해보기",
+            "core_type": "need_translation",
+            "default_artifact_type": "micro_drill",
+            "primary_action": "translate",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC49",
+            "brief": "SNS/메신저에서 ‘좋아요’ 대신 ‘한 줄 댓글’ 작성",
+            "core_type": "comment_instead_like",
+            "default_artifact_type": "micro_script",
+            "primary_action": "comment",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC50",
+            "brief": "오늘 ‘대화 후’ 느낀 점을 1문장으로 요약",
+            "core_type": "post_conversation_reflection",
+            "default_artifact_type": "text",
+            "primary_action": "summarize",
+            "tool": "phone",
+            "place": "anywhere"
+        }
+    ],
+    "funplay": {
+        "archetypes": [
+            {
+                "id": "stealth_spy",
+                "name": "Stealth / Spy",
+                "description": "Actions done secretly without being noticed by others"
+            },
+            {
+                "id": "physical_challenge",
+                "name": "Physical / Challenge",
+                "description": "Mini-dexterity or balance tasks using body parts in weird ways"
+            },
+            {
+                "id": "absurdity_surreal",
+                "name": "Absurdity / Surreal",
+                "description": "Doing something completely illogical or acting out a character"
+            },
+            {
+                "id": "observation_hunter",
+                "name": "Observation / Hunter",
+                "description": "Finding very specific visual patterns or objects in the environment"
+            },
+            {
+                "id": "speed_reflex",
+                "name": "Speed / Reflex",
+                "description": "Tasks that must be done instantly or within a tight count"
+            }
+        ],
+        "mechanics": [
+            "countdown",
+            "non_dominant",
+            "silent_mode",
+            "reverse_order",
+            "tiny_target",
+            "disguise_acting",
+            "one_breath",
+            "freeze_frame",
+            "mirror_mode",
+            "stealth_rule",
+            "constraint_object",
+            "speed_combo"
+        ],
+        "twist_modifiers": [
+            "Use non-dominant hand",
+            "Hold breath while doing it",
+            "Do it in slow motion",
+            "While making a specific face",
+            "Eyes half-closed",
+            "Whispering the whole time",
+            "Standing on one foot",
+            "Balancing something on your head",
+            "Using only two fingers",
+            "While humming a song"
+        ],
+        "forbidden": [
+            "standard exercises (squats, push-ups, etc.)",
+            "generic advice (smile at someone)",
+            "look at the sky/tree without a twist"
+        ]
+    }
+}
