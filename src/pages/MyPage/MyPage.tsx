@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import SubscriptionManager from './SubscriptionManager';
 import UserGuide from '../../components/common/UserGuide';
 import { deleteFilesFromStorage } from '../../lib/storageHelper';
+import { notificationManager } from '../../lib/notificationManager';
 
 export type GoalCategory = 'body_wellness' | 'growth_career' | 'mind_connection' | 'funplay';
 
@@ -87,6 +88,7 @@ export default function MyPage() {
     const [verifyCodeInput, setVerifyCodeInput] = useState('');
     const [verifyTimer, setVerifyTimer] = useState(0);
     const [verifyLoading, setVerifyLoading] = useState(false);
+    const [notificationTime, setNotificationTime] = useState('09:00');
 
 
     // Verification Timer
@@ -291,6 +293,8 @@ export default function MyPage() {
         }
     };
 
+
+
     const handleOpenSettings = async () => {
         setLoading(true);
         // Fetch fresh auth data
@@ -322,6 +326,10 @@ export default function MyPage() {
             // Reset password state
             setPasswordData({ current: '', new: '', confirm: '' });
             setIsPasswordExpanded(false);
+
+            // Notification State
+            setNotificationTime(user?.notification_time || '09:00');
+
             setIsSettingsOpen(true);
         }
         setLoading(false);
@@ -341,6 +349,7 @@ export default function MyPage() {
                     gender: settingsData.gender,
                     // We can also save phone_number here if we want to sync it from backupPhone
                     phone_number: settingsData.isPhoneAuth ? settingsData.loginId.replace(/-/g, '') : settingsData.backupPhone.replace(/-/g, ''), // Ensure DB has the primary/backup phone
+                    notification_time: notificationTime,
                     updated_at: new Date()
                 })
                 .eq('id', user.id);
@@ -368,8 +377,18 @@ export default function MyPage() {
                 full_name: settingsData.fullName,
                 nickname: settingsData.nickname,
                 age: settingsData.age,
-                gender: settingsData.gender
+                gender: settingsData.gender,
+                notification_time: notificationTime
             });
+
+            // 4. Schedule Notification
+            if (notificationTime) {
+                const [hour, minute] = notificationTime.split(':').map(Number);
+                await notificationManager.requestPermissions();
+                await notificationManager.scheduleDailyNotification(hour, minute);
+            } else {
+                await notificationManager.cancelNotifications();
+            }
 
             setIsSettingsOpen(false);
             alert(t.alertSettingsUpdated);
@@ -612,19 +631,33 @@ export default function MyPage() {
 
     const isGoalExpired = () => {
         if (!currentGoal.created_at) return false;
-        const start = new Date(currentGoal.created_at);
-        const end = new Date(start);
 
-        if (currentGoal.duration_months < 1) {
-            // Week handling (0.25 = 1 week, 0.5 = 2 weeks)
-            const days = currentGoal.duration_months === 0.25 ? 7 :
+        const start = new Date(currentGoal.created_at);
+        start.setHours(0, 0, 0, 0); // Normalize to midnight
+
+        let totalDays = 0;
+
+        // Force FunPlay to 7 days
+        if (currentGoal.category?.toLowerCase() === 'funplay') {
+            totalDays = 7;
+        } else if (currentGoal.duration_months < 1) {
+            // Week handling: 0.25 = 1 week (7 days), 0.5 = 2 weeks (14 days)
+            totalDays = currentGoal.duration_months === 0.25 ? 7 :
                 currentGoal.duration_months === 0.5 ? 14 :
                     Math.round(currentGoal.duration_months * 30);
-            end.setDate(end.getDate() + days);
         } else {
-            end.setMonth(end.getMonth() + currentGoal.duration_months);
+            totalDays = currentGoal.duration_months * 30;
         }
-        return new Date() > end;
+
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Normalize to midnight
+
+        const diffMs = now.getTime() - start.getTime();
+        const daysPassed = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+        console.log(`[MyPage Expiry Check] Category: ${currentGoal.category}, DaysPassed: ${daysPassed}, TotalDays: ${totalDays}, Expired: ${daysPassed >= totalDays}`);
+
+        return daysPassed >= totalDays;
     };
 
     const handleSaveMainGoal = async (isNewChallenge = false) => {
@@ -902,9 +935,31 @@ export default function MyPage() {
                                     const has = hasGoal(cat as GoalCategory);
                                     const seqLabel = (has && g.seq && g.seq > 1) ? ` (${t.challengeCount.replace('{n}', String(g.seq))})` : '';
 
+                                    // Check if this specific goal is expired
+                                    let isExpired = false;
+                                    if (has && g.created_at) {
+                                        const start = new Date(g.created_at);
+                                        start.setHours(0, 0, 0, 0);
+                                        const now = new Date();
+                                        now.setHours(0, 0, 0, 0);
+                                        let totalDays = 0;
+                                        if (cat.toLowerCase() === 'funplay') {
+                                            totalDays = 7;
+                                        } else if (g.duration_months < 1) {
+                                            totalDays = g.duration_months === 0.25 ? 7 : g.duration_months === 0.5 ? 14 : Math.round(g.duration_months * 30);
+                                        } else {
+                                            totalDays = g.duration_months * 30;
+                                        }
+                                        const diffMs = now.getTime() - start.getTime();
+                                        const daysPassed = Math.round(diffMs / (1000 * 60 * 60 * 24));
+                                        isExpired = daysPassed >= totalDays;
+                                    }
+
+                                    const prefix = has ? (isExpired ? '⏰ ' : '✔ ') : '';
+
                                     return (
                                         <option key={cat} value={cat} className="bg-slate-800 text-white capitalize">
-                                            {(has ? '✔ ' : '') + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel}
+                                            {prefix + `[${cat.charAt(0).toUpperCase() + cat.slice(1)}] ` + t[cat as GoalCategory] + seqLabel + (isExpired ? ` - ${t.expired || 'Expired'}` : '')}
                                         </option>
                                     );
                                 })}
@@ -942,18 +997,40 @@ export default function MyPage() {
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-lg font-bold capitalize text-primary flex items-center gap-2">
                                 {t[selectedCategory as GoalCategory]} {t.plan}
-                                {currentGoal.seq && currentGoal.seq > 1 && (
+                                {/* Show next seq (#3) if expired and editing, else show current seq */}
+                                {isEditing && isGoalExpired() ? (
+                                    <span className="text-[10px] bg-accent/20 px-2 py-0.5 rounded-full text-accent">#{(currentGoal.seq || 1) + 1}</span>
+                                ) : currentGoal.seq && currentGoal.seq > 1 && (
                                     <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white">#{currentGoal.seq}</span>
                                 )}
                             </h3>
                             <div className="flex items-center gap-2">
-                                {currentGoal.created_at && (
+                                {currentGoal.created_at && !isGoalExpired() && (
                                     <span className="text-[10px] text-slate-500">
                                         {t.started}: {new Date(currentGoal.created_at).toLocaleDateString()}
                                     </span>
                                 )}
+                                {isGoalExpired() && (
+                                    <span className="text-[10px] text-amber-400 font-bold">
+                                        ⏰ {t.expired || 'Expired'}
+                                    </span>
+                                )}
                                 <button
-                                    onClick={() => setIsEditing(!isEditing)}
+                                    onClick={() => {
+                                        const willEdit = !isEditing;
+                                        setIsEditing(willEdit);
+                                        // If entering edit mode on expired goal, reset form for new challenge
+                                        if (willEdit && isGoalExpired()) {
+                                            setGoals(prev => ({
+                                                ...prev,
+                                                [selectedCategory]: {
+                                                    ...INITIAL_GOALS[selectedCategory as GoalCategory],
+                                                    seq: (currentGoal.seq || 1) + 1, // Increment sequence
+                                                    category: selectedCategory,
+                                                }
+                                            }));
+                                        }
+                                    }}
                                     className={`text-xs px-2 py-1 rounded-lg transition-colors font-bold ${isEditing ? 'bg-primary text-black' : 'text-primary hover:bg-primary/10'}`}
                                 >
                                     {isEditing ? t.editing : t.viewOnly}
@@ -1276,6 +1353,37 @@ export default function MyPage() {
                                             </select>
                                         </div>
                                     </div>
+
+                                    {/* Daily Notification */}
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.dailyNotification}</label>
+                                        <div className="flex items-center gap-3 bg-white/5 p-3 rounded-xl border border-white/5">
+                                            <Bell size={16} className="text-primary" />
+                                            <div className="flex-1">
+                                                <p className="font-bold text-white text-sm">{t.notificationTime}</p>
+                                            </div>
+                                            <input
+                                                type="time"
+                                                value={notificationTime}
+                                                onChange={(e) => setNotificationTime(e.target.value)}
+                                                className="bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-white text-sm focus:outline-none focus:border-primary"
+                                            />
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                const success = await notificationManager.scheduleDailyNotification(
+                                                    new Date().getHours(),
+                                                    new Date().getMinutes() + 1
+                                                );
+                                                if (success) alert('Test notification scheduled for 1 minute from now!');
+                                            }}
+                                            className="text-[10px] text-slate-500 mt-1 hover:text-white underline"
+                                        >
+                                            {t.testNotification} (Set 1 min later)
+                                        </button>
+                                    </div>
+
+                                    <div className="h-px bg-white/10 my-1" />
 
                                     {/* Backup Contact */}
                                     <div>

@@ -51,20 +51,45 @@ serve(async (req: Request) => {
 
         // --- Logic: FunPlay ---
         else if (type === 'funplay') {
-            const { options, language, excludedKeywords, userProfile, recentMissions } = payload;
+            const { options, language, excludedKeywords, userProfile, recentMissions, randomSeed } = payload;
 
             const systemPrompt = `
-            Role: FunPlay Engine. Priority: FUN, WHIMSY. 
-            BAN: Self-improvement, Productivity, "Useful" advice. 
-            Rule: If it feels like work, reject. If it feels like a game, accept.
-            History (3 Days): ${recentMissions || "None"}
+            Role: Ultimate Game Master Engine. Priority: UNEXPECTEDNESS, NOVELTY.
+            The 5 Fun Archetypes (Rotate these):
+            Stealth/Spy: Actions done secretly without being noticed by others.
+            Physical/Challenge: Mini-dexterity or balance tasks (using body parts in weird ways).
+            Absurdity/Surreal: Doing something completely illogical or acting out a character.
+            Observation/Hunter: Finding very specific visual patterns or objects in the environment.
+            Speed/Reflex: Tasks that must be done instantly or within a tight count.
+
+            Negative Constraints:
+            NO standard exercises (e.g., "Do a squat").
+            NO generic advice (e.g., "Smile at someone").
+            NO "Look at the sky/tree" unless it has a twist.
+
+            History Logic:
+            Analyze History. If the last mission was "Physical", strictly AVOID "Physical" today.
+            Pick a contrasting Archetype from yesterday.
             `;
 
             const userPrompt = `
             User: ${userProfile?.age || 25}y ${userProfile?.gender || 'adult'}. 
             Req: Diff ${options.difficulty}, Time ${options.time_limit}s, Place ${options.place}, Mood ${options.mood}.
+            History (3 Days): ${recentMissions || "None"}
             Excludes: ${excludedKeywords?.join(', ')}. Language: ${language === 'ko' ? 'Korean' : 'English'}.
-            Output JSON: { "category": "funplay", "content": "1-2 short sentences", "verification_type": "checkbox", "reasoning": { "expected_impact": "1 short sentence" } }
+            Random Seed: ${randomSeed} (Use this to diverge from common patterns)
+
+            **Task:**
+            Generate 1 FunPlay mission based on a **randomly selected Archetype** different from History.
+            Apply a **"Twist Modifier"** (e.g., "Use non-dominant hand", "Hold breath", "Do it in slow motion", "While making a specific face").
+
+            Output JSON: { 
+              "category": "funplay",
+              "archetype": "{Selected Archetype}", 
+              "content": "Mission instruction with the twist included (1-2 sentences)", 
+              "verification_type": "checkbox", 
+              "reasoning": { "expected_impact": "Why this is fun (1 short sentence)" } 
+            }
             `;
 
             body.messages = [

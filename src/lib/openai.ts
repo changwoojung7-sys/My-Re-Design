@@ -96,11 +96,14 @@ export async function generateFunPlayMission(
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
     const { data: recentMissionsData } = await supabase
         .from('missions')
-        .select('content, category, date')
+        .select('content, category, date, details')
         .eq('user_id', _userProfile.id)
         .gte('date', threeDaysAgo.toISOString().split('T')[0]);
 
-    const recentMissions = recentMissionsData?.map(m => `[${m.category}] ${m.content} (${m.date})`).join('\n') || "";
+    const recentMissions = recentMissionsData?.map(m => {
+        const archetype = m.details?.archetype ? ` (Archetype: ${m.details.archetype})` : '';
+        return `[${m.category}] ${m.content}${archetype} (${m.date})`;
+    }).join('\n') || "";
 
     try {
         const { data, error } = await supabase.functions.invoke('generate-mission', {
@@ -111,7 +114,8 @@ export async function generateFunPlayMission(
                     options,
                     language,
                     excludedKeywords,
-                    recentMissions
+                    recentMissions,
+                    randomSeed: Math.random() // Force variety
                 }
             }
         });

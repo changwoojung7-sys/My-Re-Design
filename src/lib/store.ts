@@ -13,6 +13,7 @@ interface User {
     custom_free_trial_days?: number;
     full_name?: string;
     phone?: string;
+    notification_time?: string; // HH:mm format
     // Profile Image
     profile_image_url?: string;
     // Keeping legacy for compatibility if needed, but prefer top-level

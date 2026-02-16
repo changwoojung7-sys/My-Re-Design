@@ -12,6 +12,45 @@ import PaywallWarning from './PaywallWarning';
 import AdWarning from './AdWarning';
 import RewardAd from '../../components/ads/RewardAd';
 
+// --- Helper: Check Goal Expiry (Module Level) ---
+const isGoalExpired = (goal: any) => {
+    if (!goal || !goal.created_at) return false;
+
+    // Funplay: 1 week (approx 7 days)
+    // Others: duration_months * 30
+    const durationMonths = goal.duration_months || 1;
+    let totalDays = 0;
+
+    // 🚨 Force FunPlay to 7 days regardless of DB value
+    if (goal.category?.toLowerCase() === 'funplay') {
+        totalDays = 7;
+    } else if (durationMonths < 1) {
+        // 0.25 = 1 week = 7 days
+        // 0.5 = 2 weeks = 14 days
+        totalDays = durationMonths === 0.25 ? 7 : durationMonths === 0.5 ? 14 : Math.round(durationMonths * 30);
+    } else {
+        totalDays = durationMonths * 30;
+    }
+
+    const start = new Date(goal.created_at);
+    if (isNaN(start.getTime())) return false;
+
+    // Normalization: Set both to Midnight Local Time to compare Calendar Days
+    start.setHours(0, 0, 0, 0);
+
+    const now = new Date();
+    // Use local time for 'Now'
+    now.setHours(0, 0, 0, 0);
+
+    // Calculate Calendar Days Passed
+    const diffMs = now.getTime() - start.getTime();
+    const daysPassed = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    console.log(`[Expiry Check] Goal: ${goal.category}, DaysPassed: ${daysPassed}, TotalDays: ${totalDays}, Expired: ${daysPassed >= totalDays}`);
+
+    return daysPassed >= totalDays;
+};
+
 export default function Today() {
     const { user, missions, setMissions } = useStore();
     const { language, t } = useLanguage();
@@ -42,17 +81,104 @@ export default function Today() {
     const [refreshCount, setRefreshCount] = useState(0);
     const [showChallengeComplete, setShowChallengeComplete] = useState(false);
 
+    // Monetization & Trial State
+    const [accountAgeDays, setAccountAgeDays] = useState<number>(0);
+    const [trialPhase, setTrialPhase] = useState<1 | 2 | 3 | 4>(1);
+    const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
+    const [isAdUnlocked, setIsAdUnlocked] = useState(false); // Session-based Unlock
+    const [showRewardAd, setShowRewardAd] = useState(false);
+    const [adSlotId, setAdSlotId] = useState<string | undefined>(undefined);
+    const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+    const [checkingSubs, setCheckingSubs] = useState(true);
+
     // Derived State
     const selectedGoal = userGoals.find(g => g.id === selectedGoalId);
 
     // Initial Fetch
+    // Moved Monetization State & Check here to prevent RefError
+
+
+    // Initial Check
+    useEffect(() => {
+        const checkStatus = async () => {
+            setCheckingSubs(true);
+
+            // 1. Calculate Trial Phase (Based on SELECTED GOAL)
+            let startDate = new Date();
+            if (selectedGoal?.created_at) {
+                startDate = new Date(selectedGoal.created_at);
+            } else if (user) {
+                // Fallback (e.g. no goal selected yet, or loading)
+                const { data: profile } = await supabase.from('profiles').select('created_at').eq('id', user.id).single();
+                if (profile?.created_at) {
+                    startDate = new Date(profile.created_at);
+                }
+            }
+
+            // Calculate Days
+            const now = new Date();
+            const diffTime = Math.abs(now.getTime() - startDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            setAccountAgeDays(diffDays);
+
+            // Determine Phase
+            if (diffDays <= 7) setTrialPhase(1);
+            else if (diffDays <= 21) setTrialPhase(2);
+            else if (diffDays <= 30) setTrialPhase(3);
+            else setTrialPhase(4);
+
+            // 2. Fetch Settings
+            const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
+            if (slotData?.value) setAdSlotId(slotData.value);
+
+            const { data: modeData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_mode').single();
+            if (modeData?.value) setPaywallMode(modeData.value as 'subscription' | 'ads');
+
+            // 3. Check Subscription
+            if (user) {
+                const { data: subData } = await supabase
+                    .from('subscriptions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('status', 'active');
+
+                let hasSub = false;
+                if (subData && subData.length > 0) {
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+
+                    const active = subData.find(s => {
+                        const sStart = new Date(s.start_date);
+                        sStart.setHours(0, 0, 0, 0);
+                        const sEnd = new Date(s.end_date);
+                        sEnd.setHours(23, 59, 59, 999);
+
+                        if (sStart > now || sEnd < now) return false;
+
+                        // Check Type/Target
+                        if (s.type === 'all') return true;
+
+                        const targetMatch = s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase();
+                        return s.type === 'mission' && targetMatch;
+                    });
+
+                    if (active) hasSub = true;
+                }
+                setHasActiveSubscription(hasSub);
+            }
+            setCheckingSubs(false);
+        };
+        checkStatus();
+    }, [user, selectedGoal?.category]);
+
     useEffect(() => {
         if (user) initData();
     }, [user]);
 
     // Rerun fetch when Date or Goal changes
+    // Rerun fetch when Date or Goal changes
     useEffect(() => {
-        if (user && selectedGoalId) {
+        if (user && selectedGoalId && !checkingSubs) {
             // Load refresh count from local storage
             const key = `refresh_${user.id}_${selectedGoalId}_${selectedDate}`;
             const saved = localStorage.getItem(key);
@@ -74,7 +200,7 @@ export default function Today() {
 
             fetchMissions();
         }
-    }, [selectedDate, selectedGoalId]);
+    }, [selectedDate, selectedGoalId, checkingSubs]);
 
     const initData = async () => {
         setLoading(true);
@@ -107,7 +233,11 @@ export default function Today() {
         }
 
         // Filter out completed goals (Handle NULL as active)
-        const rawActiveGoals = goals.filter(g => g.is_completed !== true);
+        // AND Filter out EXPIRED goals (Time-based)
+        const rawActiveGoals = goals.filter(g => {
+            if (g.is_completed) return false;
+            return !isGoalExpired(g);
+        });
 
         if (rawActiveGoals.length === 0) {
             setUserGoals([]);
@@ -640,6 +770,8 @@ export default function Today() {
     const isPastEmpty = missions.length === 0 && draftMissions.length === 0 && selectedDate < formatLocalYMD(new Date());
     const activeList = isPreview ? draftMissions : missions;
 
+
+
     // --- Monetization & 3-Stage Trial Logic ---
     const currentDayNum = getSelectedDayNum();
 
@@ -649,88 +781,7 @@ export default function Today() {
     // 22~30: Phase 3 (Decision - 1 Mission Limit, Ads for History/Refresh)
     // 31+: Phase 4 (Paywall Active)
 
-    const [accountAgeDays, setAccountAgeDays] = useState<number>(0);
-    const [trialPhase, setTrialPhase] = useState<1 | 2 | 3 | 4>(1);
 
-    const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
-    const [isAdUnlocked, setIsAdUnlocked] = useState(false); // Session-based Unlock
-    const [showRewardAd, setShowRewardAd] = useState(false);
-    const [adSlotId, setAdSlotId] = useState<string | undefined>(undefined);
-    const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
-    const [checkingSubs, setCheckingSubs] = useState(true);
-
-    // Initial Check
-    useEffect(() => {
-        const checkStatus = async () => {
-            setCheckingSubs(true);
-
-            // 1. Calculate Trial Phase (Based on SELECTED GOAL)
-            let startDate = new Date();
-            if (selectedGoal?.created_at) {
-                startDate = new Date(selectedGoal.created_at);
-            } else if (user) {
-                // Fallback (e.g. no goal selected yet, or loading)
-                const { data: profile } = await supabase.from('profiles').select('created_at').eq('id', user.id).single();
-                if (profile?.created_at) {
-                    startDate = new Date(profile.created_at);
-                }
-            }
-
-            // Calculate Days
-            const now = new Date();
-            const diffTime = Math.abs(now.getTime() - startDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-            setAccountAgeDays(diffDays);
-
-            // Determine Phase
-            if (diffDays <= 7) setTrialPhase(1);
-            else if (diffDays <= 21) setTrialPhase(2);
-            else if (diffDays <= 30) setTrialPhase(3);
-            else setTrialPhase(4);
-
-            // 2. Fetch Settings
-            const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
-            if (slotData?.value) setAdSlotId(slotData.value);
-
-            const { data: modeData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_mode').single();
-            if (modeData?.value) setPaywallMode(modeData.value as 'subscription' | 'ads');
-
-            // 3. Check Subscription
-            if (user) {
-                const { data: subData } = await supabase
-                    .from('subscriptions')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('status', 'active');
-
-                let hasSub = false;
-                if (subData && subData.length > 0) {
-                    const now = new Date();
-                    now.setHours(0, 0, 0, 0);
-
-                    const active = subData.find(s => {
-                        const sStart = new Date(s.start_date);
-                        sStart.setHours(0, 0, 0, 0);
-                        const sEnd = new Date(s.end_date);
-                        sEnd.setHours(23, 59, 59, 999);
-
-                        if (sStart > now || sEnd < now) return false;
-
-                        // Check Type/Target
-                        if (s.type === 'all') return true;
-
-                        const targetMatch = s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase();
-                        return s.type === 'mission' && targetMatch;
-                    });
-
-                    if (active) hasSub = true;
-                }
-                setHasActiveSubscription(hasSub);
-            }
-            setCheckingSubs(false);
-        };
-        checkStatus();
-    }, [user, selectedGoal?.category]);
 
     // Paywall Active Condition
     const isFunplay = selectedGoal?.category === 'funplay';
@@ -1058,7 +1109,7 @@ export default function Today() {
             {/* Mission List (Scrollable) */}
             <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 no-scrollbar overscroll-y-contain relative">
                 {/* Loading Overlay */}
-                {loading && (
+                {(loading || checkingSubs) && (
                     <div className="absolute inset-0 z-10 bg-slate-950/50 backdrop-blur-[2px] flex flex-col items-center justify-center animate-in fade-in duration-300">
                         <Sparkles className="mx-auto mb-3 text-primary animate-pulse" size={28} />
                         <p className="text-sm text-slate-400 font-medium animate-pulse">Designing your loop...</p>
