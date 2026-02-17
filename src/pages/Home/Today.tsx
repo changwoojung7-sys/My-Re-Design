@@ -22,10 +22,7 @@ const isGoalExpired = (goal: any) => {
     const durationMonths = goal.duration_months || 1;
     let totalDays = 0;
 
-    // 🚨 Force FunPlay to 7 days regardless of DB value
-    if (goal.category?.toLowerCase() === 'funplay') {
-        totalDays = 7;
-    } else if (durationMonths < 1) {
+    if (durationMonths < 1) {
         // 0.25 = 1 week = 7 days
         // 0.5 = 2 weeks = 14 days
         totalDays = durationMonths === 0.25 ? 7 : durationMonths === 0.5 ? 14 : Math.round(durationMonths * 30);
@@ -1096,9 +1093,9 @@ export default function Today() {
                 </div>
             )}
 
-            {/* Mission List (Scrollable) */}
-            <div className="space-y-3 flex-1 overflow-y-auto min-h-0 px-5 pb-24 no-scrollbar overscroll-y-contain relative">
-                {/* Loading Overlay */}
+            {/* Mission List Area (Wrapper for overlay positioning) */}
+            <div className="flex-1 min-h-0 relative">
+                {/* Loading Overlay - OUTSIDE scroll, covers visible area */}
                 <AnimatePresence>
                     {(loading || checkingSubs) && (
                         <motion.div
@@ -1113,282 +1110,286 @@ export default function Today() {
                     )}
                 </AnimatePresence>
 
-                {(
-                    <AnimatePresence>
-                        {activeList.map((mission) => {
-                            const isBeingVerified = verifyingId === mission.id;
+                {/* Mission List (Scrollable) */}
+                <div className="space-y-3 h-full overflow-y-auto px-5 pb-24 no-scrollbar overscroll-y-contain">
 
-                            return (
-                                <motion.div
-                                    key={mission.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className={`relative rounded-2xl border transition-all shadow-md overflow-hidden ${isPreview ? 'bg-white/5 border-dashed border-slate-600 opacity-90 p-4' :
-                                        mission.is_completed ? 'bg-slate-900/40 border-slate-800/50 p-4' : 'bg-gradient-to-br from-white/10 to-white/5 border-white/10'
-                                        }`}
-                                >
-                                    {/* Main Card Content */}
-                                    <div className={`${!isPreview && !mission.is_completed && !isBeingVerified ? 'p-4' : ''}`}>
-                                        <div className="flex items-start gap-4">
-                                            {/* Check Icon */}
-                                            <button
-                                                onClick={() => !isPreview && openVerify(mission)}
-                                                disabled={isPreview}
-                                                className={`mt-1 shrink-0 transition-all ${isPreview ? 'text-slate-600 cursor-default' :
-                                                    mission.is_completed ? 'text-green-500 hover:text-green-400' : 'text-slate-500 hover:text-white'
-                                                    }`}
-                                            >
-                                                {mission.is_completed ? <CheckCircle size={26} /> : <Circle size={26} />}
-                                            </button>
+                    {(
+                        <AnimatePresence>
+                            {activeList.map((mission) => {
+                                const isBeingVerified = verifyingId === mission.id;
 
-                                            <div className="flex-1 min-w-0">
-                                                {/* Header Row */}
-                                                <div className="flex justify-between items-start mb-1">
-                                                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/5">
-                                                        {mission.category}
-                                                    </span>
+                                return (
+                                    <motion.div
+                                        key={mission.id}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        className={`relative rounded-2xl border transition-all shadow-md overflow-hidden ${isPreview ? 'bg-white/5 border-dashed border-slate-600 opacity-90 p-4' :
+                                            mission.is_completed ? 'bg-slate-900/40 border-slate-800/50 p-4' : 'bg-gradient-to-br from-white/10 to-white/5 border-white/10'
+                                            }`}
+                                    >
+                                        {/* Main Card Content */}
+                                        <div className={`${!isPreview && !mission.is_completed && !isBeingVerified ? 'p-4' : ''}`}>
+                                            <div className="flex items-start gap-4">
+                                                {/* Check Icon */}
+                                                <button
+                                                    onClick={() => !isPreview && openVerify(mission)}
+                                                    disabled={isPreview}
+                                                    className={`mt-1 shrink-0 transition-all ${isPreview ? 'text-slate-600 cursor-default' :
+                                                        mission.is_completed ? 'text-green-500 hover:text-green-400' : 'text-slate-500 hover:text-white'
+                                                        }`}
+                                                >
+                                                    {mission.is_completed ? <CheckCircle size={26} /> : <Circle size={26} />}
+                                                </button>
 
-                                                    {/* Action Button (Verify/Check) */}
-                                                    {!isPreview && !mission.is_completed && !isBeingVerified && (
-                                                        <div
-                                                            onClick={() => openVerify(mission)}
-                                                            className="flex items-center gap-1.5 text-[10px] font-bold text-primary cursor-pointer hover:bg-primary/20 transition-all bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg shadow-sm"
-                                                        >
-                                                            {mission.verification_type === 'text' ? <PenTool size={14} /> : <Camera size={14} />}
-                                                            <span>{t.verify}</span>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    {/* Header Row */}
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-white/5">
+                                                            {mission.category}
+                                                        </span>
 
-                                                <h3 className="text-sm font-bold text-white mb-1 leading-snug">
-                                                    {mission.content}
-                                                </h3>
-
-                                                {/* PERSONALIZATION & INSIGHT UI */}
-                                                {!mission.is_completed && mission.reasoning && (
-                                                    <div className="mt-2 space-y-2">
-                                                        {/* 1. Decision Support via Trust Score */}
-                                                        {mission.trust_score && (
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                                <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
-                                                                    <div
-                                                                        className="h-full bg-accent"
-                                                                        style={{ width: `${mission.trust_score}%` }}
-                                                                    />
-                                                                </div>
-                                                                <span className="text-[10px] text-accent font-bold">{mission.trust_score}% Match</span>
-                                                            </div>
-                                                        )}
-
-                                                        {/* 2. Insight Badge (Why?) - Simplified & Fast */}
-                                                        {(typeof mission.reasoning === 'string' || mission.reasoning?.expected_impact) && (
-                                                            <div className="mt-3 relative group">
-                                                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/50 to-transparent rounded-l-xl" />
-                                                                <div className="p-3 pl-4 rounded-r-xl bg-white/5 border border-white/5 backdrop-blur-sm">
-                                                                    <div className="flex items-start gap-2.5">
-                                                                        <div className="mt-0.5 shrink-0 bg-primary/10 p-1 rounded-full">
-                                                                            <Lightbulb size={12} className="text-primary" />
-                                                                        </div>
-                                                                        <div className="space-y-1.5 min-w-0 flex-1">
-                                                                            <p className="text-xs text-slate-200 font-medium leading-relaxed">
-                                                                                {typeof mission.reasoning === 'string' ? mission.reasoning : mission.reasoning?.expected_impact}
-                                                                            </p>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
+                                                        {/* Action Button (Verify/Check) */}
+                                                        {!isPreview && !mission.is_completed && !isBeingVerified && (
+                                                            <div
+                                                                onClick={() => openVerify(mission)}
+                                                                className="flex items-center gap-1.5 text-[10px] font-bold text-primary cursor-pointer hover:bg-primary/20 transition-all bg-primary/10 border border-primary/20 px-3 py-1.5 rounded-lg shadow-sm"
+                                                            >
+                                                                {mission.verification_type === 'text' ? <PenTool size={14} /> : <Camera size={14} />}
+                                                                <span>{t.verify}</span>
                                                             </div>
                                                         )}
                                                     </div>
-                                                )}
 
-                                                {/* COMPLETED PROOF DISPLAY */}
-                                                {mission.is_completed && !isBeingVerified && (
-                                                    <div className="mt-3 relative group space-y-3">
-                                                        {/* 1. Text Proof */}
-                                                        {mission.proof_text && (
-                                                            <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5 text-sm text-slate-300 italic">
-                                                                " {mission.proof_text} "
-                                                            </div>
-                                                        )}
+                                                    <h3 className="text-sm font-bold text-white mb-1 leading-snug">
+                                                        {mission.content}
+                                                    </h3>
 
-                                                        {/* 2. Media Proof */}
-                                                        {mission.image_url && (
-                                                            <div>
-                                                                {mission.proof_type === 'video' || mission.image_url.endsWith('.mp4') ? (
-                                                                    <video src={mission.image_url} controls className="w-full h-32 object-cover rounded-xl border border-white/10" />
-                                                                ) : mission.proof_type === 'audio' || mission.image_url.endsWith('.mp3') ? (
-                                                                    <audio src={mission.image_url} controls className="w-full mt-2" />
-                                                                ) : (
-                                                                    <img src={mission.image_url} alt="Proof" className="w-full h-32 object-cover rounded-xl border border-white/10" />
-                                                                )}
-                                                            </div>
-                                                        )}
-
-                                                        {/* Edit Overlay (Visible on Hover/Touch) - Covers entire area? Or just append button? 
-                                                            Let's make it a floating action button or cover the media if exists.
-                                                            To avoid covering text, let's just make the whole container clickable or add an explicit Edit button.
-                                                            The original design had an overlay. Let's keep a subtle overlay if media exists, or just a button if only text.
-                                                        */}
-                                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                            <div className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/10 pointer-events-auto cursor-pointer shadow-xl" onClick={() => openVerify(mission)}>
-                                                                <PenTool size={12} />
-                                                                {t.edit || 'Edit'}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* VERIFICATION AREA (Expandable) */}
-                                    <AnimatePresence>
-                                        {isBeingVerified && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                className="bg-black/40 border-t border-white/5"
-                                            >
-                                                <div className="p-4">
-                                                    <div className="flex justify-between items-center mb-3">
-                                                        <div className="flex gap-2">
-                                                            <button
-                                                                onClick={() => setVerifyMode('media')}
-                                                                className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${verifyMode === 'media' ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
-                                                            >
-                                                                <Camera size={14} /> Photo/Video/Voice
-                                                            </button>
-                                                            <button
-                                                                onClick={() => setVerifyMode('text')}
-                                                                className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${verifyMode === 'text' ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
-                                                            >
-                                                                <PenTool size={14} /> Text
-                                                            </button>
-                                                        </div>
-                                                        <button onClick={() => setVerifyingId(null)} className="text-slate-500 hover:text-white">
-                                                            <X size={18} />
-                                                        </button>
-                                                    </div>
-
-                                                    {verifyMode === 'text' ? (
-                                                        <div className="space-y-3">
-                                                            <textarea
-                                                                value={textInput}
-                                                                onChange={(e) => setTextInput(e.target.value)}
-                                                                placeholder="Type your reflection or notes here..."
-                                                                className="w-full h-24 bg-slate-900/80 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-primary outline-none resize-none"
-                                                            />
-                                                            <button
-                                                                onClick={handleTextSubmit}
-                                                                disabled={!textInput.trim()}
-                                                                className="w-full py-3 bg-primary text-black font-bold rounded-xl text-sm hover:bg-primary/90 disabled:opacity-50"
-                                                            >
-                                                                Complete Mission
-                                                            </button>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="relative group">
-                                                            {/* If media exists, show preview with delete button */}
-                                                            {mission.image_url ? (
-                                                                <div className="relative">
-                                                                    {mission.proof_type === 'video' ? (
-                                                                        <video src={mission.image_url || undefined} controls className="w-full h-48 object-cover rounded-xl border border-white/10" />
-                                                                    ) : mission.proof_type === 'audio' ? (
-                                                                        <div className="w-full h-24 bg-slate-800 rounded-xl flex items-center justify-center border border-white/10">
-                                                                            <audio src={mission.image_url || undefined} controls className="w-full px-4" />
-                                                                        </div>
-                                                                    ) : (
-                                                                        <img src={mission.image_url || undefined} alt="Proof" className="w-full h-48 object-cover rounded-xl border border-white/10" />
-                                                                    )}
-
-                                                                    {/* Change/Delete Actions */}
-                                                                    <div className="absolute top-2 right-2 flex gap-2">
-                                                                        <button
-                                                                            onClick={triggerFileClick}
-                                                                            className="p-2 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors backdrop-blur-sm"
-                                                                            title="Replace"
-                                                                        >
-                                                                            <Camera size={16} />
-                                                                        </button>
-                                                                        <button
-                                                                            onClick={handleDeleteMedia}
-                                                                            className="p-2 bg-red-500/80 text-white rounded-full hover:bg-red-600 transition-colors backdrop-blur-sm"
-                                                                            title="Delete"
-                                                                        >
-                                                                            <X size={16} />
-                                                                        </button>
+                                                    {/* PERSONALIZATION & INSIGHT UI */}
+                                                    {!mission.is_completed && mission.reasoning && (
+                                                        <div className="mt-2 space-y-2">
+                                                            {/* 1. Decision Support via Trust Score */}
+                                                            {mission.trust_score && (
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    <div className="h-1.5 flex-1 bg-white/10 rounded-full overflow-hidden">
+                                                                        <div
+                                                                            className="h-full bg-accent"
+                                                                            style={{ width: `${mission.trust_score}%` }}
+                                                                        />
                                                                     </div>
+                                                                    <span className="text-[10px] text-accent font-bold">{mission.trust_score}% Match</span>
                                                                 </div>
-                                                            ) : (
-                                                                <div
-                                                                    onClick={triggerFileClick}
-                                                                    className="border-2 border-dashed border-white/20 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-white/5 transition-all group"
-                                                                >
-                                                                    <div className="flex gap-4 mb-2 text-slate-400 group-hover:text-primary transition-colors">
-                                                                        <Camera size={24} />
-                                                                        <Video size={24} />
-                                                                        <Mic size={24} />
+                                                            )}
+
+                                                            {/* 2. Insight Badge (Why?) - Simplified & Fast */}
+                                                            {(typeof mission.reasoning === 'string' || mission.reasoning?.expected_impact) && (
+                                                                <div className="mt-3 relative group">
+                                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-primary/50 to-transparent rounded-l-xl" />
+                                                                    <div className="p-3 pl-4 rounded-r-xl bg-white/5 border border-white/5 backdrop-blur-sm">
+                                                                        <div className="flex items-start gap-2.5">
+                                                                            <div className="mt-0.5 shrink-0 bg-primary/10 p-1 rounded-full">
+                                                                                <Lightbulb size={12} className="text-primary" />
+                                                                            </div>
+                                                                            <div className="space-y-1.5 min-w-0 flex-1">
+                                                                                <p className="text-xs text-slate-200 font-medium leading-relaxed">
+                                                                                    {typeof mission.reasoning === 'string' ? mission.reasoning : mission.reasoning?.expected_impact}
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
                                                                     </div>
-                                                                    <p className="text-sm font-medium text-slate-300">Tap to upload</p>
-                                                                    <p className="text-[10px] text-slate-500">Photo, Video, or Audio</p>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     )}
+
+                                                    {/* COMPLETED PROOF DISPLAY */}
+                                                    {mission.is_completed && !isBeingVerified && (
+                                                        <div className="mt-3 relative group space-y-3">
+                                                            {/* 1. Text Proof */}
+                                                            {mission.proof_text && (
+                                                                <div className="bg-slate-800/50 p-3 rounded-xl border border-white/5 text-sm text-slate-300 italic">
+                                                                    " {mission.proof_text} "
+                                                                </div>
+                                                            )}
+
+                                                            {/* 2. Media Proof */}
+                                                            {mission.image_url && (
+                                                                <div>
+                                                                    {mission.proof_type === 'video' || mission.image_url.endsWith('.mp4') ? (
+                                                                        <video src={mission.image_url} controls className="w-full h-32 object-cover rounded-xl border border-white/10" />
+                                                                    ) : mission.proof_type === 'audio' || mission.image_url.endsWith('.mp3') ? (
+                                                                        <audio src={mission.image_url} controls className="w-full mt-2" />
+                                                                    ) : (
+                                                                        <img src={mission.image_url} alt="Proof" className="w-full h-32 object-cover rounded-xl border border-white/10" />
+                                                                    )}
+                                                                </div>
+                                                            )}
+
+                                                            {/* Edit Overlay (Visible on Hover/Touch) - Covers entire area? Or just append button? 
+                                                            Let's make it a floating action button or cover the media if exists.
+                                                            To avoid covering text, let's just make the whole container clickable or add an explicit Edit button.
+                                                            The original design had an overlay. Let's keep a subtle overlay if media exists, or just a button if only text.
+                                                        */}
+                                                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                <div className="bg-slate-900/90 text-white text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-white/10 pointer-events-auto cursor-pointer shadow-xl" onClick={() => openVerify(mission)}>
+                                                                    <PenTool size={12} />
+                                                                    {t.edit || 'Edit'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </motion.div>
-                            );
-                        })}
-                    </AnimatePresence>
-                )}
+                                            </div>
+                                        </div>
 
-                {/* Empty State (Cheering Message) */}
-                {!loading && !isPreview && !isPastEmpty && activeList.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-10 animate-in fade-in slide-in-from-bottom-4">
-                        <div className="w-24 h-24 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-primary/10 relative">
-                            <Sparkles size={40} className="text-primary animate-pulse" />
-                            <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_10s_linear_infinite]" />
+                                        {/* VERIFICATION AREA (Expandable) */}
+                                        <AnimatePresence>
+                                            {isBeingVerified && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    exit={{ height: 0, opacity: 0 }}
+                                                    className="bg-black/40 border-t border-white/5"
+                                                >
+                                                    <div className="p-4">
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    onClick={() => setVerifyMode('media')}
+                                                                    className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${verifyMode === 'media' ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                                                                >
+                                                                    <Camera size={14} /> Photo/Video/Voice
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => setVerifyMode('text')}
+                                                                    className={`p-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${verifyMode === 'text' ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                                                                >
+                                                                    <PenTool size={14} /> Text
+                                                                </button>
+                                                            </div>
+                                                            <button onClick={() => setVerifyingId(null)} className="text-slate-500 hover:text-white">
+                                                                <X size={18} />
+                                                            </button>
+                                                        </div>
+
+                                                        {verifyMode === 'text' ? (
+                                                            <div className="space-y-3">
+                                                                <textarea
+                                                                    value={textInput}
+                                                                    onChange={(e) => setTextInput(e.target.value)}
+                                                                    placeholder="Type your reflection or notes here..."
+                                                                    className="w-full h-24 bg-slate-900/80 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-primary outline-none resize-none"
+                                                                />
+                                                                <button
+                                                                    onClick={handleTextSubmit}
+                                                                    disabled={!textInput.trim()}
+                                                                    className="w-full py-3 bg-primary text-black font-bold rounded-xl text-sm hover:bg-primary/90 disabled:opacity-50"
+                                                                >
+                                                                    Complete Mission
+                                                                </button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="relative group">
+                                                                {/* If media exists, show preview with delete button */}
+                                                                {mission.image_url ? (
+                                                                    <div className="relative">
+                                                                        {mission.proof_type === 'video' ? (
+                                                                            <video src={mission.image_url || undefined} controls className="w-full h-48 object-cover rounded-xl border border-white/10" />
+                                                                        ) : mission.proof_type === 'audio' ? (
+                                                                            <div className="w-full h-24 bg-slate-800 rounded-xl flex items-center justify-center border border-white/10">
+                                                                                <audio src={mission.image_url || undefined} controls className="w-full px-4" />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <img src={mission.image_url || undefined} alt="Proof" className="w-full h-48 object-cover rounded-xl border border-white/10" />
+                                                                        )}
+
+                                                                        {/* Change/Delete Actions */}
+                                                                        <div className="absolute top-2 right-2 flex gap-2">
+                                                                            <button
+                                                                                onClick={triggerFileClick}
+                                                                                className="p-2 bg-black/60 text-white rounded-full hover:bg-black/80 transition-colors backdrop-blur-sm"
+                                                                                title="Replace"
+                                                                            >
+                                                                                <Camera size={16} />
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={handleDeleteMedia}
+                                                                                className="p-2 bg-red-500/80 text-white rounded-full hover:bg-red-600 transition-colors backdrop-blur-sm"
+                                                                                title="Delete"
+                                                                            >
+                                                                                <X size={16} />
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div
+                                                                        onClick={triggerFileClick}
+                                                                        className="border-2 border-dashed border-white/20 rounded-xl p-8 flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 hover:bg-white/5 transition-all group"
+                                                                    >
+                                                                        <div className="flex gap-4 mb-2 text-slate-400 group-hover:text-primary transition-colors">
+                                                                            <Camera size={24} />
+                                                                            <Video size={24} />
+                                                                            <Mic size={24} />
+                                                                        </div>
+                                                                        <p className="text-sm font-medium text-slate-300">Tap to upload</p>
+                                                                        <p className="text-[10px] text-slate-500">Photo, Video, or Audio</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
+                    )}
+
+                    {/* Empty State (Cheering Message) */}
+                    {!loading && !isPreview && !isPastEmpty && activeList.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-10 animate-in fade-in slide-in-from-bottom-4">
+                            <div className="w-24 h-24 bg-gradient-to-tr from-primary/20 to-accent/20 rounded-full flex items-center justify-center mb-6 shadow-xl shadow-primary/10 relative">
+                                <Sparkles size={40} className="text-primary animate-pulse" />
+                                <div className="absolute inset-0 border border-white/10 rounded-full animate-[spin_10s_linear_infinite]" />
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-3">
+                                {userGoals.length === 0 ? t.emptyStateTitle : t.readyToStart}
+                            </h3>
+                            <p className="text-slate-400 mb-8 leading-relaxed whitespace-pre-wrap">
+                                {userGoals.length === 0 ? t.emptyStateDesc : "Press the button to generate your daily missions!"}
+                            </p>
+
+                            {userGoals.length === 0 ? (
+                                <button
+                                    onClick={() => navigate('/mypage')}
+                                    className="bg-white text-black font-bold px-8 py-4 rounded-2xl hover:bg-slate-200 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                                >
+                                    {t.createGoal} <ArrowRight size={18} />
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={handleRefresh}
+                                    className="bg-primary text-black font-bold px-8 py-4 rounded-2xl hover:bg-primary/90 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                                >
+                                    {t.generateNewMissions} <Sparkles size={18} />
+                                </button>
+                            )}
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-3">
-                            {userGoals.length === 0 ? t.emptyStateTitle : t.readyToStart}
-                        </h3>
-                        <p className="text-slate-400 mb-8 leading-relaxed whitespace-pre-wrap">
-                            {userGoals.length === 0 ? t.emptyStateDesc : "Press the button to generate your daily missions!"}
-                        </p>
+                    )}
 
-                        {userGoals.length === 0 ? (
-                            <button
-                                onClick={() => navigate('/mypage')}
-                                className="bg-white text-black font-bold px-8 py-4 rounded-2xl hover:bg-slate-200 transition-all shadow-lg active:scale-95 flex items-center gap-2"
-                            >
-                                {t.createGoal} <ArrowRight size={18} />
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleRefresh}
-                                className="bg-primary text-black font-bold px-8 py-4 rounded-2xl hover:bg-primary/90 transition-all shadow-lg active:scale-95 flex items-center gap-2"
-                            >
-                                {t.generateNewMissions} <Sparkles size={18} />
-                            </button>
-                        )}
-                    </div>
-                )}
-
-                {/* Loop Closed Celebration */}
-                {!loading && !isPreview && activeList.length > 0 && activeList.every(m => m.is_completed) && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-6 p-4 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-2xl text-center shrink-0"
-                    >
-                        <p className="text-white font-bold text-sm">✨ Loop Closed!</p>
-                    </motion.div>
-                )}
+                    {/* Loop Closed Celebration */}
+                    {!loading && !isPreview && activeList.length > 0 && activeList.every(m => m.is_completed) && (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="mt-6 p-4 bg-gradient-to-r from-primary/20 to-accent/20 border border-primary/30 rounded-2xl text-center shrink-0"
+                        >
+                            <p className="text-white font-bold text-sm">✨ Loop Closed!</p>
+                        </motion.div>
+                    )}
+                </div>
             </div>
-        </div >
+        </div>
     );
 }

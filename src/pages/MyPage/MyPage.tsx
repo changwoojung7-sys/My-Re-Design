@@ -643,10 +643,7 @@ export default function MyPage() {
 
         let totalDays = 0;
 
-        // Force FunPlay to 7 days
-        if (currentGoal.category?.toLowerCase() === 'funplay') {
-            totalDays = 7;
-        } else if (currentGoal.duration_months < 1) {
+        if (currentGoal.duration_months < 1) {
             // Week handling: 0.25 = 1 week (7 days), 0.5 = 2 weeks (14 days)
             totalDays = currentGoal.duration_months === 0.25 ? 7 :
                 currentGoal.duration_months === 0.5 ? 14 :
@@ -737,9 +734,7 @@ export default function MyPage() {
         const now = new Date();
         now.setHours(0, 0, 0, 0);
         let totalDays = 0;
-        if (g.category?.toLowerCase() === 'funplay') {
-            totalDays = 7;
-        } else if (g.duration_months < 1) {
+        if (g.duration_months < 1) {
             totalDays = g.duration_months === 0.25 ? 7 : g.duration_months === 0.5 ? 14 : Math.round(g.duration_months * 30);
         } else {
             totalDays = (g.duration_months || 1) * 30;
