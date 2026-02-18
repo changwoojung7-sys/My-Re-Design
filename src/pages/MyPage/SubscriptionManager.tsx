@@ -268,6 +268,42 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
         setLoading(true);
 
+        // Create Pending Payment Record ID
+        const paymentId = mode === 'real' ? `pay_${new Date().getTime()}` : undefined;
+        const merchantUid = mode === 'real' ? undefined : `mid_${new Date().getTime()}`;
+
+        try {
+            // Save Pending Payment to DB to prevent Session Loss on Redirect
+            const { error: pendingError } = await supabase.from('payments').insert({
+                user_id: user.id,
+                amount: tier.price,
+                plan_type: `${activeTab}_${tier.months}mo`,
+                duration_months: tier.months,
+                target_id: activeTab === 'mission' ? selectedCategory : null,
+                status: 'pending',
+                merchant_uid: merchantUid || paymentId, // Use paymentId as merchant_uid for V2 if needed, or store in imp_uid? 
+                // Context says: V1 uses imp_uid (from PG) and merchant_uid (our ID). 
+                // V2 uses paymentId. 
+                // Our schema has imp_uid and merchant_uid.
+                // For V2, let's store paymentId in imp_uid for consistency in lookup, or use merchant_uid?
+                // V2 paymentId is basically the ID we generate.
+                imp_uid: mode === 'real' ? paymentId : undefined, // Store generated key for V2 lookup
+                coverage_start_date: startDate.toISOString(),
+                coverage_end_date: endDate.toISOString()
+            });
+
+            if (pendingError) {
+                console.error('Failed to create pending payment', pendingError);
+                // We continue? Or stop? 
+                // If we stop, we prevent payment. Safer.
+                throw new Error('Payment initialization failed. Please try again.');
+            }
+        } catch (e: any) {
+            alert(e.message);
+            setLoading(false);
+            return;
+        }
+
         // Call PortOne Payment
         if (mode === 'real') {
             // --- PortOne V2 (Real) ---
@@ -281,10 +317,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
             const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
 
-            const paymentId = `pay_${new Date().getTime()}`;
-
-            // Save state for Mobile Redirect (V2)
-            // Even though we await, mobile might redirect page.
+            // Save state for Mobile Redirect (V2) - Keep LocalStorage as Backup
             const saveState = {
                 mode,
                 tier,
@@ -299,7 +332,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                 const response = await window.PortOne.requestPayment({
                     storeId: PORTONE_V2_STORE_ID,
                     channelKey: PORTONE_V2_CHANNEL_KEY,
-                    paymentId: paymentId,
+                    paymentId: paymentId!, // Use generated ID
                     orderName: `MyReDesign Premium - ${targetLabel} (${tier.label})`,
                     totalAmount: tier.price,
                     currency: "CURRENCY_KRW",
@@ -313,8 +346,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                 });
 
                 if (response.code != null) {
-                    // Error occurred (PortOne V2 returns code on error, or throws?)
-                    // V2 logic: response is object. if code exists, it's error.
+                    // Error occurred
                     alert(`Payment Failed: ${response.message}`);
                     setLoading(false);
                     return;
@@ -349,8 +381,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         } else {
             // --- PortOne V1 (Test/Classic) ---
 
-            // Save state for Mobile Redirect (if it happens)
-            // We need to save simplified state because dates won't survive JSON
+            // Save state for Mobile Redirect (V1)
             const saveState = {
                 mode,
                 tier,
@@ -364,7 +395,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             IMP.request_pay({
                 pg: 'html5_inicis', // PG Provider
                 pay_method: 'card',
-                merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
+                merchant_uid: merchantUid!, // Use generated ID
                 name: `MyReDesign Premium - ${targetLabel} (${tier.label})`,
                 amount: tier.price,
                 buyer_email: user.email,
@@ -391,8 +422,6 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                         alert(t.subscriptionFailed.replace('{error}', result.error || 'Unknown error'));
                     }
                 } else {
-                    // Only failure comes here in PC. Mobile redirect doesn't trigger this callback usually if redirected.
-                    // But if it fails instantly (e.g. user cancel), it might.
                     localStorage.removeItem('pending_payment');
                     alert(`Payment Failed: ${rsp.error_msg}`);
                 }

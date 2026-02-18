@@ -42,20 +42,46 @@ export const processPaymentSuccess = async (
         if (verifyData?.error) throw new Error(verifyData.error);
 
         // 2. Record Payment
-        const { error: payError } = await supabase
+        // Check if there is a pending payment to update
+        let existingId: string | null = null;
+
+        const lookupValue = merchantUid || paymentIdOrImpUid;
+        const { data: existing } = await supabase
             .from('payments')
-            .insert({
-                user_id: (await supabase.auth.getUser()).data.user?.id,
-                amount: tier.price,
-                plan_type: `${planType}_${tier.months}mo`,
-                duration_months: tier.months,
-                target_id: targetCategory,
-                status: 'paid',
-                merchant_uid: merchantUid || paymentIdOrImpUid,
-                imp_uid: paymentIdOrImpUid,
-                coverage_start_date: startDate.toISOString(),
-                coverage_end_date: endDate.toISOString()
-            });
+            .select('id')
+            .or(`merchant_uid.eq.${lookupValue},imp_uid.eq.${lookupValue}`)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (existing) existingId = existing.id;
+
+        const paymentData = {
+            user_id: (await supabase.auth.getUser()).data.user?.id,
+            amount: tier.price,
+            plan_type: `${planType}_${tier.months}mo`,
+            duration_months: tier.months,
+            target_id: targetCategory,
+            status: 'paid',
+            merchant_uid: merchantUid || paymentIdOrImpUid,
+            imp_uid: paymentIdOrImpUid,
+            coverage_start_date: startDate.toISOString(),
+            coverage_end_date: endDate.toISOString()
+        };
+
+        let payError;
+        if (existingId) {
+            const { error } = await supabase
+                .from('payments')
+                .update(paymentData)
+                .eq('id', existingId);
+            payError = error;
+        } else {
+            const { error } = await supabase
+                .from('payments')
+                .insert(paymentData);
+            payError = error;
+        }
 
         if (payError) throw payError;
 
@@ -102,7 +128,7 @@ export const checkMobilePaymentResult = async () => {
 
     // V2 Params (PortOne V2)
     const paymentId = urlParams.get('paymentId');
-    const code = urlParams.get('code'); // If present, might be error or just status? Docs say code!=null on error usually
+    const code = urlParams.get('code');
     const message = urlParams.get('message');
 
     // Case 1: V1 Failure
@@ -110,40 +136,69 @@ export const checkMobilePaymentResult = async () => {
         return { success: false, error: error_msg || 'Mobile payment failed' };
     }
 
-    // Case 2: V2 Failure (If code is present and indicates error)
+    // Case 2: V2 Failure
     if (code && code !== 'FAILURE_TYPE_PG') {
-        // Note: Sometimes code is present even on success? PortOne docs vary. 
-        // Usually if paymentId is present, we should verify. 
-        // If message describes a failure, we should return error.
-        // But safer to try verification if paymentId is there.
         if (!paymentId) {
             return { success: false, error: message || `Payment Failed (${code})` };
         }
     }
 
     // Case 3: Success (V1 or V2)
-    const targetId = paymentId || imp_uid; // Payment ID (imp_uid for V1, paymentId for V2)
+    const targetId = paymentId || imp_uid || merchant_uid;
 
     if (targetId) {
-        // IMPORTANT: We need to reconstruct the plan details from localStorage
-        // Since mobile redirect loses state, we should have saved the pending payment intent
+        // Attempt to recover state from LocalStorage first
+        let paymentData: any = null;
         const pendingPayment = localStorage.getItem('pending_payment');
-        if (pendingPayment) {
-            const paymentData = JSON.parse(pendingPayment);
-            localStorage.removeItem('pending_payment'); // Clear immediately
 
-            // Now call process
+        if (pendingPayment) {
+            paymentData = JSON.parse(pendingPayment);
+            localStorage.removeItem('pending_payment');
+        } else {
+            // Fallback: Recover from DB (Session persistence)
+            console.log('Attempting to recover session from DB for:', targetId);
+            const { data: pendingRecord } = await supabase
+                .from('payments')
+                .select('*')
+                .or(`merchant_uid.eq.${targetId},imp_uid.eq.${targetId}`)
+                .eq('status', 'pending')
+                .maybeSingle();
+
+            if (pendingRecord) {
+                // Reconstruct data
+                const [typeStr, durationStr] = pendingRecord.plan_type.split('_');
+                // typeStr: 'mission' or 'all'
+                // durationStr: '1mo', '3mo' -> parse int
+                const duration = parseInt(durationStr);
+
+                paymentData = {
+                    mode: targetId.startsWith('pay_') ? 'real' : 'test', // Auto-detect mode
+                    tier: {
+                        months: duration,
+                        price: pendingRecord.amount,
+                        label: `${duration} Months` // Approx label
+                    },
+                    planType: typeStr as 'mission' | 'all',
+                    targetCategory: pendingRecord.target_id,
+                    startDate: pendingRecord.coverage_start_date,
+                    endDate: pendingRecord.coverage_end_date
+                };
+            }
+        }
+
+        if (paymentData) {
             return await processPaymentSuccess(
                 targetId,
                 paymentData.mode,
                 paymentData.tier,
                 paymentData.planType,
                 paymentData.targetCategory,
-                new Date(paymentData.startDate), // Restore Date objects
+                new Date(paymentData.startDate),
                 new Date(paymentData.endDate),
-                merchant_uid || undefined // Optional for V2, required for V1 if verifying by merchant_uid (but we use imp_uid usually)
+                merchant_uid || undefined
             );
         }
+
         return { success: false, error: 'Session lost during redirect. Please check your page.' };
     }
 

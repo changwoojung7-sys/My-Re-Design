@@ -292,13 +292,26 @@
 - `window.PortOne.requestPayment()` → CURRENCY_KRW / CARD
 - Store ID: `store-25bcb4a5-...`
 - Channel Key: `channel-key-eeaefe66-...`
+- **모바일 리다이렉트 처리**:
+  - 모바일 환경에서는 PG사 페이지로 이동 후 돌아올 때 `redirectUrl` (`window.location.href`)로 복귀
+  - **State Preservation**: 리다이렉트 시 상태 유실 방지를 위해 `localStorage`에 `pending_payment` 저장
+  - 복귀 시 `checkMobilePaymentResult`가 URL의 `paymentId` 또는 `imp_uid`를 감지하여 결제 완료 처리
+  - 성공 시 `pending_payment` 삭제
 
-#### 결제 흐름
-1. 결제 요청 (PortOne V1 또는 V2)
-2. 서버 검증: `verify-payment` Edge Function 호출
-3. `payments` 테이블 INSERT (금액, 기간, imp_uid 등)
-4. `subscriptions` 테이블 INSERT (type:mission/all, start_date, end_date)
-5. (Paywall 전용) `profiles.subscription_tier` = 'premium' 업데이트
+#### 결제 흐름 (Unified Logic: `src/lib/payment.ts`)
+1. **결제 요청**:
+   - V1: `IMP.request_pay()` (Test Mode)
+   - V2: `PortOne.requestPayment()` (Real Mode) + `redirectUrl` 설정
+2. **결제 결과 처리 (`processPaymentSuccess`)**:
+   - PC: 콜백 함수에서 즉시 호출
+   - Mobile: 리다이렉트 후 `checkMobilePaymentResult`에서 호출
+3. **서버 검증 (`verify-payment`)**:
+   - PortOne API를 통해 위변조 여부 확인 (V1/V2 자동 분기)
+   - 실패 시 `alert`로 상세 에러 메시지 표시
+4. **데이터 저장**:
+   - `payments` 테이블 INSERT (status: 'paid')
+   - `subscriptions` 테이블 INSERT (status: 'active')
+5. **(Paywall 전용)**: `profiles.subscription_tier` = 'premium' 업데이트
 
 #### 구독 연장
 - 기존 활성 구독이 있으면 `end_date` 이후부터 연장 시작
