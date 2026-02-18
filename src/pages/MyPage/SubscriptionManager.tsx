@@ -7,6 +7,8 @@ import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
 import SupportModal from '../../components/layout/SupportModal';
 
+import { processPaymentSuccess, checkMobilePaymentResult } from '../../lib/payment';
+
 declare global {
     interface Window {
         IMP: any;
@@ -184,27 +186,25 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         });
     })();
 
-    // PortOne Setup (V1 & V2)
+    // PortOne Scrips are now loaded in index.html exclusively
+    // No dynamic loading here to prevent duplicates
+
+    // Check for Mobile Payment Redirect Result on Mount
     useEffect(() => {
-        // V1
-        const jquery = document.createElement("script");
-        jquery.src = "https://code.jquery.com/jquery-1.12.4.min.js";
-        const iamport = document.createElement("script");
-        iamport.src = "https://cdn.iamport.kr/js/iamport.payment-1.2.0.js";
-
-        // V2
-        const portoneV2 = document.createElement("script");
-        portoneV2.src = "https://cdn.portone.io/v2/browser-sdk.js";
-
-        document.head.appendChild(jquery);
-        document.head.appendChild(iamport);
-        document.head.appendChild(portoneV2);
-
-        return () => {
-            document.head.removeChild(jquery);
-            document.head.removeChild(iamport);
-            document.head.removeChild(portoneV2);
+        const checkMobileResult = async () => {
+            const result = await checkMobilePaymentResult();
+            if (result) {
+                if (result.success) {
+                    alert(t.subscriptionSuccessful);
+                    await fetchData();
+                    // Optional: Clear strict mode query params using history.replaceState if desired
+                } else {
+                    alert(t.subscriptionFailed.replace('{error}', result.error || 'Unknown error'));
+                }
+                // Ensure loading is false (though it defaults to false on fresh load)
+            }
         };
+        checkMobileResult();
     }, []);
 
     const handleSubscribe = async (tier: PricingTier) => {
@@ -295,7 +295,8 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                         fullName: user.nickname,
                         phoneNumber: user.phone || '010-0000-0000',
                         email: user.email,
-                    }
+                    },
+                    redirectUrl: window.location.href, // Required for Mobile V2
                 });
 
                 if (response.code != null) {
@@ -306,16 +307,46 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                     return;
                 }
 
-                // Success
-                await processPaymentSuccess(response.paymentId, mode, tier, startDate, endDate, targetLabel);
+                // Success - Use centralized handler
+                const result = await processPaymentSuccess(
+                    response.paymentId,
+                    mode,
+                    tier,
+                    activeTab,
+                    activeTab === 'mission' ? selectedCategory : null,
+                    startDate,
+                    endDate,
+                    undefined // merchant_uid might be in response
+                );
+
+                if (result.success) {
+                    alert(t.subscriptionSuccessful);
+                    await fetchData();
+                } else {
+                    alert(t.subscriptionFailed.replace('{error}', result.error || 'Unknown error'));
+                }
 
             } catch (e: any) {
                 console.error("Payment Request Error:", e);
                 alert(`Payment Request Failed: ${e.message}`);
+            } finally {
                 setLoading(false);
             }
         } else {
             // --- PortOne V1 (Test/Classic) ---
+
+            // Save state for Mobile Redirect (if it happens)
+            // We need to save simplified state because dates won't survive JSON
+            const saveState = {
+                mode,
+                tier,
+                planType: activeTab,
+                targetCategory: activeTab === 'mission' ? selectedCategory : null,
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString()
+            };
+            localStorage.setItem('pending_payment', JSON.stringify(saveState));
+
             IMP.request_pay({
                 pg: 'html5_inicis', // PG Provider
                 pay_method: 'card',
@@ -325,94 +356,34 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                 buyer_email: user.email,
                 buyer_name: user.nickname,
                 buyer_tel: user.phone || '010-0000-0000',
-                m_redirect_url: window.location.href,
+                m_redirect_url: window.location.href, // Returns here
             }, async (rsp: any) => {
                 if (rsp.success) {
-                    await processPaymentSuccess(rsp.imp_uid, mode, tier, startDate, endDate, targetLabel, rsp.merchant_uid);
+                    const result = await processPaymentSuccess(
+                        rsp.imp_uid,
+                        mode,
+                        tier,
+                        activeTab,
+                        activeTab === 'mission' ? selectedCategory : null,
+                        startDate,
+                        endDate,
+                        rsp.merchant_uid
+                    );
+                    if (result.success) {
+                        localStorage.removeItem('pending_payment'); // Clear on success
+                        alert(t.subscriptionSuccessful);
+                        await fetchData();
+                    } else {
+                        alert(t.subscriptionFailed.replace('{error}', result.error || 'Unknown error'));
+                    }
                 } else {
-                    setLoading(false);
+                    // Only failure comes here in PC. Mobile redirect doesn't trigger this callback usually if redirected.
+                    // But if it fails instantly (e.g. user cancel), it might.
+                    localStorage.removeItem('pending_payment');
                     alert(`Payment Failed: ${rsp.error_msg}`);
                 }
+                setLoading(false);
             });
-        }
-    };
-
-    // Helper to process success for both V1 and V2
-    const processPaymentSuccess = async (
-        paymentIdOrImpUid: string,
-        mode: string,
-        tier: PricingTier,
-        startDate: Date,
-        endDate: Date,
-        _targetLabel: string, // Renamed to _targetLabel as it's not used in the body
-        merchantUid?: string
-    ) => {
-        try {
-            // 1. Verify Payment Server-Side (Secure)
-            // The session object was destructured but not used. The call itself might be for token refresh or similar.
-            await supabase.auth.getSession();
-
-            const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-                body: {
-                    imp_uid: mode === 'real' ? undefined : paymentIdOrImpUid, // V1 only
-                    payment_id: mode === 'real' ? paymentIdOrImpUid : undefined, // V2 only
-                    merchant_uid: merchantUid || paymentIdOrImpUid,
-                    mode: mode
-                }
-            });
-
-            if (verifyError) throw verifyError;
-            if (verifyData?.error) throw new Error(verifyData.error);
-
-            // 2. Record Payment
-            const { error: payError } = await supabase
-                .from('payments')
-                .insert({
-                    user_id: user.id,
-                    amount: tier.price,
-                    plan_type: `${activeTab}_${tier.months}mo`,
-                    duration_months: tier.months,
-                    target_id: activeTab === 'mission' ? selectedCategory : null,
-                    status: 'paid',
-                    merchant_uid: merchantUid || paymentIdOrImpUid,
-                    imp_uid: paymentIdOrImpUid,
-                    coverage_start_date: startDate.toISOString(),
-                    coverage_end_date: endDate.toISOString()
-                });
-
-            if (payError) throw payError;
-
-            // 3. Create Subscription
-            const { error: subError } = await supabase
-                .from('subscriptions')
-                .insert({
-                    user_id: user.id,
-                    type: activeTab,
-                    target_id: activeTab === 'mission' ? selectedCategory : null,
-                    start_date: startDate.toISOString(),
-                    end_date: endDate.toISOString(),
-                    status: 'active'
-                });
-
-            if (subError) throw subError;
-
-            alert(t.subscriptionSuccessful);
-            await fetchData();
-
-        } catch (error: any) {
-            console.error('Subscription error:', error);
-
-            // Handle 401 Invalid JWT specifically (Stale Token Issue)
-            if (error.message && error.message.includes('Invalid JWT') || error.message.includes('401')) {
-                alert("인증 토큰이 만료되었거나 업데이트되었습니다. 자동으로 로그아웃됩니다. 다시 로그인 후 시도해주세요.");
-                await supabase.auth.signOut();
-                window.location.reload();
-                return;
-            }
-
-            alert(t.subscriptionFailed.replace('{error}', error.message || 'Unknown error'));
-        } finally {
-            setLoading(false);
         }
     };
 

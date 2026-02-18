@@ -3,13 +3,16 @@ import { Lock } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SupportModal from '../../components/layout/SupportModal';
 
 // PortOne Type Definition (Minimal)
+import { processPaymentSuccess, checkMobilePaymentResult } from '../../lib/payment';
+
 declare global {
     interface Window {
         IMP: any;
+        PortOne: any;
     }
 }
 
@@ -31,6 +34,22 @@ export default function Paywall({ onClose }: PaywallProps) {
         setSupportModalState({ isOpen: true, view });
     };
 
+    // Check for Mobile Payment Redirect Result on Mount
+    useEffect(() => {
+        const checkMobileResult = async () => {
+            const result = await checkMobilePaymentResult();
+            if (result) {
+                if (result.success) {
+                    alert(t.subscriptionSuccessful || 'Payment Successful!');
+                    window.location.reload();
+                } else {
+                    alert(`Payment Failed: ${result.error}`);
+                }
+            }
+        };
+        checkMobileResult();
+    }, []);
+
     const plans = [
         { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 3000, save: '24%' },
         { id: '3m', name: t.plan3Months, price: t.price3Months, amount: 7500, save: '37%' },
@@ -46,92 +65,125 @@ export default function Paywall({ onClose }: PaywallProps) {
         const { data: payModeData } = await supabase.from('admin_settings').select('value').eq('key', 'payment_mode').single();
         const mode = payModeData?.value || 'test'; // Default to test
 
-        // Initialize PortOne (User Code)
-        IMP.init('imp05646567'); // User's Identification Code
+        // Initialize PortOne (User Code for V1, or just proceed for V2 check)
+        // If mode is real, we use V2 logic which doesn't need IMP.init traditionally unless hybrid?
+        // But let's init anyway for V1 fallback or consistency
+        if (mode !== 'real') {
+            IMP.init('imp05646567'); // User's Identification Code (V1 Test)
+        }
 
-        IMP.request_pay({
-            pg: 'html5_inicis', // PG Provider
-            pay_method: 'card', // Payment Method
-            merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
-            name: `MyReDesign Premium - ${plan.name}`,
-            amount: plan.amount,
-            buyer_email: user?.email,
-            buyer_name: user?.nickname,
-            buyer_tel: user?.phone || '010-0000-0000', // Use user's phone if available
-            m_redirect_url: window.location.href, // Redirect URL for mobile
-        }, async (rsp: any) => {
-            if (rsp.success) {
-                // Payment Success Logic
-                try {
-                    // Verify Payment Server-Side
-                    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-                        body: {
-                            imp_uid: rsp.imp_uid,
-                            merchant_uid: rsp.merchant_uid,
-                            mode: mode // Pass mode to verify sandbox transactions
-                        }
-                    });
+        // Save state for Mobile Redirect
+        const monthsToAdd = parseInt(plan.id.replace('m', ''));
+        const startDate = new Date();
 
-                    if (verifyError) throw verifyError;
-                    if (verifyData?.error) throw new Error(verifyData.error);
+        const saveState = {
+            mode,
+            tier: { months: monthsToAdd, price: plan.amount, label: plan.name },
+            planType: 'all',
+            targetCategory: null,
+            startDate: startDate.toISOString(),
+            endDate: new Date(new Date(startDate).setMonth(startDate.getMonth() + monthsToAdd)).toISOString()
+        };
+        localStorage.setItem('pending_payment', JSON.stringify(saveState));
 
-                    // Calculate Dates
-                    const monthsToAdd = parseInt(plan.id.replace('m', ''));
-                    const startDate = new Date();
-                    const endDate = new Date(startDate);
-                    endDate.setMonth(endDate.getMonth() + monthsToAdd);
+        if (mode === 'real') {
+            // --- PortOne V2 (Real) ---
+            if (!window.PortOne) {
+                alert("PortOne V2 SDK Loading...");
+                return;
+            }
 
-                    // 1. Record Payment (Unified 'payments' table)
-                    const { error: payError } = await supabase.from('payments').insert({
-                        user_id: user?.id,
-                        amount: plan.amount,
-                        plan_type: `all_${monthsToAdd}mo`,
-                        duration_months: monthsToAdd,
-                        target_id: null, // Paywall is typically All Access
-                        status: 'paid',
-                        merchant_uid: rsp.merchant_uid,
-                        imp_uid: rsp.imp_uid,
-                        coverage_start_date: startDate.toISOString(),
-                        coverage_end_date: endDate.toISOString()
-                    });
+            // PortOne V2 Store ID and Channel Key (Real) -> Copied from SubscriptionManager
+            const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
+            const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
 
-                    if (payError) throw payError;
+            const paymentId = `pay_${new Date().getTime()}`;
 
-                    // 2. Create Subscription
-                    const { error: subError } = await supabase.from('subscriptions').insert({
-                        user_id: user?.id,
-                        type: 'all',
-                        target_id: null,
-                        start_date: startDate.toISOString(),
-                        end_date: endDate.toISOString(),
-                        status: 'active'
-                    });
+            try {
+                const response = await window.PortOne.requestPayment({
+                    storeId: PORTONE_V2_STORE_ID,
+                    channelKey: PORTONE_V2_CHANNEL_KEY,
+                    paymentId: paymentId,
+                    orderName: `MyReDesign Premium - ${plan.name}`,
+                    totalAmount: plan.amount,
+                    currency: "CURRENCY_KRW",
+                    payMethod: "CARD",
+                    customer: {
+                        fullName: user?.nickname || 'Guest',
+                        phoneNumber: user?.phone || '010-0000-0000',
+                        email: user?.email,
+                    },
+                    redirectUrl: window.location.href, // Required for Mobile V2
+                });
 
-                    if (subError) throw subError;
+                if (response.code != null) {
+                    alert(`Payment Failed: ${response.message}`);
+                    return;
+                }
 
-                    // 3. Update Profile (Optional - gracefully handle missing column)
-                    try {
-                        const { error: profileError } = await supabase.from('profiles').update({
-                            subscription_tier: 'premium'
-                        }).eq('id', user?.id);
+                // Success
+                const result = await processPaymentSuccess(
+                    response.paymentId,
+                    mode,
+                    { months: parseInt(plan.id.replace('m', '')), price: plan.amount, label: plan.name },
+                    'all',
+                    null,
+                    new Date(),
+                    new Date(new Date().setMonth(new Date().getMonth() + parseInt(plan.id.replace('m', '')))),
+                    undefined
+                );
 
-                        if (profileError) {
-                            console.warn('Profile update warning (tier):', profileError.message);
-                        }
-                    } catch (profileErr) {
-                        console.warn('Profile update failed (likely missing column), but payment success.', profileErr);
-                    }
-
+                if (result.success) {
                     alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
                     window.location.reload();
-                } catch (err: any) {
-                    console.error('Payment DB Error:', err);
-                    alert(`Payment processed but failed to save: ${err.message}`);
+                } else {
+                    alert(`Payment processed but failed to save: ${result.error}`);
                 }
-            } else {
-                alert(`Payment Failed: ${rsp.error_msg}`);
+
+            } catch (e: any) {
+                console.error("Payment Request Error:", e);
+                alert(`Payment Request Failed: ${e.message}`);
             }
-        });
+
+        } else {
+            // --- PortOne V1 (Test) ---
+            IMP.request_pay({
+                pg: 'html5_inicis', // PG Provider
+                pay_method: 'card', // Payment Method
+                merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
+                name: `MyReDesign Premium - ${plan.name}`,
+                amount: plan.amount,
+                buyer_email: user?.email,
+                buyer_name: user?.nickname,
+                buyer_tel: user?.phone || '010-0000-0000', // Use user's phone if available
+                m_redirect_url: window.location.href, // Redirect URL for mobile
+            }, async (rsp: any) => {
+                if (rsp.success) {
+                    // Success - Use centralized handler
+                    const result = await processPaymentSuccess(
+                        rsp.imp_uid,
+                        mode,
+                        // Convert Paywall plan to PaymentTier structure
+                        { months: parseInt(plan.id.replace('m', '')), price: plan.amount, label: plan.name },
+                        'all', // Paywall is always All Access
+                        null,
+                        new Date(), // Start Now
+                        new Date(new Date().setMonth(new Date().getMonth() + parseInt(plan.id.replace('m', '')))), // End Date
+                        rsp.merchant_uid
+                    );
+
+                    if (result.success) {
+                        alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
+                        window.location.reload();
+                    } else {
+                        alert(`Payment processed but failed to save: ${result.error}`);
+                    }
+                } else {
+                    localStorage.removeItem('pending_payment');
+                    alert(`Payment Failed: ${rsp.error_msg}`);
+                }
+            });
+        }
     };
 
     return (
