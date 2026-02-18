@@ -282,6 +282,19 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
 
             const paymentId = `pay_${new Date().getTime()}`;
+
+            // Save state for Mobile Redirect (V2)
+            // Even though we await, mobile might redirect page.
+            const saveState = {
+                mode,
+                tier,
+                planType: activeTab,
+                targetCategory: activeTab === 'mission' ? selectedCategory : null,
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString()
+            };
+            localStorage.setItem('pending_payment', JSON.stringify(saveState));
+
             try {
                 const response = await window.PortOne.requestPayment({
                     storeId: PORTONE_V2_STORE_ID,
@@ -320,6 +333,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                 );
 
                 if (result.success) {
+                    localStorage.removeItem('pending_payment');
                     alert(t.subscriptionSuccessful);
                     await fetchData();
                 } else {

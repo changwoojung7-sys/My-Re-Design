@@ -134,6 +134,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                 );
 
                 if (result.success) {
+                    localStorage.removeItem('pending_payment');
                     alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
                     window.location.reload();
                 } else {
