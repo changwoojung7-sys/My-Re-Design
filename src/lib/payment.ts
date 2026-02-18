@@ -108,7 +108,15 @@ export const processPaymentSuccess = async (
             console.warn('Profile update failed', e);
         }
 
-        return { success: true };
+        return {
+            success: true,
+            data: {
+                planName: `${planType === 'all' ? 'All Access' : targetCategory} (${tier.label})`,
+                amount: tier.price,
+                startDate: startDate,
+                endDate: endDate
+            }
+        };
     } catch (error: any) {
         console.error('Payment processing error:', error);
         alert(`Payment Processing Error: ${error.message}`);

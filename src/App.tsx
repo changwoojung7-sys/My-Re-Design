@@ -164,14 +164,19 @@ function App() {
         window.history.replaceState({}, '', url.toString());
 
         if (result.success) {
-          alert("Payment Successful! Your subscription is now active.");
-          // Force reload user profile/data if needed, or just let components refetch on mount
-          // Since we are at App level, we can't easily trigger component refetch without context/events.
-          // But a page reload or store update works.
-          // Let's reload window to be safe and ensure all states (Context/Store) are fresh.
+          const { data } = result;
+          const msg = data
+            ? `결제가 성공적으로 완료되었습니다!\n\n📄 상품명: ${data.planName}\n💰 결제금액: ₩${data.amount.toLocaleString()}`
+            : "결제가 성공적으로 완료되었습니다!";
+
+          alert(msg);
+
+          // Force reload user profile/data if needed
           window.location.reload();
         } else {
-          alert(`Payment Failed: ${result.error || 'Unknown error'}`);
+          // Ensure error message is also localized or clear
+          const errorMsg = result.error || 'Unknown error';
+          alert(`결제 처리에 실패했습니다.\n사유: ${errorMsg}`);
         }
       }
     };

@@ -413,7 +413,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
         }
     };
 
-    const handleCancel = async (paymentId: string, createdAt: string, imp_uid?: string, merchant_uid?: string) => {
+    const handleCancel = async (paymentId: string, createdAt: string, imp_uid: string | undefined, merchant_uid: string | undefined, amount: number, planName: string) => {
         const createdDate = new Date(createdAt);
         const today = new Date();
 
@@ -444,7 +444,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             if (error) throw error;
             if (data?.error) throw new Error(data.error);
 
-            alert(t.cancelSuccess);
+            alert(`결제가 취소되었습니다.\n\n📄 취소상품: ${planName}\n💰 환불금액: ₩${amount.toLocaleString()}`);
             await fetchData();
         } catch (error: any) {
             console.error('Cancel error:', error);
@@ -677,7 +677,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
                                                                     return canCancel && (
                                                                         <button
-                                                                            onClick={() => handleCancel(item.id, item.created_at, item.imp_uid, item.merchant_uid)}
+                                                                            onClick={() => handleCancel(item.id, item.created_at, item.imp_uid, item.merchant_uid, Number(item.amount), planName)}
                                                                             className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
                                                                         >
                                                                             {t.cancelPayment}
