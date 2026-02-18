@@ -145,6 +145,38 @@ function App() {
     };
     validateSession();
 
+    // --- NEW: Global Payment Result Check ---
+    const checkPayment = async () => {
+      // Import dynamically to avoid circular deps if any, or just import at top
+      const { checkMobilePaymentResult } = await import('./lib/payment');
+      const result = await checkMobilePaymentResult();
+
+      if (result) {
+        // Clear URL Params to prevent double-alert on refresh
+        const url = new URL(window.location.href);
+        url.searchParams.delete('imp_success');
+        url.searchParams.delete('error_msg');
+        url.searchParams.delete('imp_uid');
+        url.searchParams.delete('merchant_uid');
+        url.searchParams.delete('paymentId');
+        url.searchParams.delete('code');
+        url.searchParams.delete('message');
+        window.history.replaceState({}, '', url.toString());
+
+        if (result.success) {
+          alert("Payment Successful! Your subscription is now active.");
+          // Force reload user profile/data if needed, or just let components refetch on mount
+          // Since we are at App level, we can't easily trigger component refetch without context/events.
+          // But a page reload or store update works.
+          // Let's reload window to be safe and ensure all states (Context/Store) are fresh.
+          window.location.reload();
+        } else {
+          alert(`Payment Failed: ${result.error || 'Unknown error'}`);
+        }
+      }
+    };
+    checkPayment();
+
     return () => {
       subscription.unsubscribe();
     };

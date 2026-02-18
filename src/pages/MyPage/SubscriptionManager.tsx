@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
 import SupportModal from '../../components/layout/SupportModal';
 
-import { processPaymentSuccess, checkMobilePaymentResult } from '../../lib/payment';
+import { processPaymentSuccess } from '../../lib/payment';
 
 declare global {
     interface Window {
@@ -80,6 +80,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
             .from('payments')
             .select('*')
             .eq('user_id', user.id)
+            .neq('status', 'pending') // Hide pending payments from history
             .order('created_at', { ascending: false });
         if (payData) setHistory(payData);
 
@@ -188,24 +189,6 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
     // PortOne Scrips are now loaded in index.html exclusively
     // No dynamic loading here to prevent duplicates
-
-    // Check for Mobile Payment Redirect Result on Mount
-    useEffect(() => {
-        const checkMobileResult = async () => {
-            const result = await checkMobilePaymentResult();
-            if (result) {
-                if (result.success) {
-                    alert(t.subscriptionSuccessful);
-                    await fetchData();
-                    // Optional: Clear strict mode query params using history.replaceState if desired
-                } else {
-                    alert(t.subscriptionFailed.replace('{error}', result.error || 'Unknown error'));
-                }
-                // Ensure loading is false (though it defaults to false on fresh load)
-            }
-        };
-        checkMobileResult();
-    }, []);
 
     const handleSubscribe = async (tier: PricingTier) => {
         if (!user) return;
