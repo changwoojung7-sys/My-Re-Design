@@ -119,7 +119,7 @@ export const processPaymentSuccess = async (
         };
     } catch (error: any) {
         console.error('Payment processing error:', error);
-        alert(`Payment Processing Error: ${error.message}`);
+        // Alert is handled by the caller (App.tsx or component)
         return { success: false, error: error.message };
     }
 };

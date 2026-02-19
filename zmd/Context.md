@@ -299,6 +299,7 @@
     - 주요 카드사 및 간편결제 앱 패키지명(viva.republica.toss, com.kakao.talk 등)을 명시적으로 선언함.
   - **State Preservation (Session Loss 방지)**: 리다이렉트 시 상태 유실 방지를 위해 결제 요청 전 `payments` 테이블에 `status='pending'`으로 레코드를 미리 저장.
   - **Global Payment Check**: `App.tsx`에서 앱 로드 시 `checkMobilePaymentResult`를 전역적으로 호출하여, 어떤 화면으로 복귀하더라도 즉시 성공/실패 알림 표시.
+  - **Strict Validation**: 리다이렉트 URL 파라미터(`imp_success`, `success`)를 **엄격하게 검증**하여, 명시적인 성공 신호(`true`)가 없으면 **무조건 실패/취소**로 처리. 이는 사용자 취소(X 버튼) 시 발생할 수 있는 모호한 상태를 방지함.
   - 성공 시 `pending` 레코드를 `paid`로 업데이트.
 
 #### 결제 흐름 (Unified Logic: `src/lib/payment.ts`)
@@ -307,11 +308,14 @@
    - V1: `IMP.request_pay()` (Test Mode)
    - V2: `PortOne.requestPayment()` (Real Mode) + `redirectUrl` 설정
 2. **결제 결과 처리 (`processPaymentSuccess`)**:
+   - **엄격한 검증**: Client-side에서 성공 플래그(`true`) 확인 필수. 실패/취소 시 `processPaymentFailure`로 분기.
+   - **Alert 제거**: 내부 `alert` 호출 제거. 에러 객체 반환 → 호출처(`App.tsx` 등)에서 메시지 처리.
    - **전역 체크**: `App.tsx` 마운트 시 `checkMobilePaymentResult` 호출 (모바일 리다이렉트 대응).
    - PC: 콜백 함수에서 즉시 호출
 3. **서버 검증 (`verify-payment`)**:
    - PortOne API를 통해 위변조 여부 확인 (V1/V2 자동 분기)
-   - 실패 시 `alert`로 상세 에러 메시지 표시
+   - **로깅 강화**: 검증 시 결제 상태(`status`), 금액 등을 로그로 남겨 추적 용이성 확보.
+   - 실패 시 `alert`로 상세 에러 메시지 표시 (App.tsx에서 통합 처리)
 4. **데이터 저장**:
    - `payments` 테이블 INSERT (status: 'paid')
    - `subscriptions` 테이블 INSERT (status: 'active')

@@ -176,7 +176,15 @@ function App() {
         } else {
           // Ensure error message is also localized or clear
           const errorMsg = result.error || 'Unknown error';
-          alert(`결제 처리에 실패했습니다.\n사유: ${errorMsg}`);
+
+          // Check for specific technical errors and show user-friendly message
+          if (errorMsg.includes('Payment status is') && (errorMsg.includes('FAILED') || errorMsg.includes('CANCELLED'))) {
+            alert('결제가 취소되었거나 승인되지 않았습니다.');
+          } else if (errorMsg.includes('Payment Cancelled')) {
+            alert('결제가 취소되었습니다.');
+          } else {
+            alert(`결제 처리에 실패했습니다.\n사유: ${errorMsg}`);
+          }
         }
       }
     };
