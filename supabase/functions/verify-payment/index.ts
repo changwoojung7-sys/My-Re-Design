@@ -77,6 +77,12 @@ serve(async (req) => {
             }
 
             const paymentData = verifyData.response;
+
+            // Strict Status Check for V1
+            if (paymentData.status !== 'paid') {
+                throw new Error(`Payment status is '${paymentData.status}', not 'paid'. verification failed.`);
+            }
+
             return new Response(
                 JSON.stringify({ success: true, payment: paymentData }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -110,7 +116,7 @@ serve(async (req) => {
             // Check status
             // V2 API Status: PAID, CANCELLED, etc.
             if (paymentData.status !== 'PAID') {
-                // throw new Error(`Payment status is ${paymentData.status}`);
+                throw new Error(`Payment status is '${paymentData.status}', not 'PAID'. verification failed.`);
             }
 
             return new Response(

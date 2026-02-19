@@ -7,7 +7,7 @@ import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
 import SupportModal from '../../components/layout/SupportModal';
 
-import { processPaymentSuccess } from '../../lib/payment';
+import { processPaymentSuccess, processPaymentFailure } from '../../lib/payment';
 
 declare global {
     interface Window {
@@ -357,6 +357,8 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
 
             } catch (e: any) {
                 console.error("Payment Request Error:", e);
+                // Handle failure/cancellation
+                if (paymentId) await processPaymentFailure(paymentId);
                 alert(`Payment Request Failed: ${e.message}`);
             } finally {
                 setLoading(false);
@@ -405,7 +407,11 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                         alert(t.subscriptionFailed.replace('{error}', result.error || 'Unknown error'));
                     }
                 } else {
+                    // Payment Failed or Cancelled
                     localStorage.removeItem('pending_payment');
+                    if (merchantUid) await processPaymentFailure(merchantUid);
+                    // Standardize error message? rsp.error_msg
+                    // PortOne often sends "결제 포기" or "사용자 취소"
                     alert(`Payment Failed: ${rsp.error_msg}`);
                 }
                 setLoading(false);

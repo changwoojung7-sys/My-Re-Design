@@ -124,6 +124,29 @@ export const processPaymentSuccess = async (
     }
 };
 
+export const processPaymentFailure = async (paymentIdOrImpUid: string) => {
+    try {
+        const { data: existing } = await supabase
+            .from('payments')
+            .select('id')
+            .or(`merchant_uid.eq.${paymentIdOrImpUid},imp_uid.eq.${paymentIdOrImpUid}`)
+            .eq('status', 'pending')
+            .maybeSingle();
+
+        if (existing) {
+            await supabase
+                .from('payments')
+                .update({
+                    status: 'cancelled',
+                    cancelled_at: new Date().toISOString()
+                })
+                .eq('id', existing.id);
+        }
+    } catch (error) {
+        console.error('Error processing payment failure:', error);
+    }
+};
+
 // Check for Mobile Redirect Result
 export const checkMobilePaymentResult = async () => {
     const urlParams = new URL(window.location.href).searchParams;

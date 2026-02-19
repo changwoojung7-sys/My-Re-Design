@@ -216,8 +216,12 @@ export default function Admin() {
         return diffMonth > 0 ? `${diffMonth} Months` : '1 Month';
     };
 
-    const cancelPayment = async (id: string, imp_uid?: string, merchant_uid?: string) => {
-        if (!confirm('정말 이 결제를 취소하시겠습니까? 기록은 유지되지만 취소 상태로 변경됩니다.')) return;
+    const cancelPayment = async (id: string, imp_uid?: string, merchant_uid?: string, isForce: boolean = false) => {
+        const confirmMsg = isForce
+            ? '⚠️ [강제 취소] \nPG사 연동 없이 DB에서만 취소 처리하시겠습니까?\n(실제 결제가 안 된 건을 정리할 때 사용하세요)'
+            : '정말 이 결제를 취소하시겠습니까?';
+
+        if (!confirm(confirmMsg)) return;
 
         try {
             // Call Edge Function for Secure Cancellation
@@ -226,7 +230,8 @@ export default function Admin() {
                     imp_uid: imp_uid,
                     merchant_uid: merchant_uid,
                     payment_id: id,
-                    reason: 'Admin cancelled payment via Dashboard'
+                    reason: isForce ? 'Force Cancelled by Admin' : 'Admin cancelled payment via Dashboard',
+                    action: isForce ? 'force_cancel' : 'cancel'
                 }
             });
 
@@ -657,23 +662,48 @@ export default function Admin() {
                                             <p className="text-xs text-slate-500 text-center py-10">미션 내역이 없습니다.</p>
                                         ) : (
                                             userMissions.map(m => {
-                                                const dayCount = Math.floor((new Date().getTime() - new Date(m.created_at).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                                const daysPassed = Math.floor((new Date().getTime() - new Date(m.created_at).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+                                                // Calculate Duration
+                                                // Funplay defaults to 0.25 (1 week) if not set, or uses stored duration_months
+                                                // Other goals default to 1 month
+                                                const durationMonths = m.duration_months || (m.category === 'funplay' ? 0.25 : 1);
+                                                let totalDays = 0;
+                                                if (durationMonths < 1) {
+                                                    totalDays = durationMonths === 0.25 ? 7 : durationMonths === 0.5 ? 14 : Math.round(durationMonths * 30);
+                                                } else {
+                                                    totalDays = durationMonths * 30;
+                                                }
+
+                                                const isExpired = daysPassed > totalDays;
+                                                const isCompleted = m.is_completed;
+                                                const isEnded = isExpired || isCompleted;
+
+                                                const endDate = new Date(m.created_at);
+                                                endDate.setDate(endDate.getDate() + totalDays);
+
                                                 return (
-                                                    <div key={m.id} className="bg-white/5 p-2.5 rounded-lg border border-white/5 hover:bg-white/10 transition-colors">
+                                                    <div key={m.id} className={`p-2.5 rounded-lg border transition-colors ${isEnded ? 'bg-black/40 border-white/5 opacity-70' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}>
                                                         <div className="flex justify-between items-start mb-1">
-                                                            <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded uppercase">
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${isEnded ? 'bg-slate-700 text-slate-400' : 'bg-purple-500/20 text-purple-300'}`}>
                                                                 {m.category || '기타'}
                                                             </span>
                                                             <span className="text-[10px] text-slate-500 font-mono">
                                                                 {new Date(m.created_at).toLocaleDateString()}
                                                             </span>
                                                         </div>
-                                                        <p className="text-xs font-bold text-white line-clamp-2 mt-0.5">{m.target_text || '목표 없음'}</p>
+                                                        <p className={`text-xs font-bold line-clamp-2 mt-0.5 ${isEnded ? 'text-slate-400' : 'text-white'}`}>{m.target_text || '목표 없음'}</p>
                                                         <div className="flex justify-between items-center mt-1.5">
-                                                            <span className="text-[10px] text-accent font-bold">
-                                                                D+{dayCount}
-                                                            </span>
-                                                            {/* m.seq 체크 */}
+                                                            {isEnded ? (
+                                                                <span className="text-[10px] text-slate-500 font-bold flex items-center gap-1">
+                                                                    {isCompleted ? <span className="text-emerald-400">성공</span> : '종료됨'}
+                                                                    <span className="font-mono font-normal">({endDate.toLocaleDateString()})</span>
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-accent font-bold">
+                                                                    D+{daysPassed} <span className="text-slate-500 font-mono font-normal">/ {totalDays}일</span>
+                                                                </span>
+                                                            )}
                                                             {m.seq && <span className="text-[10px] text-slate-600">Challenge #{m.seq}</span>}
                                                         </div>
                                                     </div>
@@ -750,9 +780,19 @@ export default function Admin() {
                                         ) : (
                                             userPayments.map((pay: any, idx: number) => {
                                                 const isCancelled = pay.status === 'cancelled' || !!pay.cancelled_at;
+                                                const isPaid = pay.status === 'paid';
+
                                                 return (
                                                     <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center">
                                                         <div>
+                                                            <div className="flex items-center gap-2 mb-0.5">
+                                                                <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${isPaid ? 'bg-emerald-500/10 text-emerald-400' :
+                                                                    isCancelled ? 'bg-red-500/10 text-red-400' :
+                                                                        'bg-yellow-500/10 text-yellow-400'
+                                                                    }`}>
+                                                                    {pay.status || 'Unknown'}
+                                                                </span>
+                                                            </div>
                                                             <p className={`text-xs font-bold uppercase ${isCancelled ? 'text-slate-500 line-through' : 'text-white'}`}>
                                                                 {/* Display more descriptive name based on Plan Type */}
                                                                 {pay.plan_type === 'all_1mo' ? 'Premium (1 Month)' :
@@ -775,13 +815,22 @@ export default function Admin() {
                                                                 </div>
                                                             ) : (
                                                                 <div className="flex flex-col items-end gap-1">
-                                                                    <span className="text-xs font-bold text-accent">${pay.amount}</span>
-                                                                    <button
-                                                                        onClick={() => cancelPayment(pay.id, pay.imp_uid, pay.merchant_uid)}
-                                                                        className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded border border-red-500/30 hover:bg-red-500/30"
-                                                                    >
-                                                                        Cancel
-                                                                    </button>
+                                                                    <span className="text-xs font-bold text-accent">₩{Number(pay.amount).toLocaleString()}</span>
+                                                                    <div className="flex gap-1">
+                                                                        <button
+                                                                            onClick={() => cancelPayment(pay.id, pay.imp_uid, pay.merchant_uid, false)}
+                                                                            className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20"
+                                                                        >
+                                                                            취소
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => cancelPayment(pay.id, pay.imp_uid, pay.merchant_uid, true)}
+                                                                            className="text-[9px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 hover:bg-slate-600"
+                                                                            title="강제 취소 (DB만 업데이트)"
+                                                                        >
+                                                                            강제
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -796,6 +845,8 @@ export default function Admin() {
                     )}
                 </AnimatePresence>
             </div>
-        </div >
+        </div>
     );
 }
+
+
