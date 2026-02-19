@@ -294,17 +294,21 @@
 - Channel Key: `channel-key-eeaefe66-...`
 - **모바일 리다이렉트 처리**:
   - 모바일 환경에서는 PG사 페이지로 이동 후 돌아올 때 `redirectUrl` (`window.location.href`)로 복귀
-  - **State Preservation**: 리다이렉트 시 상태 유실 방지를 위해 `localStorage`에 `pending_payment` 저장
-  - 복귀 시 `checkMobilePaymentResult`가 URL의 `paymentId` 또는 `imp_uid`를 감지하여 결제 완료 처리
-  - 성공 시 `pending_payment` 삭제
+  - **Android 11+ (API 30+) 앱 가시성 확보**:
+    - 보안 강화로 인해 외부 결제 앱(토스, 카드사 앱 등) 호출 시 `AndroidManifest.xml`에 `<queries>` 태그 필수.
+    - 주요 카드사 및 간편결제 앱 패키지명(viva.republica.toss, com.kakao.talk 등)을 명시적으로 선언함.
+  - **State Preservation (Session Loss 방지)**: 리다이렉트 시 상태 유실 방지를 위해 결제 요청 전 `payments` 테이블에 `status='pending'`으로 레코드를 미리 저장.
+  - **Global Payment Check**: `App.tsx`에서 앱 로드 시 `checkMobilePaymentResult`를 전역적으로 호출하여, 어떤 화면으로 복귀하더라도 즉시 성공/실패 알림 표시.
+  - 성공 시 `pending` 레코드를 `paid`로 업데이트.
 
 #### 결제 흐름 (Unified Logic: `src/lib/payment.ts`)
 1. **결제 요청**:
+   - **DB 저장**: `payments` 테이블에 'pending' 상태로 결제 정보 선저장.
    - V1: `IMP.request_pay()` (Test Mode)
    - V2: `PortOne.requestPayment()` (Real Mode) + `redirectUrl` 설정
 2. **결제 결과 처리 (`processPaymentSuccess`)**:
+   - **전역 체크**: `App.tsx` 마운트 시 `checkMobilePaymentResult` 호출 (모바일 리다이렉트 대응).
    - PC: 콜백 함수에서 즉시 호출
-   - Mobile: 리다이렉트 후 `checkMobilePaymentResult`에서 호출
 3. **서버 검증 (`verify-payment`)**:
    - PortOne API를 통해 위변조 여부 확인 (V1/V2 자동 분기)
    - 실패 시 `alert`로 상세 에러 메시지 표시
@@ -338,7 +342,7 @@
 | `missions` | AI 생성 미션 (content, category, is_completed, image_url, proof_text, proof_type, trust_score, reasoning 등) |
 | `mission_generations` | 일일 미션 생성 횟수 추적 (user_id, goal_category, count, date) |
 | `subscriptions` | 구독 정보 (type:mission/all, target_id, start_date, end_date, status) |
-| `payments` | 결제 내역 (amount, plan_type, imp_uid, merchant_uid, coverage_start/end_date, status) |
+| `payments` | 결제 내역 (amount, plan_type, imp_uid, merchant_uid, coverage_start/end_date, status: paid/pending/cancelled) |
 | `friends` | 양방향 친구 관계 |
 | `friend_groups` | 친구 그룹 |
 | `goal_likes` | 목표 좋아요 |
