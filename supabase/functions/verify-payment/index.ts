@@ -79,6 +79,8 @@ serve(async (req) => {
             const paymentData = verifyData.response;
 
             // Strict Status Check for V1
+            console.log(`[Verify] V1 Status: ${paymentData.status}, Amount: ${paymentData.amount}, Name: ${paymentData.name}`);
+
             if (paymentData.status !== 'paid') {
                 throw new Error(`Payment status is '${paymentData.status}', not 'paid'. verification failed.`);
             }
@@ -115,6 +117,8 @@ serve(async (req) => {
 
             // Check status
             // V2 API Status: PAID, CANCELLED, etc.
+            console.log(`[Verify] V2 Status: ${paymentData.status}, Amount: ${paymentData.amount.total}, Name: ${paymentData.orderName}`);
+
             if (paymentData.status !== 'PAID') {
                 throw new Error(`Payment status is '${paymentData.status}', not 'PAID'. verification failed.`);
             }

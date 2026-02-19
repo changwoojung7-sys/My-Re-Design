@@ -617,85 +617,91 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                                     {history.length === 0 ? (
                                         <p className="text-xs text-slate-500 text-center py-4">{t.noPaymentHistory}</p>
                                     ) : (
-                                        history.map((item) => {
-                                            // Parse plan type string like "mission_1mo" or "all_12mo"
-                                            const [type, durationStr] = item.plan_type.split('_');
-                                            const durationNum = parseInt(durationStr); // e.g. 1, 3, 6, 12
+                                        history
+                                            .filter(item => item.status === 'paid' || item.status === 'cancelled') // Double-check: Only show definitive states
+                                            .map((item) => {
+                                                // Parse plan type string like "mission_1mo" or "all_12mo"
+                                                const [type, durationStr] = item.plan_type.split('_');
+                                                const durationNum = parseInt(durationStr); // e.g. 1, 3, 6, 12
 
-                                            let planName = type === 'all' ? t.allAccessPlan : t.missionPlan;
-                                            if (type === 'mission' && item.target_id) {
-                                                // Translate category name if possible (using existing key in t)
-                                                // t[item.target_id] relies on the category string matching the key exactly
-                                                const translatedCat = (t as any)[item.target_id] || item.target_id;
-                                                planName += ` (${translatedCat})`;
-                                            }
+                                                let planName = type === 'all' ? t.allAccessPlan : t.missionPlan;
+                                                if (type === 'mission' && item.target_id) {
+                                                    // Translate category name if possible (using existing key in t)
+                                                    // t[item.target_id] relies on the category string matching the key exactly
+                                                    const translatedCat = (t as any)[item.target_id] || item.target_id;
+                                                    planName += ` (${translatedCat})`;
+                                                }
 
-                                            return (
-                                                <div key={item.id} className="bg-white/5 p-3 rounded-xl flex justify-between items-center">
-                                                    <div>
-                                                        <p className={`text-xs font-bold mb-1 ${(item.status === 'cancelled' || !!item.cancelled_at) ? 'text-slate-500 line-through' : 'text-white'}`}>
-                                                            {planName}
-                                                            <span className="text-[10px] text-slate-500 font-normal ml-2">
-                                                                {t.paymentDate} : {(() => {
-                                                                    const d = new Date(item.created_at);
-                                                                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                                                                })()}
-                                                            </span>
-                                                        </p>
-                                                        <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                                                            {(() => {
-                                                                const startDate = new Date(item.coverage_start_date || item.created_at);
-                                                                const endDate = item.coverage_end_date
-                                                                    ? new Date(item.coverage_end_date)
-                                                                    : new Date(startDate.getTime() + (durationNum * 30 * 24 * 60 * 60 * 1000)); // approx fallback
+                                                const isCancelled = item.status === 'cancelled' || !!item.cancelled_at;
+                                                const isPaid = item.status === 'paid';
 
-                                                                // Fix: Ensure fallback end date is roughly correct (add months) if not present
-                                                                if (!item.coverage_end_date) {
-                                                                    endDate.setTime(startDate.getTime()); // reset
-                                                                    endDate.setMonth(endDate.getMonth() + durationNum);
-                                                                }
-
-                                                                return (
-                                                                    <>
-                                                                        <span>{startDate.toLocaleDateString()}</span>
-                                                                        <span>-</span>
-                                                                        <span>{endDate.toLocaleDateString()}</span>
-                                                                        <span className="ml-1 text-primary">({durationNum}{durationNum > 1 ? t.months : t.month})</span>
-                                                                    </>
-                                                                );
-                                                            })()}
-                                                        </p>
-                                                    </div>
-                                                    <div className="text-right flex flex-col items-end gap-1">
-                                                        {(item.status === 'cancelled' || !!item.cancelled_at) ? (
-                                                            <>
-                                                                <p className="text-xs font-bold text-red-500">{t.cancelled}</p>
-                                                                <p className="text-[10px] text-slate-500">{new Date(item.cancelled_at || new Date()).toLocaleDateString()}</p>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <p className="text-xs font-bold text-primary">₩{Number(item.amount).toLocaleString()}</p>
+                                                return (
+                                                    <div key={item.id} className="bg-white/5 p-3 rounded-xl flex justify-between items-center">
+                                                        <div>
+                                                            <p className={`text-xs font-bold mb-1 ${isCancelled ? 'text-slate-500 line-through' : isPaid ? 'text-white' : 'text-yellow-500'}`}>
+                                                                {planName}
+                                                                {!isPaid && !isCancelled && <span className="text-[9px] ml-1 bg-yellow-500/20 text-yellow-500 px-1 rounded">PENDING</span>}
+                                                                <span className="text-[10px] text-slate-500 font-normal ml-2">
+                                                                    {t.paymentDate} : {(() => {
+                                                                        const d = new Date(item.created_at);
+                                                                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                                                                    })()}
+                                                                </span>
+                                                            </p>
+                                                            <p className="text-[10px] text-slate-400 flex items-center gap-1">
                                                                 {(() => {
-                                                                    const pDate = new Date(item.created_at);
-                                                                    const now = new Date();
-                                                                    const diff = (now.getTime() - pDate.getTime()) / (1000 * 3600 * 24);
-                                                                    const canCancel = diff <= 2.0;
+                                                                    const startDate = new Date(item.coverage_start_date || item.created_at);
+                                                                    const endDate = item.coverage_end_date
+                                                                        ? new Date(item.coverage_end_date)
+                                                                        : new Date(startDate.getTime() + (durationNum * 30 * 24 * 60 * 60 * 1000)); // approx fallback
 
-                                                                    return canCancel && (
-                                                                        <button
-                                                                            onClick={() => handleCancel(item.id, item.created_at, item.imp_uid, item.merchant_uid, Number(item.amount), planName)}
-                                                                            className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
-                                                                        >
-                                                                            {t.cancelPayment}
-                                                                        </button>
+                                                                    // Fix: Ensure fallback end date is roughly correct (add months) if not present
+                                                                    if (!item.coverage_end_date) {
+                                                                        endDate.setTime(startDate.getTime()); // reset
+                                                                        endDate.setMonth(endDate.getMonth() + durationNum);
+                                                                    }
+
+                                                                    return (
+                                                                        <>
+                                                                            <span>{startDate.toLocaleDateString()}</span>
+                                                                            <span>-</span>
+                                                                            <span>{endDate.toLocaleDateString()}</span>
+                                                                            <span className="ml-1 text-primary">({durationNum}{durationNum > 1 ? t.months : t.month})</span>
+                                                                        </>
                                                                     );
                                                                 })()}
-                                                            </>
-                                                        )}
+                                                            </p>
+                                                        </div>
+                                                        <div className="text-right flex flex-col items-end gap-1">
+                                                            {(item.status === 'cancelled' || !!item.cancelled_at) ? (
+                                                                <>
+                                                                    <p className="text-xs font-bold text-red-500">{t.cancelled}</p>
+                                                                    <p className="text-[10px] text-slate-500">{new Date(item.cancelled_at || new Date()).toLocaleDateString()}</p>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <p className="text-xs font-bold text-primary">₩{Number(item.amount).toLocaleString()}</p>
+                                                                    {(() => {
+                                                                        const pDate = new Date(item.created_at);
+                                                                        const now = new Date();
+                                                                        const diff = (now.getTime() - pDate.getTime()) / (1000 * 3600 * 24);
+                                                                        const canCancel = diff <= 2.0;
+
+                                                                        return canCancel && (
+                                                                            <button
+                                                                                onClick={() => handleCancel(item.id, item.created_at, item.imp_uid, item.merchant_uid, Number(item.amount), planName)}
+                                                                                className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                                                                            >
+                                                                                {t.cancelPayment}
+                                                                            </button>
+                                                                        );
+                                                                    })()}
+                                                                </>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })
+                                                );
+                                            })
                                     )}
                                 </div>
                             </div>

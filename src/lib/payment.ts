@@ -162,14 +162,23 @@ export const checkMobilePaymentResult = async () => {
     const code = urlParams.get('code');
     const message = urlParams.get('message');
 
-    // Case 1: V1 Failure
-    if (imp_success === 'false' || error_msg) {
-        return { success: false, error: error_msg || 'Mobile payment failed' };
+    // Case 1: V1 Failure Check (Strict)
+    // If imp_success is explicitly 'false', OR if it's MISSING (and we are in a redirect flow with imp_uid), treat as fail.
+    // We should only proceed if imp_success === 'true'.
+    // Note: Some flows might use 'success' instead of 'imp_success'.
+    const successFlag = imp_success || urlParams.get('success');
+
+    if (successFlag !== 'true') {
+        // If we have an error message, use it. If not, generic cancellation/fail.
+        // But only if we actually HAVE some ID (meaning it's a payment redirect, not just a random page load)
+        if (imp_uid || merchant_uid) {
+            return { success: false, error: error_msg || 'Payment Cancelled or Failed' };
+        }
     }
 
-    // Case 2: V2 Failure
-    if (code && code !== 'FAILURE_TYPE_PG') {
-        if (!paymentId) {
+    // Case 2: V2 Failure (PortOne V2)
+    if (code) {
+        if (code !== 'FAILURE_TYPE_PG') {
             return { success: false, error: message || `Payment Failed (${code})` };
         }
     }
