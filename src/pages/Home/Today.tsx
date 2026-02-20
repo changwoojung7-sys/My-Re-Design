@@ -346,7 +346,6 @@ export default function Today() {
                 // Phase 1, 2: 3 Missions
                 // Phase 3: 1 Mission
                 // Phase 4: 0 Mission (Locked by Paywall view, but if bypassed, limit to 0 or 1?)
-                const isFunplay = selectedGoal?.category === 'funplay';
 
                 let limit = 3;
                 // Removed the limit of 1 mission for trialPhase === 3
