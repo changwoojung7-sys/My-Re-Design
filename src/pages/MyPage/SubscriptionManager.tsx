@@ -6,6 +6,7 @@ import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
 import SupportModal from '../../components/layout/SupportModal';
+import { Capacitor } from '@capacitor/core';
 
 import { processPaymentSuccess, processPaymentFailure } from '../../lib/payment';
 
@@ -325,7 +326,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                         phoneNumber: user.phone || '010-0000-0000',
                         email: user.email,
                     },
-                    redirectUrl: window.location.href, // Required for Mobile V2
+                    redirectUrl: Capacitor.isNativePlatform() ? 'myredesign://payment/result' : window.location.href, // Required for Mobile V2
                 });
 
                 if (response.code != null) {
@@ -386,7 +387,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                 buyer_email: user.email,
                 buyer_name: user.nickname,
                 buyer_tel: user.phone || '010-0000-0000',
-                m_redirect_url: window.location.href, // Returns here
+                m_redirect_url: Capacitor.isNativePlatform() ? 'myredesign://payment/result' : window.location.href, // Returns here
             }, async (rsp: any) => {
                 if (rsp.success) {
                     const result = await processPaymentSuccess(
@@ -474,7 +475,7 @@ export default function SubscriptionManager({ onClose, initialCategory }: Subscr
                             <CreditCard className="text-primary" size={24} />
                             {t.manageSubscription}
                         </h2>
-                        <button onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white">
+                        <button title="닫기" onClick={onClose} className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white">
                             <X size={20} />
                         </button>
                     </div>

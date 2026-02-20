@@ -390,8 +390,13 @@ export default function MyPage() {
             // 4. Schedule Notification
             if (notificationTime) {
                 const [hour, minute] = notificationTime.split(':').map(Number);
-                await notificationManager.requestPermissions();
-                await notificationManager.scheduleDailyNotification(hour, minute);
+                const granted = await notificationManager.requestPermissions();
+
+                if (granted) {
+                    await notificationManager.scheduleDailyNotification(hour, minute);
+                } else {
+                    alert('알림 권한이 거부되어 일일 알림을 설정할 수 없습니다. 설정에서 권한을 허용해주세요.');
+                }
             } else {
                 await notificationManager.cancelNotifications();
             }
@@ -907,6 +912,7 @@ export default function MyPage() {
 
                         {/* Notification Bell */}
                         <button
+                            title="알림"
                             onClick={() => setShowRequestsModal(true)}
                             className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors relative"
                         >
@@ -917,12 +923,14 @@ export default function MyPage() {
                         </button>
 
                         <button
+                            title="설정"
                             onClick={handleOpenSettings}
                             className="p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors"
                         >
                             <Settings size={18} />
                         </button>
                         <button
+                            title="로그아웃"
                             onClick={handleLogout}
                             className="p-2 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500/20"
                         >
@@ -1026,6 +1034,7 @@ export default function MyPage() {
                         {goalViewMode === 'active' && (
                             <div className="relative">
                                 <select
+                                    title="카테고리 선택"
                                     value={selectedCategory}
                                     onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
                                     className="w-full appearance-none bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-primary font-bold capitalize"
@@ -1225,6 +1234,7 @@ export default function MyPage() {
                                         <div>
                                             <label className="text-xs text-slate-400 block mb-1">{t.duration}</label>
                                             <select
+                                                title={t.duration}
                                                 disabled={!isEditing}
                                                 value={currentGoal.duration_months}
                                                 onChange={e => updateGoal('duration_months', Number(e.target.value))}
@@ -1258,11 +1268,11 @@ export default function MyPage() {
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">{t.height}</label>
-                                                    <input type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                                    <input title={t.height} placeholder={t.height} type="number" disabled={!isEditing} value={currentGoal.details.height || ''} onChange={e => updateGoal('height', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                                 </div>
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">{t.weight}</label>
-                                                    <input type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
+                                                    <input title={t.weight} placeholder={t.weight} type="number" disabled={!isEditing} value={currentGoal.details.weight || ''} onChange={e => updateGoal('weight', e.target.value, true)} className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs outline-none disabled:opacity-50" />
                                                 </div>
                                             </div>
                                             <div>
@@ -1310,6 +1320,7 @@ export default function MyPage() {
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">{t.funplayDifficulty}</label>
                                                     <select
+                                                        title={t.funplayDifficulty}
                                                         disabled={!isEditing}
                                                         value={currentGoal.details.difficulty}
                                                         onChange={e => updateGoal('difficulty', e.target.value, true)}
@@ -1323,6 +1334,7 @@ export default function MyPage() {
                                                 <div>
                                                     <label className="text-xs text-slate-400 block mb-1">{t.funplayMood}</label>
                                                     <select
+                                                        title={t.funplayMood}
                                                         disabled={!isEditing}
                                                         value={currentGoal.details.mood}
                                                         onChange={e => updateGoal('mood', e.target.value, true)}
@@ -1404,7 +1416,7 @@ export default function MyPage() {
                                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                                     <Settings size={20} className="text-primary" /> {t.accountSettings}
                                 </h2>
-                                <button onClick={() => setIsSettingsOpen(false)} className="bg-white/10 p-2 rounded-full text-white hover:bg-white/20">
+                                <button title="닫기" onClick={() => setIsSettingsOpen(false)} className="bg-white/10 p-2 rounded-full text-white hover:bg-white/20">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -1418,6 +1430,7 @@ export default function MyPage() {
                                         <Globe size={14} /> {t.language || "Language"}
                                     </label>
                                     <select
+                                        title={t.language || "Language"}
                                         value={language}
                                         onChange={(e) => setLanguage(e.target.value as any)}
                                         className="w-28 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-primary appearance-none cursor-pointer hover:bg-white/10 transition-colors"
@@ -1448,6 +1461,7 @@ export default function MyPage() {
                                                 <Camera size={24} className="text-white" />
                                             </div>
                                             <input
+                                                title="프로필 이미지 변경"
                                                 type="file"
                                                 accept="image/*"
                                                 className="absolute inset-0 opacity-0 cursor-pointer"
@@ -1479,6 +1493,8 @@ export default function MyPage() {
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.fullName}</label>
                                             <input
+                                                title={t.fullName}
+                                                placeholder={t.fullName}
                                                 type="text"
                                                 value={settingsData.fullName}
                                                 onChange={e => setSettingsData({ ...settingsData, fullName: e.target.value })}
@@ -1488,6 +1504,8 @@ export default function MyPage() {
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.nickname}</label>
                                             <input
+                                                title={t.nickname}
+                                                placeholder={t.nickname}
                                                 type="text"
                                                 value={settingsData.nickname}
                                                 onChange={e => setSettingsData({ ...settingsData, nickname: e.target.value })}
@@ -1497,6 +1515,8 @@ export default function MyPage() {
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.age}</label>
                                             <input
+                                                title={t.age}
+                                                placeholder={t.age}
                                                 type="number"
                                                 value={settingsData.age}
                                                 onChange={e => setSettingsData({ ...settingsData, age: Number(e.target.value) })}
@@ -1506,6 +1526,7 @@ export default function MyPage() {
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 uppercase mb-1">{t.gender}</label>
                                             <select
+                                                title={t.gender}
                                                 value={settingsData.gender}
                                                 onChange={e => setSettingsData({ ...settingsData, gender: e.target.value })}
                                                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-primary appearance-none"
@@ -1525,6 +1546,8 @@ export default function MyPage() {
                                                 <p className="font-bold text-white text-sm">{t.notificationTime}</p>
                                             </div>
                                             <input
+                                                title={t.notificationTime}
+                                                placeholder={t.notificationTime}
                                                 type="time"
                                                 value={notificationTime}
                                                 onChange={(e) => setNotificationTime(e.target.value)}
@@ -1677,7 +1700,7 @@ export default function MyPage() {
                                                         <Lock size={14} />
                                                         {t.verifyIdentity}
                                                     </span>
-                                                    <button onClick={() => setShowDeleteVerify(false)} className="bg-red-500/10 p-1 rounded-full hover:bg-red-500/20"><X size={14} /></button>
+                                                    <button title="닫기" onClick={() => setShowDeleteVerify(false)} className="bg-red-500/10 p-1 rounded-full hover:bg-red-500/20"><X size={14} /></button>
                                                 </div>
 
                                                 <p className="text-xs text-slate-400">
@@ -1738,7 +1761,7 @@ export default function MyPage() {
                                     <Bell size={18} className="text-yellow-400" />
                                     {t.accessRequests}
                                 </h3>
-                                <button onClick={() => setShowRequestsModal(false)} className="text-slate-400 hover:text-white">
+                                <button title="닫기" onClick={() => setShowRequestsModal(false)} className="text-slate-400 hover:text-white">
                                     <X size={20} />
                                 </button>
                             </div>

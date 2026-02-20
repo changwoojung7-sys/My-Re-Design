@@ -4,6 +4,7 @@ import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import { useState, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import SupportModal from '../../components/layout/SupportModal';
 
 // PortOne Type Definition (Minimal)
@@ -41,7 +42,7 @@ export default function Paywall({ onClose }: PaywallProps) {
             if (result) {
                 if (result.success) {
                     alert(t.subscriptionSuccessful || 'Payment Successful!');
-                    window.location.reload();
+                    window.location.href = '/';
                 } else {
                     alert(`Payment Failed: ${result.error}`);
                 }
@@ -113,7 +114,8 @@ export default function Paywall({ onClose }: PaywallProps) {
                         phoneNumber: user?.phone || '010-0000-0000',
                         email: user?.email,
                     },
-                    redirectUrl: window.location.href, // Required for Mobile V2
+                    redirectUrl: Capacitor.isNativePlatform() ? 'myredesign://payment/result' : window.location.href, // Required for Mobile V2
+                    appScheme: 'myredesign',
                 });
 
                 if (response.code != null) {
@@ -136,7 +138,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                 if (result.success) {
                     localStorage.removeItem('pending_payment');
                     alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
-                    window.location.reload();
+                    window.location.href = '/';
                 } else {
                     alert(`Payment processed but failed to save: ${result.error}`);
                 }
@@ -157,7 +159,8 @@ export default function Paywall({ onClose }: PaywallProps) {
                 buyer_email: user?.email,
                 buyer_name: user?.nickname,
                 buyer_tel: user?.phone || '010-0000-0000', // Use user's phone if available
-                m_redirect_url: window.location.href, // Redirect URL for mobile
+                m_redirect_url: Capacitor.isNativePlatform() ? 'myredesign://payment/result' : window.location.href, // Redirect URL for mobile
+                app_scheme: 'myredesign',
             }, async (rsp: any) => {
                 if (rsp.success) {
                     // Success - Use centralized handler
@@ -175,7 +178,7 @@ export default function Paywall({ onClose }: PaywallProps) {
 
                     if (result.success) {
                         alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
-                        window.location.reload();
+                        window.location.href = '/';
                     } else {
                         alert(`Payment processed but failed to save: ${result.error}`);
                     }

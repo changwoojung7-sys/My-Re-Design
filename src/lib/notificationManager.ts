@@ -23,13 +23,13 @@ export const notificationManager = {
             await LocalNotifications.schedule({
                 notifications: [
                     {
-                        title: "Mission Time! 🎯",
-                        body: "It's time to check your daily mission and grow today!",
+                        title: "미션 수행 시간입니다! 🎯",
+                        body: "오늘의 작은 성장이 기다리고 있어요. 지금 바로 확인해보세요!",
                         id: 1,
                         schedule: {
                             on: {
-                                hour,
-                                minute,
+                                hour: hour,
+                                minute: minute,
                             },
                             allowWhileIdle: true, // Allow executing even when device is in doze mode
                             repeats: true, // Repeat daily

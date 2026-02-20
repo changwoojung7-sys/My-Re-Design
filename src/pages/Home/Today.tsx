@@ -349,9 +349,8 @@ export default function Today() {
                 const isFunplay = selectedGoal?.category === 'funplay';
 
                 let limit = 3;
-                if (!isFunplay && !hasActiveSubscription && trialPhase === 3) {
-                    limit = 1;
-                }
+                // Removed the limit of 1 mission for trialPhase === 3
+                // Now showing 3 missions until day 30 for free users.
 
                 // FILTER LOGIC:
                 // ALWAYS show missions that are already COMPLETED, regardless of limit.
@@ -428,11 +427,8 @@ export default function Today() {
                 m.category.toLowerCase() === selectedGoal.category.toLowerCase()
             );
 
-            // Phase 3 Limit check
+            // Phase 3 Limit check removed: Always show 3 missions for standard goals in Trial Phase 1-3.
             let limit = 3;
-            if (!hasActiveSubscription && trialPhase === 3) {
-                limit = 1;
-            }
 
             newMissions = currentCategoryMissions.slice(0, limit);
         }
@@ -954,6 +950,7 @@ export default function Today() {
             </AnimatePresence>
             <input
                 type="file"
+                title="파일 선택"
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*,video/*,audio/*"
@@ -1002,6 +999,7 @@ export default function Today() {
                 {userGoals.length > 0 ? (
                     <div className="relative">
                         <select
+                            title="목표 선택"
                             value={selectedGoalId || ''}
                             onChange={(e) => setSelectedGoalId(e.target.value)}
                             className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"
@@ -1029,6 +1027,7 @@ export default function Today() {
                     <div className="relative bg-white/5 rounded-xl px-3 border border-white/5 flex flex-row items-center justify-center gap-2 overflow-hidden h-12">
                         <div className="absolute inset-0 opacity-0 z-10">
                             <select
+                                title="날짜 선택"
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
                                 className="w-full h-full cursor-pointer bg-slate-800 text-white"
@@ -1266,7 +1265,7 @@ export default function Today() {
                                                                     <PenTool size={14} /> Text
                                                                 </button>
                                                             </div>
-                                                            <button onClick={() => setVerifyingId(null)} className="text-slate-500 hover:text-white">
+                                                            <button title="닫기" onClick={() => setVerifyingId(null)} className="text-slate-500 hover:text-white">
                                                                 <X size={18} />
                                                             </button>
                                                         </div>

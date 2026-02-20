@@ -5,6 +5,7 @@
 ## 1. 개발 환경 (Development Environment)
 
 ### Tech Stack
+
 - **Framework**: React 19 + TypeScript
 - **Build Tool**: Vite
 - **Mobile Runtime**: Capacitor (Android)
@@ -16,12 +17,14 @@
 - **Deployment**: Vercel (Web), Google Play Store (Android)
 
 ### 주요 라이브러리
+
 - `react-router-dom`: 라우팅 관리
 - `canvas-confetti`: 미션 완료 시 축하 효과
 - `@capacitor/*`: 네이티브 기능 (카메라, 파일 시스템) 연동
 - `framer-motion`: UI 애니메이션 (페이드, 슬라이드, 스케일)
 
 ### 폴더 구조
+
 - `src/pages/Home/`: Today(미션), Paywall, PaywallWarning, AdWarning
 - `src/pages/Dashboard/`: My Loop (Growth 탭)
 - `src/pages/History/`: History, HistoryDetail
@@ -36,6 +39,7 @@
 - `supabase/functions/`: Edge Functions (generate-mission, verify-payment, cancel-payment 등)
 
 ### 라우팅 구조 (App.tsx)
+
 | 경로 | 컴포넌트 | 설명 |
 |------|----------|------|
 | `/login` | Login | 로그인 (카카오/이메일) |
@@ -56,6 +60,7 @@
 **MyReDesign**은 사용자가 Body/Mind/Growth/FunPlay 목표를 설정하고, AI가 생성한 맞춤형 데일리 미션을 수행하며 습관을 형성하는 앱입니다.
 
 ### 사용자 흐름
+
 1. **Splash/Login**: 카카오 로그인 또는 이메일 로그인. 카카오 리다이렉트 핸들러(`KakaoRedirectHandler`) 내장.
 2. **Onboarding**: (신규 유저) 나이, 성별, 주요 목표(Body/Mind/Growth) 설정.
 3. **Main (Today)**: 매일 생성되는 미션 확인 및 인증.
@@ -71,12 +76,14 @@
 앱의 메인 화면. 선택된 목표에 따라 AI 미션을 수행합니다.
 
 #### 목표 선택 (Goal Selector)
+
 - **콤보 박스**: 상단에서 활성 목표 중 선택 가능
 - **필터링**: `is_completed === true` 또는 `isGoalExpired()` 인 목표는 자동 필터링
 - **만료 판단**: `duration_months` 값 기반 (0.25=7일, 0.5=14일, 1+=월×30일)
 - **최신 우선**: 카테고리별 최신 목표만 유지 (`latestGoalsMap`)
 
 #### 미션 생성 (Mission Generation)
+
 - **AI 생성**: `generateMissions()` / `generateFunPlayMission()` (src/lib/openai.ts)
 - **2단계 프로세스**:
   1. `generateDraftPlan()`: AI가 미션 초안 생성 → `isPreview = true`로 미리보기 표시
@@ -86,6 +93,7 @@
 - **데모 모드**: `user.id === 'demo123'` 시 목업 데이터 사용
 
 #### 미션 인증 (Verification)
+
 - **인증 방식 선택**: 미디어(사진/영상/음성) 또는 텍스트
 - **미디어 업로드**: Supabase Storage(`mission-proofs`)에 저장 → URL 반환 → `missions.image_url` 업데이트
 - **텍스트 입력**: `missions.proof_text` 필드에 저장
@@ -94,10 +102,12 @@
 - **챌린지 완료**: 모든 미션 완료 시 "Loop Closed!" 축하 메시지
 
 #### 날짜 이동
+
 - **과거 미션 조회**: 최대 N일 전까지 과거 날짜 선택하여 해당일 미션 확인
 - **오늘 아닌 날짜**: 미션 생성/인증 불가 (읽기 전용)
 
 #### 로딩 애니메이션 (MissionLoading)
+
 - **별자리/스파클 애니메이션**: 미션 생성 중 표시
 - **메시지 순환**: 4초 간격으로 로딩 메시지 변경
 - **프로그레스 바**: 20초 기준 선형 진행
@@ -109,21 +119,25 @@
 목표별 진행 상황과 AI 코칭을 제공합니다.
 
 #### 통계 대시보드
+
 - **스트릭(🔥 Streak)**: 연속 미션 수행 일수 계산 (`calculateStreak`)
 - **완료율**: 전체 미션 대비 완료 비율
 - **총 완료 수**: 누적 완료 미션 개수
 - **이번 달 미션**: 현재 월 미션 수
 
 #### 캘린더 뷰
+
 - **월별 보기**: 달력 형태로 미션 수행 날짜 표시
 - **연도별 보기**: 월별 완료율 그리드
 - **네비게이션**: 이전/다음 월/년 이동
 
 #### AI 코칭 인사이트
+
 - `generateCoaching()` 호출 → 목표와 미션 기록 기반 맞춤 코칭 메시지 생성
 - 목표별 개별 코칭 제공
 
 #### 목표 선택
+
 - 콤보 박스로 목표 전환 → 해당 목표의 통계/캘린더/코칭 표시
 
 ---
@@ -133,16 +147,19 @@
 과거 미션 기록을 전체적으로 확인합니다.
 
 #### 기록 조회
+
 - **활성 목표**: 현재 진행중인 챌린지 별도 표시
 - **완료된 기록**: 과거 종료/만료된 챌린지 목록
 - **전체 히스토리**: 날짜순 정렬된 모든 미션 기록
 
 #### 통계 정보
+
 - **미션 수**: 목표별 전체 미션 수 (`fetchMissionCounts`)
 - **완료 수**: 목표별 완료된 미션 수 (`fetchCompletedCounts`)
 - **달성률**: 완료/전체 비율 표시
 
 #### 상세 보기 (HistoryDetail)
+
 - 특정 목표 클릭 → 날짜별 인증 사진/텍스트 모아보기
 - 카테고리 필터링 (Body/Mind/Growth/FunPlay/전체)
 
@@ -153,22 +170,26 @@
 친구 관리와 소셜 인터랙션 화면.
 
 #### 친구 관리
+
 - **친구 목록**: 그룹별 또는 전체 친구 표시
 - **그룹 관리**: 그룹 생성(`createGroup`), 수정(`updateGroup`), 삭제(`deleteGroup`)
 - **미션 상태 탭**: "진행중" / "완료" 필터링
 
 #### 친구 검색 및 추가
+
 - **검색 방식**: 전화번호(뒷자리/전체), 이메일, 닉네임
 - **퍼지 검색**: 010→+82 변환 포함
 - **그룹 배정**: 친구 추가 시 그룹 선택 가능
 
 #### 소셜 인터랙션
+
 - **응원하기(Like)**: `goal_likes` 테이블 → 좋아요 토글
 - **방명록(Comment)**: `goal_comments` 테이블 → 댓글 CRUD
 - **기록 보기 요청**: 친구의 상세 미션 기록 열람 권한 요청 (`handleRequestHistory`)
 - **공유 기능**: 초대 링크/코드 공유 (`handleShare`)
 
 #### 친구 정보 표시
+
 - 각 친구의 활성 목표, 진행률, 완료 미션 수
 - 랭킹 기반 정렬
 
@@ -179,11 +200,13 @@
 사용자 프로필, 목표 관리, 구독 관리를 위한 화면.
 
 #### 프로필 관리
+
 - **정보 수정**: 닉네임, 나이, 성별, 프로필 이미지
 - **프로필 이미지**: Supabase Storage 업로드 (`handleProfileImageUpload`)
 - **비밀번호 변경**: 6자 이상 검증 (`handlePasswordUpdate`)
 
 #### 목표(Loop) 관리
+
 - **4가지 카테고리**: Body Wellness / Mind Connection / Growth Career / FunPlay
 - **목표 생성/수정**: 목표 텍스트, 기간(duration_months), 세부 설정(난이도, 시간 제한, 분위기 등)
 - **목표 만료 판단**: `isGoalExpired()`, `isGoalItemExpired()` 함수
@@ -194,36 +217,43 @@
 - **새 챌린지 시작**: 기존 목표 완료 후 동일 카테고리에서 재시작
 
 #### 카테고리 잠금 해제
+
 - `isCategoryUnlocked()`: 구독 상태에 따라 카테고리별 잠금/해제 판단
 - **Trial Phase** 중에는 모든 카테고리 접근 가능
 - Trial 종료 후 구독 없으면 잠금 → 구독 관리 모달로 유도
 
 #### 알림 설정
+
 - `notificationManager`: 알림 권한 요청 및 관리
 
 #### 기록 열람 요청 관리
+
 - **수신 요청**: 다른 사용자의 기록 열람 요청 확인 (`fetchIncomingRequests`)
 - **승인/거부**: `handleApproveRequest` / `handleRejectRequest`
 
 #### 계정 관리
+
 - **로그아웃**: Supabase Auth signOut + 스토어 초기화
 - **회원 탈퇴**: 이메일 OTP 인증 → 전체 데이터 삭제 (goals, missions, friends, comments, likes, 미디어 파일)
 
 ---
 
 ### F. 온보딩 (Onboarding.tsx) `/onboarding`
+
 - 신규 가입 시 최초 진입
 - 기본 정보 입력 (나이, 성별)
 - Body/Mind/Growth 3개 카테고리 목표 한 번에 설정
 - 완료 시 자동으로 첫 미션 생성 → 메인 화면 이동
 
 ### G. 로그인 (Login.tsx) `/login`
+
 - **카카오 로그인**: OAuth 기반, 카카오 리다이렉트 핸들러 내장
 - **이메일 로그인**: Supabase Auth
 - **비밀번호 찾기**: OTP 기반 비밀번호 재설정 (ResetPassword.tsx)
 - **데모 계정**: `demo123`으로 체험 가능
 
 ### H. 관리자 (Admin.tsx) `/admin`
+
 - 결제 모드(test/real), 광고 슬롯 ID, Paywall 모드(subscription/ads) 등 `admin_settings` 관리
 
 ---
@@ -237,8 +267,8 @@
 | Phase | 기간 | 설명 |
 |-------|------|------|
 | Phase 1 | 1~7일 | 완전 무료, 모든 기능 접근 가능 |
-| Phase 2 | 8~21일 | 부분 제한 시작 |
-| Phase 3 | 22~30일 | 추가 제한 |
+| Phase 2 | 8~21일 | 기본 미션 3개 제공 유지 |
+| Phase 3 | 22~30일 | 기본 미션 3개 제공 유지 (이전에는 1개로 제한됨) |
 | Phase 4 | 31일~ | 무료 체험 종료, 구독 필요 |
 
 - Trial 일수는 **선택된 목표의 `created_at`** 기준으로 계산 (fallback: 프로필 생성일)
@@ -248,17 +278,20 @@
 `admin_settings.paywall_mode`에 따라 두 가지 모드 중 하나가 적용됩니다:
 
 #### 광고 모드 (`ads`)
+
 - **AdWarning 모달**: 무료 체험 종료 후 표시
 - **광고 시청 → 미션 잠금 해제**: RewardAd 컴포넌트 (Google AdSense `ad_slot_id` 기반)
 - **대안**: "프리미엄 가입" 버튼으로 구독 화면 이동
 
 #### 구독 모드 (`subscription`)
+
 - **PaywallWarning 모달**: 구독 유도 모달
 - **Paywall 화면**: 결제 플랜 선택 + PortOne 결제
 
 ### 4-3. 구독 플랜 및 가격
 
 #### Mission Plan (카테고리별 개별 구독)
+
 | 기간 | 가격 |
 |------|------|
 | 1개월 | ₩1,000 |
@@ -270,6 +303,7 @@
 - 선택한 카테고리의 미션만 잠금 해제
 
 #### All Access Plan (전체 접근)
+
 | 기간 | 가격 |
 |------|------|
 | 1개월 | ₩3,000 |
@@ -280,29 +314,39 @@
 - 모든 카테고리 미션 잠금 해제 (광고 제거 포함)
 
 #### Paywall 긴급 구독 (All Access만)
+
 - Paywall 화면에서 직접 결제 시: All Access 플랜과 동일 가격
 
 ### 4-4. 결제 시스템 (SubscriptionManager / Paywall)
 
 #### PortOne V1 (테스트 모드)
+
 - `window.IMP.init('imp05646567')` → `IMP.request_pay()` → KG이니시스(html5_inicis)
 - `merchant_uid`: `mid_{timestamp}`
 
 #### PortOne V2 (실 결제 모드)
+
 - `window.PortOne.requestPayment()` → CURRENCY_KRW / CARD
 - Store ID: `store-25bcb4a5-...`
 - Channel Key: `channel-key-eeaefe66-...`
 - **모바일 리다이렉트 처리**:
-  - 모바일 환경에서는 PG사 페이지로 이동 후 돌아올 때 `redirectUrl` (`window.location.href`)로 복귀
+  - 모바일 환경에서는 PG사 페이지로 이동 후 돌아올 때 `redirectUrl` (`myredesign://payment/result`)로 복귀
+  - **Android 앱카드 호출 (Intent)**:
+    - Android 환경의 Capacitor WebView에서 기본적으로 `intent://` 형식의 URL(삼성페이, 카드사 앱 등 앱 구동 URL)을 제대로 처리하지 못해 결제 창에서 멈추는 현상을 방지함.
+    - 프론트엔드(`redirectUrl` 가로채기)나 커스텀 플러그인(`IntentHandlerPlugin`) 대신, 가장 근본적이고 확실한 방법인 **`MainActivity.java`의 `BridgeWebViewClient`를 오버라이딩**하여 네이티브 단에서 `shouldOverrideUrlLoading`을 통해 외부 앱 인텐트를 실행하도록 강제함.
+  - **딥링크(Deep Link) 복귀 및 하얀 화면(White Screen) 에러 해결 로직**:
+    - **이슈:** 외부 카드사/은행 앱에서 결제를 마치고 다시 앱으로 복귀했을 때, React 로컬 서버 연결이 끊어지며 앱이 다시 렌더링되지 않고 하얀 화면(White Screen)만 나타나는 현상.
+    - **원인:** Android 환경에서 외부 인텐트(결제 앱) 실행 후 되돌아오면 Capacitor WebView의 로컬 서버 세션 주소가 유실되어 페이지 로드를 실패하기 때문.
+    - **해결 로직 1 (앱 스키마 설정)**: Paywall.tsx의 결제 요청 파라미터에 `appScheme: 'myredesign'`을 추가하고, `AndroidManifest.xml`의 `<data android:scheme="myredesign" />` 선언과 매칭하여 딥링크 연결점 구성.
+    - **해결 로직 2 (WebView 강제 복구)**: 네이티브 최상단인 `MainActivity.java`의 `onNewIntent`와 `handleUrl` 메서드에서 `myredesign://` 패턴의 딥링크 복귀를 감지. 감지 시점 즉시 `bridge.getServerUrl()` (예: `http://localhost`) 주소를 활용해 `view.loadUrl()`을 다시 호출하여 끊어진 웹뷰 세션을 명시적으로 복구함.
+    - **해결 로직 3 (화면 새로고침 충돌 제거)**: 프론트엔드 코드(App.tsx 등)에서 모종의 충돌을 일으키던 `window.location.reload()` 호출을 모두 제거하고, 안전한 `window.location.href = '/'` 이동 방식으로 대체하여 화면 그리기 충돌을 원천 차단.
+    - **결과:** 이 모든 과정을 통해 앱 복귀 즉시 하얀 화면 없이 메인 UI가 정상 출력되고, React 측의 `appUrlOpen` 이벤트 리스너가 살아남아 유실 없이 `checkMobilePaymentResult` 함수를 통해 결제 완료 처리를 매끄럽게 수행함.
   - **Android 11+ (API 30+) 앱 가시성 확보**:
-    - 보안 강화로 인해 외부 결제 앱(토스, 카드사 앱 등) 호출 시 `AndroidManifest.xml`에 `<queries>` 태그 필수.
-    - 주요 카드사 및 간편결제 앱 패키지명(viva.republica.toss, com.kakao.talk 등)을 명시적으로 선언함.
+    - 보안 강화로 인해 외부 결제 앱(토스, 카드사 앱 등) 호출 시 `AndroidManifest.xml`에 `<queries>` 태그 필수 작성 완료.
   - **State Preservation (Session Loss 방지)**: 리다이렉트 시 상태 유실 방지를 위해 결제 요청 전 `payments` 테이블에 `status='pending'`으로 레코드를 미리 저장.
-  - **Global Payment Check**: `App.tsx`에서 앱 로드 시 `checkMobilePaymentResult`를 전역적으로 호출하여, 어떤 화면으로 복귀하더라도 즉시 성공/실패 알림 표시.
-  - **Strict Validation**: 리다이렉트 URL 파라미터(`imp_success`, `success`)를 **엄격하게 검증**하여, 명시적인 성공 신호(`true`)가 없으면 **무조건 실패/취소**로 처리. 이는 사용자 취소(X 버튼) 시 발생할 수 있는 모호한 상태를 방지함.
-  - 성공 시 `pending` 레코드를 `paid`로 업데이트.
 
 #### 결제 흐름 (Unified Logic: `src/lib/payment.ts`)
+
 1. **결제 요청**:
    - **DB 저장**: `payments` 테이블에 'pending' 상태로 결제 정보 선저장.
    - V1: `IMP.request_pay()` (Test Mode)
@@ -322,15 +366,18 @@
 5. **(Paywall 전용)**: `profiles.subscription_tier` = 'premium' 업데이트
 
 #### 구독 연장
+
 - 기존 활성 구독이 있으면 `end_date` 이후부터 연장 시작
 - 같은 타입(mission/all) + 같은 타겟 카테고리인 경우 연장 적용
 
 #### 결제 취소
+
 - `cancel-payment` Edge Function 호출
 - **48시간 이내** 결제만 취소 가능
 - 취소 시 `payments.status` → 'cancelled', 해당 구독 비활성화
 
 ### 4-5. 구독 확인 로직 (checkStatus)
+
 - `subscriptions` 테이블에서 `status='active'` + 현재 날짜 범위 내 구독 조회
 - `type='all'` → 모든 카테고리 접근 가능
 - `type='mission'` + `target_id` 매칭 → 해당 카테고리만 접근 가능

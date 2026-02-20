@@ -311,6 +311,8 @@ export default function Admin() {
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">전역 무료 체험</span>
                             <div className="flex items-center gap-1">
                                 <input
+                                    title="전역 무료 체험일"
+                                    placeholder="일수"
                                     type="number"
                                     value={globalPaywallDay}
                                     onChange={e => setGlobalPaywallDay(parseInt(e.target.value))}
@@ -326,6 +328,7 @@ export default function Admin() {
                         <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-1 rounded-lg border border-white/5 hover:border-white/10 transition-colors h-14 w-[140px]">
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Paywall Mode</span>
                             <select
+                                title="Paywall Mode"
                                 value={paywallMode}
                                 onChange={(e) => setPaywallMode(e.target.value as 'subscription' | 'ads')}
                                 className="bg-transparent text-xs font-bold text-accent outline-none cursor-pointer text-center w-full"
@@ -341,6 +344,7 @@ export default function Admin() {
                         <div className="flex flex-col items-center justify-center bg-white/5 px-3 py-1 rounded-lg border border-white/5 hover:border-white/10 transition-colors h-14 w-[140px]">
                             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider mb-0.5">Payment Mode</span>
                             <select
+                                title="Payment Mode"
                                 value={paymentMode}
                                 onChange={(e) => setPaymentMode(e.target.value as 'test' | 'real')}
                                 className={`bg-transparent text-xs font-bold outline-none cursor-pointer text-center w-full ${paymentMode === 'real' ? 'text-red-400' : 'text-emerald-400'}`}
@@ -478,6 +482,7 @@ export default function Admin() {
                                                     <Lock size={16} />
                                                 </button>
                                                 <button
+                                                    title="설정"
                                                     onClick={() => openUserDetail(user)}
                                                     className="shrink-0 bg-primary/10 text-primary border border-primary/20 rounded-lg p-2 hover:bg-primary/20 transition-colors"
                                                 >
@@ -549,7 +554,7 @@ export default function Admin() {
                         >
                             <div className="flex justify-between items-center mb-6 shrink-0">
                                 <h3 className="text-lg font-bold">회원 상세 정보</h3>
-                                <button onClick={() => setSelectedUser(null)} className="p-2 hover:bg-white/10 rounded-full">
+                                <button title="닫기" onClick={() => setSelectedUser(null)} className="p-2 hover:bg-white/10 rounded-full">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -627,12 +632,14 @@ export default function Admin() {
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="number"
+                                                title="무료 체험일"
                                                 value={customTrialDays || ''}
                                                 placeholder={String(globalPaywallDay)}
                                                 onChange={e => setCustomTrialDays(parseInt(e.target.value) || null)}
                                                 className="flex-1 bg-white/5 border border-white/10 rounded-lg p-2 text-center font-bold text-sm focus:border-primary outline-none text-white h-9"
                                             />
                                             <button
+                                                title="저장"
                                                 onClick={updateUserTrial}
                                                 className="bg-primary hover:bg-primary/90 text-white w-9 h-9 rounded-lg flex items-center justify-center shadow-lg shadow-primary/20"
                                             >

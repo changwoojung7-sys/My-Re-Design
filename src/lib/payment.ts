@@ -148,8 +148,9 @@ export const processPaymentFailure = async (paymentIdOrImpUid: string) => {
 };
 
 // Check for Mobile Redirect Result
-export const checkMobilePaymentResult = async () => {
-    const urlParams = new URL(window.location.href).searchParams;
+export const checkMobilePaymentResult = async (customUrl?: string) => {
+    const urlString = customUrl || window.location.href;
+    const urlParams = new URL(urlString).searchParams;
 
     // V1 Params
     const imp_success = urlParams.get('imp_success');

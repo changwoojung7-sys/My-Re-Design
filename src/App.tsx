@@ -81,8 +81,12 @@ function Layout() {
 }
 
 import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
+import { useLanguage } from './lib/i18n';
 
 function App() {
+  const { t } = useLanguage();
   // Version Check & Auto Logout Logic
   useEffect(() => {
     const checkVersion = async () => {
@@ -146,52 +150,69 @@ function App() {
     validateSession();
 
     // --- NEW: Global Payment Result Check ---
-    const checkPayment = async () => {
+    const checkPayment = async (customUrl?: string) => {
       // Import dynamically to avoid circular deps if any, or just import at top
       const { checkMobilePaymentResult } = await import('./lib/payment');
-      const result = await checkMobilePaymentResult();
+      const result = await checkMobilePaymentResult(customUrl);
 
       if (result) {
         // Clear URL Params to prevent double-alert on refresh
-        const url = new URL(window.location.href);
-        url.searchParams.delete('imp_success');
-        url.searchParams.delete('error_msg');
-        url.searchParams.delete('imp_uid');
-        url.searchParams.delete('merchant_uid');
-        url.searchParams.delete('paymentId');
-        url.searchParams.delete('code');
-        url.searchParams.delete('message');
-        window.history.replaceState({}, '', url.toString());
+        if (!customUrl) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('imp_success');
+          url.searchParams.delete('error_msg');
+          url.searchParams.delete('imp_uid');
+          url.searchParams.delete('merchant_uid');
+          url.searchParams.delete('paymentId');
+          url.searchParams.delete('code');
+          url.searchParams.delete('message');
+          window.history.replaceState({}, '', url.toString());
+        }
 
         if (result.success) {
           const { data } = result;
           const msg = data
-            ? `결제가 성공적으로 완료되었습니다!\n\n📄 상품명: ${data.planName}\n💰 결제금액: ₩${data.amount.toLocaleString()}`
-            : "결제가 성공적으로 완료되었습니다!";
+            ? `${t.paymentSuccessAlert}\n\n📄 상품명: ${data.planName}\n💰 결제금액: ₩${data.amount.toLocaleString()}`
+            : t.paymentSuccessAlert;
 
           alert(msg);
 
-          // Force reload user profile/data if needed
-          window.location.reload();
+          // Return to home page to clear state completely
+          window.location.href = '/';
         } else {
           // Ensure error message is also localized or clear
           const errorMsg = result.error || 'Unknown error';
 
           // Check for specific technical errors and show user-friendly message
           if (errorMsg.includes('Payment status is') && (errorMsg.includes('FAILED') || errorMsg.includes('CANCELLED'))) {
-            alert('결제가 취소되었거나 승인되지 않았습니다.');
+            alert(t.paymentCancelledOrNotApproved);
           } else if (errorMsg.includes('Payment Cancelled')) {
-            alert('결제가 취소되었습니다.');
+            alert(t.paymentCancelledAlert);
           } else {
-            alert(`결제 처리에 실패했습니다.\n사유: ${errorMsg}`);
+            alert(t.paymentFailedAlert.replace('{error}', errorMsg));
           }
+          window.location.href = '/';
         }
       }
     };
     checkPayment();
 
+    let appUrlListener: any = null;
+    if (Capacitor.isNativePlatform()) {
+      CapacitorApp.addListener('appUrlOpen', (event) => {
+        if (event.url.includes('myredesign://')) {
+          checkPayment(event.url);
+        }
+      }).then(listener => {
+        appUrlListener = listener;
+      });
+    }
+
     return () => {
       subscription.unsubscribe();
+      if (appUrlListener) {
+        appUrlListener.remove();
+      }
     };
   }, []);
 

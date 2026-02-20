@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 
 import { motion } from 'framer-motion';
 import { X, Volume2, VolumeX, Award } from 'lucide-react';
+import { useLanguage } from '../../lib/i18n';
 
 import { AdMob, RewardAdPluginEvents } from '@capacitor-community/admob';
 import { showNativeRewardedAd, ADMOB_UNITS, initializeAdMob } from '../../lib/admob';
@@ -14,6 +15,7 @@ interface RewardAdProps {
 }
 
 export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps) {
+    const { t } = useLanguage();
     const [timeLeft, setTimeLeft] = useState(5); // 5 Seconds Ad for Test
     const [canClose, setCanClose] = useState(false);
     const [isMuted, setIsMuted] = useState(false);
@@ -119,6 +121,8 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                     <button
                         onClick={() => { onReward(); onClose(); }}
                         className="bg-white/20 hover:bg-white/30 text-white p-2 rounded-full backdrop-blur-md transition-all"
+                        title={t.closeButton}
+                        aria-label={t.closeButton}
                     >
                         <X size={24} />
                     </button>
@@ -162,7 +166,12 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                                 className="h-full bg-primary"
                             />
                         </div>
-                        <button onClick={() => setIsMuted(!isMuted)} className="text-white/80 hover:text-white">
+                        <button
+                            onClick={() => setIsMuted(!isMuted)}
+                            className="text-white/80 hover:text-white"
+                            title={isMuted ? t.unmute : t.mute}
+                            aria-label={isMuted ? t.unmute : t.mute}
+                        >
                             {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                         </button>
                     </div>

@@ -4,6 +4,13 @@ export type Language = 'en' | 'ko' | 'ja' | 'zh' | 'es' | 'fr' | 'de' | 'ru';
 
 export const translations = {
     en: {
+        paymentSuccessAlert: "Payment completed successfully!",
+        paymentCancelledOrNotApproved: "Payment was cancelled or not approved.",
+        paymentCancelledAlert: "Payment was cancelled.",
+        paymentFailedAlert: "Payment processing failed.\nReason: {error}",
+        closeButton: "Close",
+        unmute: "Unmute",
+        mute: "Mute",
         // ... (Existing English) ...
         focusArea: "Focus Area",
         plan: "Plan",
@@ -308,6 +315,13 @@ export const translations = {
 
     },
     ko: {
+        paymentSuccessAlert: "결제가 성공적으로 완료되었습니다!",
+        paymentCancelledOrNotApproved: "결제가 취소되었거나 승인되지 않았습니다.",
+        paymentCancelledAlert: "결제가 취소되었습니다.",
+        paymentFailedAlert: "결제 처리에 실패했습니다.\n사유: {error}",
+        closeButton: "닫기",
+        unmute: "음소거 해제",
+        mute: "음소거",
         // ... (Existing Korean) ...
         focusArea: "집중 영역",
         plan: "계획",
@@ -605,6 +619,13 @@ export const translations = {
 
     },
     ja: {
+        paymentSuccessAlert: "決済が正常に完了しました！",
+        paymentCancelledOrNotApproved: "決済がキャンセルされたか承認されていません。",
+        paymentCancelledAlert: "決済がキャンセルされました。",
+        paymentFailedAlert: "決済処理に失敗しました。\n理由: {error}",
+        closeButton: "閉じる",
+        unmute: "ミュート解除",
+        mute: "ミュート",
         focusArea: "重点領域",
         plan: "プラン",
         started: "開始日",
@@ -872,6 +893,13 @@ export const translations = {
 
     },
     zh: {
+        paymentSuccessAlert: "支付成功！",
+        paymentCancelledOrNotApproved: "支付已取消或未获得批准。",
+        paymentCancelledAlert: "支付已取消。",
+        paymentFailedAlert: "支付处理失败。\n原因: {error}",
+        closeButton: "关闭",
+        unmute: "取消静音",
+        mute: "静音",
         focusArea: "重点领域",
         plan: "计划",
         started: "开始日期",
@@ -1139,6 +1167,13 @@ export const translations = {
         language: "语言",
     },
     es: {
+        paymentSuccessAlert: "¡Pago completado con éxito!",
+        paymentCancelledOrNotApproved: "El pago fue cancelado o no aprobado.",
+        paymentCancelledAlert: "El pago fue cancelado.",
+        paymentFailedAlert: "Fallo en el procesamiento del pago。\nRazón: {error}",
+        closeButton: "Cerrar",
+        unmute: "Activar sonido",
+        mute: "Silenciar",
         focusArea: "Área de Enfoque",
         plan: "Plan",
         started: "Iniciado",
@@ -1404,6 +1439,13 @@ export const translations = {
 
     },
     fr: {
+        paymentSuccessAlert: "Paiement effectué avec succès !",
+        paymentCancelledOrNotApproved: "Le paiement a été annulé ou n'a pas été approuvé.",
+        paymentCancelledAlert: "Le paiement a été annulé.",
+        paymentFailedAlert: "Échec du traitement du paiement.\nRaison : {error}",
+        closeButton: "Fermer",
+        unmute: "Rétablir le son",
+        mute: "Sourdine",
         focusArea: "Zone de Concentration",
         plan: "Plan",
         started: "Commencé",
@@ -1669,6 +1711,13 @@ export const translations = {
 
     },
     de: {
+        paymentSuccessAlert: "Zahlung erfolgreich abgeschlossen!",
+        paymentCancelledOrNotApproved: "Die Zahlung wurde storniert oder nicht genehmigt.",
+        paymentCancelledAlert: "Die Zahlung wurde storniert.",
+        paymentFailedAlert: "Zahlungsverarbeitung fehlgeschlagen.\nGrund: {error}",
+        closeButton: "Schließen",
+        unmute: "Stummschaltung aufheben",
+        mute: "Stumm",
         focusArea: "Fokusbereich",
         plan: "Plan",
         started: "Gestartet",
@@ -1934,6 +1983,13 @@ export const translations = {
 
     },
     ru: {
+        paymentSuccessAlert: "Платеж успешно завершен!",
+        paymentCancelledOrNotApproved: "Платеж был отменен или не одобрен.",
+        paymentCancelledAlert: "Платеж был отменен.",
+        paymentFailedAlert: "Не удалось обработать платеж.\nПричина: {error}",
+        closeButton: "Закрыть",
+        unmute: "Включить звук",
+        mute: "Без звука",
         focusArea: "Область Фокуса",
         plan: "План",
         started: "Начато",

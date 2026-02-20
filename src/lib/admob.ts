@@ -7,7 +7,7 @@ export const ADMOB_UNITS = {
     REWARDED_TEST: 'ca-app-pub-3940256099942544/5224354917',
 
     // Real Production ID
-    REWARDED_PROD: 'ca-app-pub-2810872681064029/7646925189'
+    REWARDED_PROD: 'ca-app-pub-2810872681064029/3958830106'
 };
 
 export const initializeAdMob = async () => {

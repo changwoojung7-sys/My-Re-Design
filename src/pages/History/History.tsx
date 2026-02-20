@@ -166,6 +166,7 @@ export default function History() {
                 </div>
                 <div className="relative">
                     <select
+                        title="카테고리 선택"
                         value={selectedCategory}
                         onChange={(e) => setSelectedCategory(e.target.value as GoalCategory)}
                         className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"

@@ -212,8 +212,8 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                             <button
                                 onClick={() => setEditMode(!editMode)}
                                 className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition-all ${editMode
-                                        ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                        : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
                                     }`}
                             >
                                 <Pencil size={14} />
@@ -232,6 +232,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                         </>
                     )}
                     <button
+                        title="닫기"
                         onClick={onClose}
                         className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
                     >
@@ -318,7 +319,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                                 <div key={comment.id} className="bg-white/5 rounded-xl p-3 flex gap-3 border border-white/5">
                                     <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden shrink-0">
                                         {comment.profiles?.profile_image_url ? (
-                                            <img src={comment.profiles.profile_image_url} className="w-full h-full object-cover" />
+                                            <img src={comment.profiles.profile_image_url} alt="프로필 이미지" title="프로필 이미지" className="w-full h-full object-cover" />
                                         ) : (
                                             <User size={14} className="text-slate-300" />
                                         )}
@@ -469,7 +470,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                             alt="Full Screen"
                             className="max-w-full max-h-full rounded-lg shadow-2xl"
                         />
-                        <button className="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2">
+                        <button title="닫기" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2">
                             <X size={32} />
                         </button>
                     </div>
