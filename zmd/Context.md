@@ -341,6 +341,10 @@
     - **해결 로직 2 (WebView 강제 복구)**: 네이티브 최상단인 `MainActivity.java`의 `onNewIntent`와 `handleUrl` 메서드에서 `myredesign://` 패턴의 딥링크 복귀를 감지. 감지 시점 즉시 `bridge.getServerUrl()` (예: `http://localhost`) 주소를 활용해 `view.loadUrl()`을 다시 호출하여 끊어진 웹뷰 세션을 명시적으로 복구함.
     - **해결 로직 3 (화면 새로고침 충돌 제거)**: 프론트엔드 코드(App.tsx 등)에서 모종의 충돌을 일으키던 `window.location.reload()` 호출을 모두 제거하고, 안전한 `window.location.href = '/'` 이동 방식으로 대체하여 화면 그리기 충돌을 원천 차단.
     - **결과:** 이 모든 과정을 통해 앱 복귀 즉시 하얀 화면 없이 메인 UI가 정상 출력되고, React 측의 `appUrlOpen` 이벤트 리스너가 살아남아 유실 없이 `checkMobilePaymentResult` 함수를 통해 결제 완료 처리를 매끄럽게 수행함.
+  - **PG사 결제 취소 시 리다이렉트 원복 실패(<http://null> 에러) 해결 로직**:
+    - **이슈:** 앱카드 등 외부 결제수단에서 '취소'나 '실패'를 누르고 앱으로 돌아올 때 웹뷰에 `http://null/?code=FAILURE_TYPE_PG... ERR_CLEARTEXT_NOT_PERMITTED` 에러 표시.
+    - **원인:** PG사에서 설정된 `redirectUrl`로 리다이렉트 시, 안드로이드 보안 트래픽(Cleartext Traffic) 정책 상 순수 `HTTPS` 프로토콜이 아닌 커스텀 앱 스킴(`myredesign://...`)을 중간 리다이렉트 단계에서 허용하지 않아 트래픽이 차단되며 발생.
+    - **해결 로직 (Edge Function 브릿지)**: `myredesign://...` 을 직접 `redirectUrl`로 넘기지 않고, **안전한 HTTPS 주소를 가진 Supabase Edge Function (`payment-redirect`)**을 먼저 거치게 함. Edge Function이 랜딩 HTML 페이지를 반환하며 그 내부 자바스크립트 로직을 통해 딥링크(`window.location.href = 'myredesign://...;'`)로 앱을 띄우도록 우회시켜 근본적으로 문제를 해결.
   - **Android 11+ (API 30+) 앱 가시성 확보**:
     - 보안 강화로 인해 외부 결제 앱(토스, 카드사 앱 등) 호출 시 `AndroidManifest.xml`에 `<queries>` 태그 필수 작성 완료.
   - **State Preservation (Session Loss 방지)**: 리다이렉트 시 상태 유실 방지를 위해 결제 요청 전 `payments` 테이블에 `status='pending'`으로 레코드를 미리 저장.
