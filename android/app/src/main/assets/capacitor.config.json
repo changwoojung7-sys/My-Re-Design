@@ -1,0 +1,10 @@
+{
+	"appId": "com.calamus.myredesign",
+	"appName": "MyReDesign",
+	"webDir": "dist",
+	"server": {
+		"allowNavigation": [
+			"*"
+		]
+	}
+}
