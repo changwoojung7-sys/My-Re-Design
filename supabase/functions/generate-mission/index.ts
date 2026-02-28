@@ -63,7 +63,7 @@ serve(async (req: Request) => {
         // --- 1. Check Refresh Limits ---
         const today = new Date().toISOString().split('T')[0];
         // Use actual category for per-category tracking (fallback to type for funplay/coaching)
-        const refreshCategory = payload.category || type;
+        const refreshCategory = payload.refreshCategory || payload.category || type;
         if (payload.refresh) {
             const { data: refreshLog } = await supabase
                 .from('mission_refresh_log')
