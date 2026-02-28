@@ -622,6 +622,8 @@ export default function Friends() {
                                         setShowEditGroupModal(true);
                                     }}
                                     className="absolute -top-2 -right-1 w-4 h-4 bg-slate-700 text-white rounded-full flex items-center justify-center shadow-md border border-white/10 hover:bg-slate-600 z-10"
+                                    title="그룹 설정"
+                                    aria-label="그룹 설정"
                                 >
                                     <span className="text-[8px]">⚙️</span>
                                 </button>
@@ -672,6 +674,7 @@ export default function Friends() {
                 <button
                     onClick={handleSearch}
                     disabled={searching}
+                    title="검색"
                     className="w-8 h-8 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-colors shrink-0"
                 >
                     <Search size={14} />
@@ -831,6 +834,8 @@ export default function Friends() {
                                         <button
                                             onClick={() => toggleLike(friend.userGoal.id)}
                                             className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-pink-500 group"
+                                            title="좋아요"
+                                            aria-label="좋아요"
                                         >
                                             <Heart
                                                 size={16}
@@ -843,6 +848,8 @@ export default function Friends() {
                                         <button
                                             onClick={() => handleComment(friend.userGoal.id)}
                                             className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-blue-400 group"
+                                            title="댓글"
+                                            aria-label="댓글"
                                         >
                                             <MessageCircle size={16} className="text-slate-400 group-hover:text-blue-400" />
                                             <span className="text-slate-400">
@@ -903,7 +910,7 @@ export default function Friends() {
                             {/* Header */}
                             <div className="p-4 border-b border-white/5 flex justify-between items-center bg-slate-900 shrink-0">
                                 <h3 className="font-bold text-white">Comments</h3>
-                                <button onClick={() => setShowCommentsId(null)} className="p-2 text-slate-400 hover:text-white">
+                                <button onClick={() => setShowCommentsId(null)} className="p-2 text-slate-400 hover:text-white" title="댓글 닫기" aria-label="댓글 닫기">
                                     <X size={20} />
                                 </button>
                             </div>
@@ -929,6 +936,8 @@ export default function Friends() {
                                                 <button
                                                     onClick={() => deleteComment(comment.id, showCommentsId)}
                                                     className="opacity-0 group-hover:opacity-100 text-red-500 p-2"
+                                                    title="댓글 삭제"
+                                                    aria-label="댓글 삭제"
                                                 >
                                                     <Trash2 size={14} />
                                                 </button>
@@ -952,6 +961,8 @@ export default function Friends() {
                                     <button
                                         onClick={postComment}
                                         disabled={!commentInput.trim()}
+                                        title="댓글 전송"
+                                        aria-label="댓글 전송"
                                         className="p-3 bg-primary text-black rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         <Send size={20} />

@@ -84,7 +84,7 @@
 
 #### 미션 생성 (Mission Generation)
 
-- **AI 생성**: `generateMissions()` / `generateFunPlayMission()` (src/lib/openai.ts)
+- **AI 생성**: `generateMissions()` / `generateFunPlayMissions()` (src/lib/openai.ts)
 - **2단계 프로세스**:
   1. `generateDraftPlan()`: AI가 미션 초안 생성 → `isPreview = true`로 미리보기 표시
   2. `confirmPlan()`: 사용자 "확인 및 시작" 클릭 → DB 저장 → 미션 시작

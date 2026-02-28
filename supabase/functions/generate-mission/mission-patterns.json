@@ -1388,59 +1388,247 @@
         }
     ],
     "funplay": {
-        "archetypes": [
-            {
-                "id": "stealth_spy",
-                "name": "Stealth / Spy",
-                "description": "Actions done secretly without being noticed by others"
-            },
-            {
-                "id": "physical_challenge",
-                "name": "Physical / Challenge",
-                "description": "Mini-dexterity or balance tasks using body parts in weird ways"
-            },
-            {
-                "id": "absurdity_surreal",
-                "name": "Absurdity / Surreal",
-                "description": "Doing something completely illogical or acting out a character"
-            },
-            {
-                "id": "observation_hunter",
-                "name": "Observation / Hunter",
-                "description": "Finding very specific visual patterns or objects in the environment"
-            },
-            {
-                "id": "speed_reflex",
-                "name": "Speed / Reflex",
-                "description": "Tasks that must be done instantly or within a tight count"
-            }
-        ],
-        "mechanics": [
-            "countdown",
-            "non_dominant",
-            "silent_mode",
-            "reverse_order",
-            "tiny_target",
-            "disguise_acting",
-            "one_breath",
-            "freeze_frame",
-            "mirror_mode",
-            "stealth_rule",
-            "constraint_object",
-            "speed_combo"
-        ],
-        "twist_modifiers": [
-            "Use non-dominant hand",
-            "Hold breath while doing it",
-            "Do it in slow motion",
-            "While making a specific face",
-            "Eyes half-closed",
-            "Whispering the whole time",
-            "Standing on one foot",
-            "Balancing something on your head",
-            "Using only two fingers",
-            "While humming a song"
-        ],
+        "archetypes": {
+            "easy": [
+                {
+                    "id": "silly_observer",
+                    "name": "Silly Observer",
+                    "description": "Notice something funny or unusual in your surroundings and react"
+                },
+                {
+                    "id": "sound_detective",
+                    "name": "Sound Detective",
+                    "description": "Identify or mimic specific sounds around you"
+                },
+                {
+                    "id": "finger_artist",
+                    "name": "Finger Artist",
+                    "description": "Create something using just your fingers on a surface"
+                },
+                {
+                    "id": "emoji_actor",
+                    "name": "Emoji Actor",
+                    "description": "Act out a random emoji expression with your face"
+                },
+                {
+                    "id": "color_hunter",
+                    "name": "Color Hunter",
+                    "description": "Find and count specific colors in your environment"
+                },
+                {
+                    "id": "shadow_player",
+                    "name": "Shadow Player",
+                    "description": "Make shapes or characters with shadows"
+                },
+                {
+                    "id": "texture_explorer",
+                    "name": "Texture Explorer",
+                    "description": "Touch and describe unusual textures nearby"
+                },
+                {
+                    "id": "rhythm_maker",
+                    "name": "Rhythm Maker",
+                    "description": "Create a beat using objects around you"
+                },
+                {
+                    "id": "doodle_challenge",
+                    "name": "Doodle Challenge",
+                    "description": "Draw something silly with constraints"
+                },
+                {
+                    "id": "word_inventor",
+                    "name": "Word Inventor",
+                    "description": "Create a new word and define it"
+                }
+            ],
+            "medium": [
+                {
+                    "id": "stealth_spy",
+                    "name": "Stealth Spy",
+                    "description": "Actions done secretly without being noticed by others"
+                },
+                {
+                    "id": "physical_challenge",
+                    "name": "Physical Challenge",
+                    "description": "Mini-dexterity or balance tasks using body parts"
+                },
+                {
+                    "id": "absurdity_surreal",
+                    "name": "Absurdity Surreal",
+                    "description": "Doing something completely illogical or acting out a character"
+                },
+                {
+                    "id": "observation_hunter",
+                    "name": "Observation Hunter",
+                    "description": "Finding very specific visual patterns in the environment"
+                },
+                {
+                    "id": "speed_reflex",
+                    "name": "Speed Reflex",
+                    "description": "Tasks that must be done instantly or within a tight count"
+                },
+                {
+                    "id": "improv_actor",
+                    "name": "Improv Actor",
+                    "description": "Act out a mini-scene or character for 30 seconds"
+                },
+                {
+                    "id": "puzzle_solver",
+                    "name": "Puzzle Solver",
+                    "description": "Solve a quick mental or spatial puzzle under pressure"
+                },
+                {
+                    "id": "memory_flash",
+                    "name": "Memory Flash",
+                    "description": "Memorize and recall specific details from your surroundings"
+                },
+                {
+                    "id": "body_sculptor",
+                    "name": "Body Sculptor",
+                    "description": "Hold unusual poses or shapes with your body"
+                },
+                {
+                    "id": "secret_agent",
+                    "name": "Secret Agent",
+                    "description": "Complete a covert objective without anyone noticing"
+                }
+            ],
+            "hard": [
+                {
+                    "id": "extreme_balance",
+                    "name": "Extreme Balance",
+                    "description": "Complex balance challenges using multiple body parts"
+                },
+                {
+                    "id": "multi_tasker",
+                    "name": "Multi-Tasker",
+                    "description": "Do two completely different actions simultaneously"
+                },
+                {
+                    "id": "time_bomb",
+                    "name": "Time Bomb",
+                    "description": "Complete a complex task within an extremely tight deadline"
+                },
+                {
+                    "id": "chain_reaction",
+                    "name": "Chain Reaction",
+                    "description": "Execute a sequence of rapid actions in perfect order"
+                },
+                {
+                    "id": "blindfold_master",
+                    "name": "Blindfold Master",
+                    "description": "Complete tasks with eyes fully closed using other senses"
+                },
+                {
+                    "id": "reverse_engineer",
+                    "name": "Reverse Engineer",
+                    "description": "Do everyday actions in completely reverse order"
+                },
+                {
+                    "id": "precision_sniper",
+                    "name": "Precision Sniper",
+                    "description": "Hit extremely small or specific targets with objects"
+                },
+                {
+                    "id": "combo_breaker",
+                    "name": "Combo Breaker",
+                    "description": "Combine 3+ different mechanics into one action"
+                },
+                {
+                    "id": "social_dare",
+                    "name": "Social Dare",
+                    "description": "Engage with a stranger or do something publicly unexpected"
+                },
+                {
+                    "id": "impossible_sculptor",
+                    "name": "Impossible Sculptor",
+                    "description": "Build or stack objects in seemingly impossible arrangements"
+                }
+            ]
+        },
+        "mechanics": {
+            "easy": [
+                "countdown_10",
+                "non_dominant_hand",
+                "whisper_mode",
+                "slow_motion",
+                "one_finger_only",
+                "sitting_only",
+                "eyes_squint",
+                "hum_while_doing",
+                "use_left_hand",
+                "gentle_tap"
+            ],
+            "medium": [
+                "countdown_5",
+                "non_dominant",
+                "silent_mode",
+                "reverse_order",
+                "tiny_target",
+                "disguise_acting",
+                "one_breath",
+                "freeze_frame",
+                "mirror_mode",
+                "stealth_rule",
+                "constraint_object",
+                "speed_combo"
+            ],
+            "hard": [
+                "countdown_3",
+                "both_hands_different",
+                "zero_sound",
+                "backwards_movement",
+                "micro_target",
+                "full_character",
+                "two_breaths_max",
+                "statue_hold_10s",
+                "opposite_mirror",
+                "invisible_mode",
+                "single_object_only",
+                "triple_speed",
+                "eyes_closed",
+                "one_leg_only",
+                "continuous_spin"
+            ]
+        },
+        "twist_modifiers": {
+            "easy": [
+                "Use non-dominant hand",
+                "Do it in slow motion",
+                "While making a funny face",
+                "Whispering the whole time",
+                "Using only two fingers",
+                "While humming a song",
+                "With one eye closed",
+                "While nodding your head",
+                "Counting backwards from 10",
+                "While wiggling your toes"
+            ],
+            "medium": [
+                "Hold breath while doing it",
+                "Eyes half-closed",
+                "Standing on one foot",
+                "Balancing something on your head",
+                "While walking in a circle",
+                "Using your non-dominant foot",
+                "While reciting the alphabet backwards",
+                "With arms crossed",
+                "While making animal sounds",
+                "Switching hands every 3 seconds"
+            ],
+            "hard": [
+                "Eyes completely closed",
+                "Standing on tiptoes the entire time",
+                "While spinning slowly",
+                "Balancing on one leg with eyes closed",
+                "Using only your elbows",
+                "While counting in a foreign language",
+                "With both hands behind your back",
+                "While hopping on one foot",
+                "Doing everything in reverse order",
+                "While maintaining a plank position"
+            ]
+        },
         "forbidden": [
             "standard exercises (squats, push-ups, etc.)",
             "generic advice (smile at someone)",

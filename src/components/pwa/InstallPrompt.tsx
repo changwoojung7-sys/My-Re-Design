@@ -69,7 +69,7 @@ export default function InstallPrompt() {
                                 <p className="text-xs text-slate-400">Add to home screen for quick access</p>
                             </div>
                         </div>
-                        <button onClick={() => setIsVisible(false)} className="text-slate-400 hover:text-white">
+                        <button onClick={() => setIsVisible(false)} aria-label="설치 안내 닫기" className="text-slate-400 hover:text-white">
                             <X size={18} />
                         </button>
                     </div>

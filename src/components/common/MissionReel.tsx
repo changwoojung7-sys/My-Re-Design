@@ -226,6 +226,7 @@ export default function MissionReel({ missions, category, onClose }: MissionReel
             <div className="absolute top-0 left-0 right-0 p-6 flex justify-between items-center z-20 bg-gradient-to-b from-black/60 to-transparent">
                 <button
                     onClick={onClose}
+                    aria-label="보상 릴스 닫기"
                     className="p-3 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md text-white transition-all"
                 >
                     <X size={24} />
@@ -234,12 +235,14 @@ export default function MissionReel({ missions, category, onClose }: MissionReel
                 <div className="flex gap-4">
                     <button
                         onClick={() => setIsPlaying(!isPlaying)}
+                        aria-label={isPlaying ? "일시정지" : "재생"}
                         className="p-3 bg-white/10 hover:bg-white/20 rounded-full backdrop-blur-md text-white transition-all"
                     >
                         {isPlaying ? <Pause size={24} /> : <PlayIcon size={24} />}
                     </button>
                     <button
                         onClick={() => setIsMusicPlaying(!isMusicPlaying)}
+                        aria-label={isMusicPlaying ? "음악 끄기" : "음악 켜기"}
                         className={`p-3 rounded-full backdrop-blur-md text-white transition-all ${isMusicPlaying ? 'bg-primary/50' : 'bg-white/10'}`}
                     >
                         {isMusicPlaying ? <Music size={24} className="animate-pulse" /> : <Music size={24} className="opacity-50" />}

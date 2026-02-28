@@ -167,6 +167,7 @@ export default function Onboarding() {
                 <label className="block text-sm text-slate-400 mb-2">{t.age}: {formData.age}</label>
                 <input
                     type="range" min="10" max="80" value={formData.age}
+                    title={`${t.age}: ${formData.age}`}
                     onChange={(e) => !isDemo && setFormData({ ...formData, age: Number(e.target.value) })}
                     disabled={isDemo}
                     className={`w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary ${isDemo ? 'opacity-50 cursor-not-allowed' : ''}`}

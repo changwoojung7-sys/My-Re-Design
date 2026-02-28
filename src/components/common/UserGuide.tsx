@@ -346,6 +346,7 @@ export default function UserGuide({ onClose }: UserGuideProps) {
                 {/* Close Button */}
                 <button
                     onClick={handleComplete}
+                    aria-label="가이드 닫기"
                     className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white transition-colors z-10"
                 >
                     <X size={24} />

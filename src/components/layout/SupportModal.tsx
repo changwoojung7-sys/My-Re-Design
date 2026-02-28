@@ -102,12 +102,14 @@ export default function SupportModal({ isOpen, onClose, initialView = 'main' }: 
                                 onClose();
                             }}
                             className="text-white opacity-5 hover:opacity-20 transition-opacity ml-2"
+                            title="관리자"
+                            aria-label="관리자"
                         >
                             <Lock size={16} />
                         </button>
                     </h2>
                     <div className="flex items-center gap-4">
-                        <button onClick={onClose} className="text-slate-400 hover:text-white">
+                        <button onClick={onClose} className="text-slate-400 hover:text-white" title="닫기" aria-label="닫기">
                             <X size={24} />
                         </button>
                     </div>

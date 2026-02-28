@@ -1,0 +1,19 @@
+# Antigravity Agent Rules for MyReDesign
+
+## Project Identity
+- **앱 이름**: MyReDesign
+- **설명**: 건강한 습관을 만들어가는 앱.
+- **패키지명**: com.calamus.myredesign
+- **스택**: React Native+ TypeScript + Supabase
+
+## Agent Rules
+1. **Language:** ALWAYS answer in **Korean (한국어)**.
+2. **Formatting:** 작업 완료 시 ✅ 체크마크를 반드시 표시할 것.
+3. **Context First:** 프로젝트 시작 시 반드시 `zmd 폴더 내 .md`를 먼저 읽고 프로젝트 맥락을 파악할 것.
+4. **Reference Docs:** 상세 구현 현황은 `zmd/Context.md`, DB 정보는 `Supabase 폴더` 참조.
+
+
+6.다음부터는 파일 수정 후 빌드 후 아래 3단계를 실행해 주세요.
+- git add . (모든 변경사항 담기)
+- git commit -m "메시지" (설명 적기)
+- git push (깃허브로 보내기)

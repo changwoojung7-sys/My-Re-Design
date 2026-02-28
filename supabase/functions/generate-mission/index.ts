@@ -62,17 +62,19 @@ serve(async (req: Request) => {
 
         // --- 1. Check Refresh Limits ---
         const today = new Date().toISOString().split('T')[0];
+        // Use actual category for per-category tracking (fallback to type for funplay/coaching)
+        const refreshCategory = payload.category || type;
         if (payload.refresh) {
             const { data: refreshLog } = await supabase
                 .from('mission_refresh_log')
                 .select('refresh_count')
                 .eq('user_id', userId)
                 .eq('mission_date', today)
-                .eq('category', type)
+                .eq('category', refreshCategory)
                 .maybeSingle();
 
             if (refreshLog && refreshLog.refresh_count >= 3) {
-                return new Response(JSON.stringify({ error: 'Refresh limit reached' }), {
+                return new Response(JSON.stringify({ error: 'Refresh limit reached', refresh_count: refreshLog.refresh_count }), {
                     status: 429,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
@@ -279,42 +281,62 @@ Output Schema:
         }
 
         // ====================
-        // --- FunPlay ---
+        // --- FunPlay (3 Missions) ---
         // ====================
         else if (type === 'funplay') {
             const { userProfile, options } = payload;
+            const difficulty = options.difficulty || 'easy';
 
-            // Pick random archetype & mechanic from library (typed)
-            const archetype = pickRandom(patterns.funplay.archetypes as Archetype[]);
-            const mechanic = pickRandom(patterns.funplay.mechanics as string[]);
-            const twist = pickRandom(patterns.funplay.twist_modifiers as string[]);
+            // Helper to pick N random items
+            const pickRandomN = (arr: any[], n: number) => {
+                const shuffled = [...arr].sort(() => 0.5 - Math.random());
+                return shuffled.slice(0, n);
+            };
+
+            // Pick 3 archetypes, 3 mechanics, 3 twists from difficulty-specific pool
+            const diffArchetypes = (patterns.funplay.archetypes as any)[difficulty] || (patterns.funplay.archetypes as any).easy;
+            const diffMechanics = (patterns.funplay.mechanics as any)[difficulty] || (patterns.funplay.mechanics as any).easy;
+            const diffTwists = (patterns.funplay.twist_modifiers as any)[difficulty] || (patterns.funplay.twist_modifiers as any).easy;
+
+            const selectedArchetypes = pickRandomN(diffArchetypes, 3);
+            const selectedMechanics = pickRandomN(diffMechanics, 3);
+            const selectedTwists = pickRandomN(diffTwists, 3);
 
             const systemPrompt = `Role: Ultimate Game Master Engine. Priority: UNEXPECTEDNESS, NOVELTY.
     Forbidden: ${patterns.funplay.forbidden.join('; ')}.
-If the last mission used the same archetype, STRICTLY pick a different one.`;
+Each of the 3 missions MUST use a DIFFERENT archetype from the list below.
+If the history shows recent missions with the same archetype, STRICTLY pick a different one.
+Output strictly valid JSON only.`;
 
             const userPrompt = `
 User: ${userProfile?.age || 25}y ${userProfile?.gender || 'any'}.
-Req: Diff ${options.difficulty}, Time ${options.time_limit} s, Place ${options.place}, Mood ${options.mood || 'fun'}.
+Req: Difficulty ${difficulty}, Time ${options.time_limit} s, Place ${options.place}, Mood ${options.mood || 'fun'}.
 History: ${recentMissionsJson}
 
-Selected Setup:
-- Archetype: "${archetype.name}" — ${archetype.description}
-- Mechanic: "${mechanic}"
-    - Twist Modifier: "${twist}"
+Selected Setup (use DIFFERENT archetype for each of the 3 missions):
+- Archetype 1: "${selectedArchetypes[0].name}" — ${selectedArchetypes[0].description}
+  Mechanic: "${selectedMechanics[0]}", Twist: "${selectedTwists[0]}"
+- Archetype 2: "${selectedArchetypes[1].name}" — ${selectedArchetypes[1].description}
+  Mechanic: "${selectedMechanics[1]}", Twist: "${selectedTwists[1]}"
+- Archetype 3: "${selectedArchetypes[2].name}" — ${selectedArchetypes[2].description}
+  Mechanic: "${selectedMechanics[2]}", Twist: "${selectedTwists[2]}"
 
-Task: Generate 1 FunPlay mission using the above archetype + mechanic + twist.
-Ensure it is COMPLETELY different from History.
-    Language: ${payload.language || 'ko'}.
+Task: Generate exactly 3 FunPlay missions, one per archetype+mechanic+twist combo above.
+Each mission MUST be COMPLETELY different from History and from each other.
+Language: ${payload.language || 'ko'}.
 
 Output JSON:
 {
-    "category": "funplay",
-        "archetype": "${archetype.id}",
-            "content": "Mission instruction with twist included (1-2 sentences)",
-                "verification_type": "checkbox",
-                    "fingerprint": { "primary_action": "verb", "mechanic": "${mechanic}", "place": "loc" },
-    "reasoning": { "expected_impact": "Why this is fun (1 sentence)" }
+    "missions": [
+        {
+            "category": "funplay",
+            "archetype": "archetype_id",
+            "content": "Mission instruction with twist (1-2 sentences)",
+            "verification_type": "checkbox",
+            "fingerprint": { "primary_action": "verb", "mechanic": "mechanic_name", "place": "loc" },
+            "reasoning": { "expected_impact": "Why this is fun (1 sentence)" }
+        }
+    ]
 }
 `;
 
@@ -362,7 +384,7 @@ Output JSON:
             await supabase.rpc('increment_refresh_count', {
                 p_user_id: userId,
                 p_date: today,
-                p_category: type
+                p_category: refreshCategory
             }).then(async ({ error }: { error: any }) => {
                 // If RPC doesn't exist, fallback to upsert
                 if (error) {
@@ -371,14 +393,14 @@ Output JSON:
                         .select('refresh_count')
                         .eq('user_id', userId)
                         .eq('mission_date', today)
-                        .eq('category', type)
+                        .eq('category', refreshCategory)
                         .maybeSingle();
 
                     const newCount = (existing?.refresh_count || 0) + 1;
                     await supabase.from('mission_refresh_log').upsert({
                         user_id: userId,
                         mission_date: today,
-                        category: type,
+                        category: refreshCategory,
                         refresh_count: newCount
                     }, { onConflict: 'user_id,mission_date,category' });
                 }

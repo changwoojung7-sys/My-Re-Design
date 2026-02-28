@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
-import { generateMissions, generateFunPlayMission } from '../../lib/openai';
+import { generateMissions, generateFunPlayMissions } from '../../lib/openai';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb } from 'lucide-react';
@@ -174,13 +174,10 @@ export default function Today() {
     }, [user]);
 
     // Rerun fetch when Date or Goal changes
-    // Rerun fetch when Date or Goal changes
     useEffect(() => {
         if (user && selectedGoalId && !checkingSubs) {
-            // Load refresh count from local storage
-            const key = `refresh_${user.id}_${selectedGoalId}_${selectedDate}`;
-            const saved = localStorage.getItem(key);
-            setRefreshCount(saved ? parseInt(saved) : 0);
+            // Load refresh count from DB (synced across devices)
+            fetchRefreshCountFromDB();
 
             // Check Ad Cooldown (1 Hour)
             const adKey = `ad_unlocked_${user.id}_${selectedGoalId}_${selectedDate}`;
@@ -199,6 +196,31 @@ export default function Today() {
             fetchMissions();
         }
     }, [selectedDate, selectedGoalId, checkingSubs]);
+
+    // Fetch refresh count from DB for cross-device sync (Always based on TODAY, physical time)
+    const fetchRefreshCountFromDB = async () => {
+        if (!user || !selectedGoal) return;
+
+        const now = new Date();
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+        try {
+            const { data } = await supabase
+                .from('mission_refresh_log')
+                .select('refresh_count')
+                .eq('user_id', user.id)
+                .eq('mission_date', todayStr)
+                .eq('category', selectedGoal.category)
+                .maybeSingle();
+            setRefreshCount(data?.refresh_count || 0);
+        } catch (e) {
+            console.error('Failed to fetch refresh count from DB:', e);
+            setRefreshCount(0);
+        }
+    };
 
     const initData = async () => {
         setLoading(true);
@@ -374,8 +396,16 @@ export default function Today() {
                 setMissions([]);
                 // Logic for Draft Generation:
                 const today = formatLocalYMD(new Date());
-                // Allow generation if selected date is Today or Future
-                if (selectedDate >= today) {
+
+                // 🚨 Paywall Guard: Do NOT generate drafts if paywall should be active.
+                // User must watch ad or subscribe FIRST, then missions are generated.
+                const shouldBlockForPaywall = !hasActiveSubscription
+                    && selectedGoal?.category !== 'funplay'
+                    && trialPhase === 4
+                    && !isAdUnlocked;
+
+                // Allow generation if selected date is Today or Future AND paywall is not blocking
+                if (selectedDate >= today && !shouldBlockForPaywall) {
                     await generateDraftPlan();
                 }
             }
@@ -396,11 +426,10 @@ export default function Today() {
 
         let newMissions: any[] = [];
 
-        // BRANCH: FunPlay Logic
+        // BRANCH: FunPlay Logic (now generates 3 missions like core categories)
         if (selectedGoal?.category === 'funplay') {
-            // Generate 1 Mission for FunPlay
             const details = selectedGoal.details || {};
-            const funplayMission = await generateFunPlayMission(
+            newMissions = await generateFunPlayMissions(
                 user,
                 language,
                 exclusionList,
@@ -412,9 +441,8 @@ export default function Today() {
                 },
                 isRefresh
             );
-            // Wrap in array
-            newMissions = [funplayMission];
-
+            // Limit to 3 missions
+            newMissions = newMissions.slice(0, 3);
         } else {
             // Standard Generation (3 Missions)
             // Note: generateMissions now handles history lookup internally
@@ -468,10 +496,9 @@ export default function Today() {
         setMissions([]);
         await generateDraftPlan(true); // Pass true for refresh
 
-        const newCount = refreshCount + 1;
-        setRefreshCount(newCount);
-        const key = `refresh_${user!.id}_${selectedGoalId}_${selectedDate}`;
-        localStorage.setItem(key, newCount.toString());
+        // Refresh count is now managed by Edge Function in DB (mission_refresh_log)
+        // Re-fetch the count from DB after Edge Function has updated it
+        await fetchRefreshCountFromDB();
         setLoading(false);
     };
 
@@ -852,6 +879,9 @@ export default function Today() {
         if (pendingRefresh) {
             setPendingRefresh(false);
             executeRefresh();
+        } else {
+            // Phase 4 initial entry: Ad watched → now generate missions
+            fetchMissions();
         }
     };
 
@@ -1079,7 +1109,7 @@ export default function Today() {
                             disabled={refreshCount >= 3 || loading}
                             className="bg-primary/20 border border-primary/30 text-xs font-bold text-primary hover:bg-primary/30 hover:text-white hover:border-primary/50 transition-all flex items-center gap-2 px-3 py-1.5 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed z-10 shadow-sm"
                         >
-                            {t.changeMissions?.replace('{n}', (3 - refreshCount).toString())} ↻
+                            {refreshCount >= 3 ? "내일 다시 변경" : `${t.changeMissions?.replace('{n}', (3 - refreshCount).toString())} ↻`}
                         </button>
                     </div>
                 </div>
@@ -1132,6 +1162,8 @@ export default function Today() {
                                                 <button
                                                     onClick={() => !isPreview && openVerify(mission)}
                                                     disabled={isPreview}
+                                                    title={mission.is_completed ? '미션 완료됨' : '미션 인증하기'}
+                                                    aria-label={mission.is_completed ? '미션 완료됨' : '미션 인증하기'}
                                                     className={`mt-1 shrink-0 transition-all ${isPreview ? 'text-slate-600 cursor-default' :
                                                         mission.is_completed ? 'text-green-500 hover:text-green-400' : 'text-slate-500 hover:text-white'
                                                         }`}
