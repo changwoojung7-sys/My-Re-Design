@@ -103,7 +103,6 @@ PaywallWarning 모달 → "확인" 클릭 → Paywall 결제 화면
 
 [Today.tsx L842~856](file:///c:/calamusAppBuild/MyReDesign_App/src/pages/Home/Today.tsx#L842-L856)
 
-```typescript
 const handleAdReward = () => {
     setIsAdUnlocked(true);
     // 1시간 쿨다운 저장 (localStorage)
@@ -112,6 +111,7 @@ const handleAdReward = () => {
     // 대기 중이던 리프레시 실행
     if (pendingRefresh) executeRefresh();
 };
+
 ```
 
 | 항목 | 값 |
@@ -120,6 +120,10 @@ const handleAdReward = () => {
 | 저장 위치 | `localStorage` (세션 기반) |
 | Key 형식 | `ad_unlocked_{userId}_{goalId}_{date}` |
 | 적용 범위 | 해당 목표 + 해당 날짜에만 적용 |
+
+> [!WARNING]
+> 사용자가 보상형 광고 시청 중 **중간에 X 버튼을 눌러 시청을 포기하거나 취소한 경우 `RewardAdPluginEvents.Dismissed` 이벤트는 발생하지만 리워드(`RewardAdPluginEvents.Rewarded`)는 발생하지 않습니다.** 이 경우 보상이 미지급되었음을 안내(`alert`)하고 미션 갱신/기능 언락 등의 보상은 제공하지 않도록 처리되어 있습니다.
+
 
 ---
 
@@ -157,7 +161,23 @@ const handleRefresh = async () => {
 
 ---
 
-## 8. 미션 수 제한 로직
+## 8. 히스토리 탭 무비 플레이 (Play Movie) 정책
+
+[HistoryDetail.tsx](file:///c:/calamusAppBuild/MyReDesign_App/src/pages/History/HistoryDetail.tsx) 에서 구현됩니다.
+
+기존의 무료 체험(Trial Phase) 적용 대상에서 완전히 제외되어, 이 기능은 사용자가 과거 기록들을 특별한 형태(영상/릴스)로 모아보기 위해 추가적인 리소스를 요청한다고 간주하여 **항상 과금(또는 광고 시청)을 전제로 합니다.**
+
+| 사용자 상태 | 무비 플레이 (Play Movie) 동작 |
+|-------------|----------------------------|
+| **Premium 구독자** (All/Category) | **광고 없이 즉시 재생 (MissionReel 오픈)** |
+| **비구독자 및 무료 체험 사용자** | **반드시 보상형 광고(Reward Ad) 1회 끝까지 시청 후 재생** |
+
+- 비구독자의 경우, 무료 체험 기간인 가입 초기 7일 이내라도 `Play Movie` 버튼을 누르면 즉시 Reward Ad가 로드되어 시청을 요구합니다.
+- 중간 취소 시 보상(재생)이 제공되지 않고 알림창이 표출됩니다.
+
+---
+
+## 9. 미션 수 제한 로직
 
 [Today.tsx L350~372](file:///c:/calamusAppBuild/MyReDesign_App/src/pages/Home/Today.tsx#L350-L372)
 
