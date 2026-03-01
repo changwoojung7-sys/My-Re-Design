@@ -26,7 +26,7 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
 
     useEffect(() => {
         let listeners: any[] = [];
-        let rewarded = false; // Guard against duplicate reward
+        let isRewarded = false;
 
         const setupAdMob = async () => {
             if (Capacitor.isNativePlatform()) {
@@ -37,16 +37,14 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
                 // Setup Listeners
                 const onRewarded = await AdMob.addListener(RewardAdPluginEvents.Rewarded, (reward) => {
                     console.log('User rewarded', reward);
-                    if (!rewarded) {
-                        rewarded = true;
-                        onReward(); // Grant the reward
-                    }
-                    // Do NOT close here — let Dismissed handle UI teardown
+                    isRewarded = true;
+                    onReward(); // Grant the reward
                 });
 
                 const onDismissed = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
-                    console.log('Ad dismissed, was rewarded:', rewarded);
-                    onClose(); // Always close the overlay
+                    console.log('Ad dismissed, was rewarded:', isRewarded);
+                    // Only invoke close when dismissed. The reward already happened.
+                    onClose();
                 });
 
                 const onFailed = await AdMob.addListener(RewardAdPluginEvents.FailedToLoad, (error) => {
@@ -56,8 +54,8 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
 
                 listeners = [onRewarded, onDismissed, onFailed];
 
-                // Trigger Ad
-                // Use REWARDED_PROD for release as per policy
+                // Trigger Ad 
+                // Using Production ID as requested
                 const adUnitId = ADMOB_UNITS.REWARDED_PROD;
                 const success = await showNativeRewardedAd(adUnitId);
 
@@ -74,7 +72,7 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
         return () => {
             listeners.forEach(l => l.remove());
         };
-    }, [adSlotId]);
+    }, []);
 
     // Timer Logic for Web Mock
     useEffect(() => {

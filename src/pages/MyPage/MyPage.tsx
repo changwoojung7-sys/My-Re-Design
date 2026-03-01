@@ -149,8 +149,9 @@ export default function MyPage() {
         }
     }, [user?.id, isSubManagerOpen]); // Re-fetch when sub manager closes, but NOT on every user object update (prevents loop)
 
-    // Helper to check if a category is unlocked
     const isCategoryUnlocked = (category: string) => {
+        if (category === 'funplay') return true;
+
         // 1. Check if user has explicit subscription
         const hasAllAccess = activeSubscriptions.some(s => s.type === 'all');
         const hasMissionAccess = activeSubscriptions.some(s => s.type === 'mission' && s.target_id === category);
@@ -158,7 +159,7 @@ export default function MyPage() {
 
         // 2. Check Free Trial Logic (Day Count)
         const g = goals[category as GoalCategory];
-        if (!g.created_at) return true; // Not started yet -> Unlocked (can edit)
+        if (!g?.created_at) return true; // Not started yet -> Unlocked (can edit)
 
         const start = new Date(g.created_at);
         const now = new Date();
