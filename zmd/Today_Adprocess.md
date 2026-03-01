@@ -17,26 +17,30 @@ flowchart TD
 
 ---
 
-## 1. Trial Phase (무료 체험 4단계)
+## 1. 무료 사용일수 (Dynamic Trial Phase)
 
-[Today.tsx L100~170](file:///c:/calamusAppBuild/MyReDesign_App/src/pages/Home/Today.tsx#L100-L170) 에서 구현됩니다.
+[Today.tsx](file:///c:/calamusAppBuild/MyReDesign_App/src/pages/Home/Today.tsx) 에서 구현됩니다.
 
-| Phase | 기간 | 미션 수 | 광고 | 설명 |
+기존에 하드코딩되었던 4단계(Phase 1~4) 방식은 폐기되었습니다. 이제는 사용자의 개별 설정(`custom_free_trial_days`) 또는 글로벌 설정(`globalPaywallDay`)을 통해 동적으로 무료 제공 기한이 결정됩니다.
+
+| 상태 | 기준 | 미션 수 | 광고 | 설명 |
 |-------|------|---------|------|------|
-| **Phase 1** | 1~7일 | 3개 | ❌ 없음 | 완전 무료, 모든 기능 접근 |
-| **Phase 2** | 8~21일 | 3개 | 리프레시 시만 | 미션 변경(Refresh) 시 광고 시청 필요 |
-| **Phase 3** | 22~30일 | 3개 | 리프레시 시만 | Phase 2와 동일 (이전에는 1개 제한이었으나 변경됨) |
-| **Phase 4** | 31일~ | **0개 (잠금)** | ⚠️ Paywall 활성 | 구독 또는 광고 시청 필수 |
+| **무료 기간 내** | 가입일 기준 경과일수 <= 무료 지정일수 | 3개 | 리프레시 시만 | 기간 한정 완전 무료 |
+| **무료 기간 만료** | 가입일 기준 경과일수 > 무료 지정일수 | **0개 (잠금)** | ⚠️ Paywall 활성 | 구독 또는 광고 시청 필수 |
 
 > [!IMPORTANT]
-> Trial 일수는 **선택된 목표의 `created_at`** 기준으로 계산됩니다 (fallback: 프로필 생성일)
+> 경과 일수는 **사용자 가입일 또는 목표의 `created_at`** 기준으로 계산됩니다.
+> 예외적으로 **FunPlay** 목표는 이 기간에 구애받지 않고 **항상 무료**로 이용 가능합니다.
 
 ```typescript
-// L122~L126
-if (diffDays <= 7) setTrialPhase(1);
-else if (diffDays <= 21) setTrialPhase(2);
-else if (diffDays <= 30) setTrialPhase(3);
-else setTrialPhase(4);
+const { data: paywallDayData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
+const globalPaywallDay = paywallDayData?.value ? parseInt(paywallDayData.value, 10) : 5;
+
+// 사용자에 개별 지정된 무료 이용 가능 일수가 있으면 우선 적용, 없으면 글로벌 기본값 적용
+const userFreeDays = user?.custom_free_trial_days ?? globalPaywallDay;
+
+// 경과일수(diffDays)가 무료 이용 가능 일수(userFreeDays)를 넘었는지 확인
+setIsTrialExpired(diffDays > userFreeDays);
 ```
 
 ---

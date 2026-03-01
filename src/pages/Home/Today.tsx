@@ -81,7 +81,7 @@ export default function Today() {
 
     // Monetization & Trial State
     const [accountAgeDays, setAccountAgeDays] = useState<number>(0);
-    const [trialPhase, setTrialPhase] = useState<1 | 2 | 3 | 4>(1);
+    const [isTrialExpired, setIsTrialExpired] = useState(false);
     const [paywallMode, setPaywallMode] = useState<'subscription' | 'ads'>('subscription');
     const [isAdUnlocked, setIsAdUnlocked] = useState(false); // Session-based Unlock
     const [showRewardAd, setShowRewardAd] = useState(false);
@@ -119,18 +119,23 @@ export default function Today() {
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             setAccountAgeDays(diffDays);
 
-            // Determine Phase
-            if (diffDays <= 7) setTrialPhase(1);
-            else if (diffDays <= 21) setTrialPhase(2);
-            else if (diffDays <= 30) setTrialPhase(3);
-            else setTrialPhase(4);
-
             // 2. Fetch Settings
             const { data: slotData } = await supabase.from('admin_settings').select('value').eq('key', 'ad_slot_id').single();
             if (slotData?.value) setAdSlotId(slotData.value);
 
             const { data: modeData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_mode').single();
             if (modeData?.value) setPaywallMode(modeData.value as 'subscription' | 'ads');
+
+            const { data: paywallDayData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
+            const globalPaywallDay = paywallDayData?.value ? parseInt(paywallDayData.value, 10) : 5;
+
+            // Allow user a custom free trial limit, otherwise use global default
+            const userFreeDays = user?.custom_free_trial_days ?? globalPaywallDay;
+
+            // Determine Expiration
+            // diffDays represents "days passed since start".
+            // If diffDays > userFreeDays, then the trial is expired.
+            setIsTrialExpired(diffDays > userFreeDays);
 
             // 3. Check Subscription
             if (user) {
@@ -307,7 +312,7 @@ export default function Today() {
         setLoading(false);
     };
 
-    const fetchMissions = async () => {
+    const fetchMissions = async (forceAdUnlocked?: boolean) => {
         if (!selectedGoalId) return;
 
         try {
@@ -401,12 +406,15 @@ export default function Today() {
                 // User must watch ad or subscribe FIRST, then missions are generated.
                 const shouldBlockForPaywall = !hasActiveSubscription
                     && selectedGoal?.category !== 'funplay'
-                    && trialPhase === 4
-                    && !isAdUnlocked;
+                    && isTrialExpired
+                    && !(isAdUnlocked || forceAdUnlocked);
 
                 // Allow generation if selected date is Today or Future AND paywall is not blocking
                 if (selectedDate >= today && !shouldBlockForPaywall) {
                     await generateDraftPlan();
+                } else if (shouldBlockForPaywall) {
+                    // Critical Fix: Explicitly stop loading if paywall blocks it, so the UI can render the Paywall warning
+                    setLoading(false);
                 }
             }
         } catch (err) {
@@ -481,10 +489,20 @@ export default function Today() {
     const handleRefresh = async () => {
         if (refreshCount >= 3) return;
 
-        if (user?.subscription_tier !== 'premium' && !hasActiveSubscription) {
+        // Ensure we don't trigger Ad if the user is just generating the first mission of the day
+        const isInitialGeneration = missions.length === 0 && draftMissions.length === 0;
+
+        if (user?.subscription_tier !== 'premium' && !hasActiveSubscription && !isInitialGeneration) {
             setPendingRefresh(true);
             setShowRewardAd(true);
             return;
+        }
+
+        if (isInitialGeneration) {
+            // Wait, if it's initial generation, they shouldn't be clicking 'Refresh' anyway, 
+            // the button should say 'Generate Plan' and it should bypass refresh limits.
+            // Actually, the empty state button calls execution directly? 
+            // Let's check the empty state button logic. 
         }
 
         executeRefresh();
@@ -796,7 +814,7 @@ export default function Today() {
     const isFunplay = selectedGoal?.category === 'funplay';
     const hasConfirmedMissions = missions.length > 0;
 
-    const isPaywallActive = !loading && !checkingSubs && !hasActiveSubscription && !isFunplay && trialPhase === 4 && !isAdUnlocked && !hasConfirmedMissions;
+    const isPaywallActive = !loading && !checkingSubs && !hasActiveSubscription && !isFunplay && isTrialExpired && !isAdUnlocked && !hasConfirmedMissions;
 
     useEffect(() => {
         console.log('[Paywall Debug]', {
@@ -825,45 +843,8 @@ export default function Today() {
     }, [selectedGoalId, isPaywallActive, hasActiveSubscription]);
 
     const handlePaywallCancel = async () => {
-        // Smart Fallback: Find any goal that is currently viewable
-        // Viewable = Active Subscription OR Funplay OR (Trial Phase < 4)
-
-        // Since trialPhase is global (based on account age), if it is < 4, actually ALL goals are viewable (except logic phase 4).
-        // BUT isPaywallActive is true ONLY if trialPhase === 4.
-        // So if we are here, trialPhase IS likely 4 (unless state de-sync).
-
-        // We need to find a goal that has Subscription OR is Funplay.
-        setLoading(true);
-        const { data: subs } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', user!.id)
-            .eq('status', 'active')
-            .gte('end_date', new Date().toISOString());
-
-        const safeGoal = userGoals.find(g => {
-            // 1. Funplay is always safe
-            if (g.category === 'funplay') return true;
-
-            // 2. Check Subscription Coverage
-            const isSubscribed = subs?.some(s =>
-                s.type === 'all' ||
-                (s.type === 'mission' && s.target_id === g.category)
-            );
-            if (isSubscribed) return true;
-
-            return false;
-        });
-
-        setLoading(false);
-
-        if (safeGoal && safeGoal.id !== selectedGoalId) {
-            setSelectedGoalId(safeGoal.id);
-            setPaywallStep('none'); // Ensure paywall closes
-        } else {
-            // If NO safe goal whatsoever, then we must go to dashboard
-            window.location.href = '/dashboard';
-        }
+        setPaywallStep('none');
+        window.location.href = '/dashboard';
     };
 
     const handleAdReward = () => {
@@ -881,7 +862,7 @@ export default function Today() {
             executeRefresh();
         } else {
             // Phase 4 initial entry: Ad watched → now generate missions
-            fetchMissions();
+            fetchMissions(true);
         }
     };
 
@@ -997,7 +978,7 @@ export default function Today() {
                             {/* Trial Phase Badge (Visible only to Free Users up to 30 Days) */}
                             {!hasActiveSubscription && currentDayNum <= 30 && (
                                 <span className="text-[10px] bg-white/10 backdrop-blur-md text-white/70 px-2 py-0.5 border border-white/10 rounded-full font-medium ml-1">
-                                    D:{accountAgeDays}/P:{trialPhase}
+                                    D:{accountAgeDays} {isTrialExpired ? '(Exp)' : '(Free)'}
                                 </span>
                             )}
                         </h1>
@@ -1399,10 +1380,14 @@ export default function Today() {
                                 </button>
                             ) : (
                                 <button
-                                    onClick={handleRefresh}
-                                    className="bg-primary text-black font-bold px-8 py-4 rounded-2xl hover:bg-primary/90 transition-all shadow-lg active:scale-95 flex items-center gap-2"
+                                    onClick={executeRefresh}
+                                    disabled={loading || isPastEmpty}
+                                    className="bg-primary hover:bg-primary/90 text-black font-bold px-8 py-4 rounded-2xl transition-all shadow-lg shadow-primary/20 flex flex-col items-center gap-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    {t.generateNewMissions} <Sparkles size={18} />
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg">{t.generateNewMissions}</span>
+                                        <Sparkles size={20} />
+                                    </div>
                                 </button>
                             )}
                         </div>
