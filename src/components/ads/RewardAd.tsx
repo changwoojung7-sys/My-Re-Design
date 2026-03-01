@@ -43,7 +43,10 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
 
                 const onDismissed = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
                     console.log('Ad dismissed, was rewarded:', isRewarded);
-                    // Only invoke close when dismissed. The reward already happened.
+                    if (!isRewarded) {
+                        alert("광고 시청을 끝까지 완료하지 않아 보상이 지급되지 않았습니다.");
+                    }
+                    // Only invoke close when dismissed. The reward already happened or they cancelled.
                     onClose();
                 });
 
@@ -101,6 +104,17 @@ export default function RewardAd({ onReward, onClose, adSlotId }: RewardAdProps)
     // The legacy AdSense web-ad logic is temporarily disabled to allow testing the AdMob flow in browser.
 
     // (Legacy AdSense Block Removed for AdMob Testing)
+
+    // NATIVE MODE LOADING STATE
+    if (isNativeMode) {
+        return (
+            <div className="fixed inset-0 z-[10000] bg-black/95 flex flex-col items-center justify-center p-0 backdrop-blur-md">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-b-4 border-primary mb-6"></div>
+                <h2 className="text-xl font-bold text-white mb-2 tracking-tight">광고를 준비 중입니다</h2>
+                <p className="text-slate-400 text-sm animate-pulse">잠시만 기다려주세요...</p>
+            </div>
+        );
+    }
 
     // MOCK MODE (For Browser Testing with Test ID behavior simulation)
     return (

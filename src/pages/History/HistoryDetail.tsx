@@ -5,8 +5,6 @@ import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
 import MissionReel from '../../components/common/MissionReel';
 import RewardAd from '../../components/ads/RewardAd';
-import AdWarning from '../Home/AdWarning';
-import Paywall from '../Home/Paywall';
 import { useStore } from '../../lib/store';
 
 interface HistoryDetailProps {
@@ -23,11 +21,8 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [showReel, setShowReel] = useState(false);
     const [showAd, setShowAd] = useState(false);
-    const [showAdWarning, setShowAdWarning] = useState(false);
-    const [showPaywall, setShowPaywall] = useState(false);
     const [hasAccess, setHasAccess] = useState(false);
     const [stats, setStats] = useState<{ likes: number, comments: any[] }>({ likes: 0, comments: [] });
-    const [dayCount, setDayCount] = useState(0);
     const [editMode, setEditMode] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -40,22 +35,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
     const checkSubscriptionAccess = async () => {
         if (!user) return;
 
-        // ... (Free Trial Logic - Phase 1 etc) ... 
-        // Logic truncated for brevity in replace block, but need to preserve existing logic if not changing?
-        // Wait, replace_file_content replaces the whole block.
-        // I need to be careful not to delete the logic I just fixed.
-        // It's safer to just inject the imports and state first, then the render logic.
-        // Or re-implement the checkSubscriptionAccess carefully.
-
-        // Let's re-implement checkSubscriptionAccess with the recent fix (using goal.created_at) + day calculation
-
-        // Priority 1: Funplay
-        if (goal.category === 'funplay') {
-            setHasAccess(true);
-            return;
-        }
-
-        // Priority 2: Active Subscription
+        // 프리미엄 구독 여부만 확인 (비구독자는 항상 광고 시청)
         const { data: subs } = await supabase
             .from('subscriptions')
             .select('*')
@@ -73,34 +53,6 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
             }
         }
 
-        // Priority 3: Trial Phase 1 (0-7 Days)
-        let createdDate = new Date();
-        if (goal.created_at) {
-            createdDate = new Date(goal.created_at);
-        } else {
-            // Fallback
-            const { data: profile } = await supabase.from('profiles').select('created_at').eq('id', user.id).single();
-            if (profile?.created_at) {
-                createdDate = new Date(profile.created_at);
-            }
-        }
-
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - createdDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        setDayCount(diffDays);
-
-        if (diffDays <= 7) {
-            setHasAccess(true);
-            return;
-        }
-
-        // Use custom free trial days as override if present
-        if (user.custom_free_trial_days && user.custom_free_trial_days > 0) {
-            setHasAccess(true);
-            return;
-        }
-
         setHasAccess(false);
     };
 
@@ -108,13 +60,8 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
         if (hasAccess) {
             setShowReel(true);
         } else {
-            // Phase 2 (Day 8-21): Just Ad
-            if (dayCount <= 21) {
-                setShowAd(true);
-            } else {
-                // Phase 3+ (Day 22+): Warning First
-                setShowAdWarning(true);
-            }
+            // 비구독자는 바로 광고 시청 모달 오픈
+            setShowAd(true);
         }
     };
 
@@ -241,26 +188,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                 </div>
             </div>
 
-            {/* Ad Warning Modal - Encourages Subscription */}
-            {showAdWarning && (
-                <AdWarning
-                    currentDay={dayCount}
-                    onWatchAd={() => {
-                        setShowAdWarning(false);
-                        setShowAd(true);
-                    }}
-                    onSubscribe={() => {
-                        setShowAdWarning(false);
-                        setShowPaywall(true);
-                    }}
-                    onClose={() => setShowAdWarning(false)}
-                />
-            )}
 
-            {/* Paywall Modal */}
-            {showPaywall && (
-                <Paywall onClose={() => setShowPaywall(false)} />
-            )}
 
             {/* Ad Modal */}
             {showAd && (
