@@ -114,7 +114,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                         phoneNumber: user?.phone || '010-0000-0000',
                         email: user?.email,
                     },
-                    redirectUrl: Capacitor.isNativePlatform() ? 'myredesign://payment/result' : window.location.href, // Required for Mobile V2
+                    redirectUrl: Capacitor.isNativePlatform() ? import.meta.env.VITE_SUPABASE_URL + '/functions/v1/payment-redirect' : window.location.href, // Required for Mobile V2
                     appScheme: 'myredesign',
                 });
 
@@ -159,7 +159,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                 buyer_email: user?.email,
                 buyer_name: user?.nickname,
                 buyer_tel: user?.phone || '010-0000-0000', // Use user's phone if available
-                m_redirect_url: Capacitor.isNativePlatform() ? 'myredesign://payment/result' : window.location.href, // Redirect URL for mobile
+                m_redirect_url: Capacitor.isNativePlatform() ? import.meta.env.VITE_SUPABASE_URL + '/functions/v1/payment-redirect' : window.location.href, // Redirect URL for mobile
                 app_scheme: 'myredesign',
             }, async (rsp: any) => {
                 if (rsp.success) {
