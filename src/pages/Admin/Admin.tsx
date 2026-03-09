@@ -188,6 +188,7 @@ export default function Admin() {
             .from('payments')
             .select('*')
             .eq('user_id', user.id)
+            .neq('status', 'pending')
             .order('created_at', { ascending: false });
 
         setUserMissions(goals || []);
