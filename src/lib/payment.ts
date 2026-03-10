@@ -179,9 +179,8 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
 
     // Case 2: V2 Failure (PortOne V2)
     if (code) {
-        if (code !== 'FAILURE_TYPE_PG') {
-            return { success: false, error: message || `Payment Failed (${code})` };
-        }
+        // PortOne V2에서 code 파라미터가 넘어오면 결제 과정에 문제가 있거나 취소된 경우입니다.
+        return { success: false, error: message || `Payment Failed (${code})` };
     }
 
     // Case 3: Success (V1 or V2)
