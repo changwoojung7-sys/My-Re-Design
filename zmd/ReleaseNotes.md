@@ -19,9 +19,12 @@
 * **Version Name**: `2.1.1`
 * **Version Code**: `30`
 
+> **[필독] 안드로이드 빌드 환경 관련 안내**
+> 최신 버전의 원활한 빌드와 인텐트 권한 반영을 위해, Android Studio 내의 **Gradle JDK** 설정을 **Java 11 이상 (Java 17 권장)**으로 설정해주시기 바랍니다. (Settings > Build, Execution, Deployment > Build Tools > Gradle > Gradle JDK)
+
 ---
 
-# 📢 [업데이트] v2.1.0 (Version Code 29) 배포 안내
+## 📢 [업데이트] v2.1.0 (Version Code 29) 배포 안내
 
 안녕하세요, **My Re Design**입니다!
 최신 안드로이드 기기 지원 및 빌드 안정성을 대폭 강화한 **v2.1.0** 업데이트를 배포했습니다.
@@ -55,7 +58,7 @@
 
 ---
 
-# 📢 [업데이트] v2.0.7 (Version Code 27) 배포 안내
+## 📢 [업데이트] v2.0.7 (Version Code 28) 배포 안내
 
 안녕하세요, **My Re Design**입니다!
 미션 생성 로직의 고도화와 기기 간 동기화 이슈를 완벽히 해결한 **v2.0.7** 업데이트를 배포했습니다.

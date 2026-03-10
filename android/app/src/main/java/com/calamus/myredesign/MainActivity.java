@@ -72,7 +72,17 @@ public class MainActivity extends BridgeActivity {
                 if (view != null) {
                     String serverUrl = this.bridge.getServerUrl();
                     if (serverUrl != null) {
-                         view.loadUrl(serverUrl);
+                        String query = uri.getQuery();
+                        String reloadUrl = serverUrl;
+                        if (query != null && !query.isEmpty()) {
+                            // serverUrl이 /로 끝나고 query가 있으면 적절히 결합
+                            if (reloadUrl.endsWith("/")) {
+                                reloadUrl += "index.html?" + query;
+                            } else {
+                                reloadUrl += "?" + query;
+                            }
+                        }
+                        view.loadUrl(reloadUrl);
                     }
                 }
             }
