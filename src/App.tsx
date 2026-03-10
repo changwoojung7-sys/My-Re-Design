@@ -184,9 +184,12 @@ function App() {
           const errorMsg = result.error || 'Unknown error';
 
           // Check for specific technical errors and show user-friendly message
-          if (errorMsg.includes('Payment status is') && (errorMsg.includes('FAILED') || errorMsg.includes('CANCELLED'))) {
-            alert(t.paymentCancelledOrNotApproved);
-          } else if (errorMsg.includes('Payment Cancelled')) {
+          const isCancelled = 
+            (errorMsg.includes('Payment status is') && (errorMsg.includes('FAILED') || errorMsg.includes('CANCELLED'))) ||
+            errorMsg.toLowerCase().includes('canc') || 
+            errorMsg.includes('취소');
+
+          if (isCancelled) {
             alert(t.paymentCancelledAlert);
           } else {
             alert(t.paymentFailedAlert.replace('{error}', errorMsg));

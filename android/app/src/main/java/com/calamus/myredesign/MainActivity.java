@@ -22,6 +22,18 @@ public class MainActivity extends BridgeActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 
+                // 앱 내부 커스텀 스키마 (myredesign://) 직접 처리
+                if (url.startsWith("myredesign://")) {
+                    try {
+                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                        intent.setPackage(getPackageName()); // 현재 앱으로 명시적 타겟팅
+                        startActivity(intent);
+                        return true;
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
+
                 // 외부 앱 (앱카드 등) 호출 인텐트 캡처
                 if (url.startsWith("intent:") || url.startsWith("market:") || url.startsWith("ispmobile:")) {
                     try {
@@ -75,12 +87,10 @@ public class MainActivity extends BridgeActivity {
                         String query = uri.getQuery();
                         String reloadUrl = serverUrl;
                         if (query != null && !query.isEmpty()) {
-                            // serverUrl이 /로 끝나고 query가 있으면 적절히 결합
-                            if (reloadUrl.endsWith("/")) {
-                                reloadUrl += "index.html?" + query;
-                            } else {
-                                reloadUrl += "?" + query;
+                            if (!reloadUrl.endsWith("/")) {
+                                reloadUrl += "/";
                             }
+                            reloadUrl += "?" + query;
                         }
                         view.loadUrl(reloadUrl);
                     }

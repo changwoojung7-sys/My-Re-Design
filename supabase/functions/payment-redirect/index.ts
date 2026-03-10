@@ -10,6 +10,7 @@ serve(async (req: Request) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="3;url=myredesign://payment/result${search}">
     <title>Payment Result</title>
     <style>
         body { display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; font-family: -apple-system, sans-serif; background-color: #0f172a; color: white; }
@@ -25,15 +26,15 @@ serve(async (req: Request) => {
                 const search = window.location.search;
                 const fallbackUrl = "myredesign://payment/result" + search;
                 // 즉시 이동 시도
-                window.location.replace(fallbackUrl);
-                // 2.5초 후에도 반응 없으면 버튼 표시
+                window.location.href = fallbackUrl;
+                // 3초 후에도 반응 없으면 버튼 표시
                 setTimeout(function() {
                     const msgDiv = document.getElementById("message");
                     if (msgDiv) {
-                        msgDiv.innerHTML = '<p>문제가 발생했거나 앱으로 돌아가지 않는다면 아래 버튼을 눌러주세요.</p>' + 
-                                         '<a href="' + fallbackUrl + '" class="btn">앱 띄우기</a>';
+                        msgDiv.innerHTML = '<p>앱으로 자동으로 돌아가지 않나요?</p>' + 
+                                         '<a href="' + fallbackUrl + '" class="btn">앱으로 돌아가기</a>';
                     }
-                }, 2500);
+                }, 3000);
             })();
         </script>
     </div>
