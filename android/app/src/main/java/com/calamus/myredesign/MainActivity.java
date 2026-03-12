@@ -46,7 +46,7 @@ public class MainActivity extends BridgeActivity {
                     // 버그 픽스: null을 반환하면 안드로이드가 실제 네트워크 응답의 HTML 코드를 텍스트로 읽어버림
                     // 안전한 텅 빈 HTML을 스트림으로 주입하여 완벽한 방어막을 칩니다.
                     String emptyHtml = "<html><head></head><body style=\"background-color:#111827;\"></body></html>";
-                    java.io.InputStream dummyData = new java.io.ByteArrayInputStream(emptyHtml.getBytes(java.nio.charset.StandardCharsets.UTF-8));
+                    java.io.InputStream dummyData = new java.io.ByteArrayInputStream(emptyHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
                     return new android.webkit.WebResourceResponse("text/html", "UTF-8", dummyData);
                 }
                 return super.shouldInterceptRequest(view, request);
