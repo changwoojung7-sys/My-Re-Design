@@ -44,7 +44,12 @@ export default function Paywall({ onClose }: PaywallProps) {
                     alert(t.subscriptionSuccessful || 'Payment Successful!');
                     window.location.href = '/';
                 } else {
-                    alert(`Payment Failed: ${result.error}`);
+                    const errorMsg = result.error?.toLowerCase() || '';
+                    if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
+                        alert('결제를 취소하셨습니다.');
+                    } else {
+                        alert(`결제 실패: ${result.error}`);
+                    }
                 }
             }
         };
@@ -140,12 +145,22 @@ export default function Paywall({ onClose }: PaywallProps) {
                     alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
                     window.location.href = '/';
                 } else {
-                    alert(`Payment processed but failed to save: ${result.error}`);
+                    const errorMsg = result.error?.toLowerCase() || '';
+                    if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
+                        alert('결제 처리가 취소되었습니다.');
+                    } else {
+                        alert(`결제 처리 중 요류가 발생했습니다: ${result.error}`);
+                    }
                 }
 
             } catch (e: any) {
                 console.error("Payment Request Error:", e);
-                alert(`Payment Request Failed: ${e.message}`);
+                const errorMsg = e.message?.toLowerCase() || '';
+                if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
+                    alert('결제를 취소하셨습니다.');
+                } else {
+                    alert(`결제 요청 실패: ${e.message}`);
+                }
             }
 
         } else {
@@ -180,11 +195,21 @@ export default function Paywall({ onClose }: PaywallProps) {
                         alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
                         window.location.href = '/';
                     } else {
-                        alert(`Payment processed but failed to save: ${result.error}`);
+                        const errorMsg = result.error?.toLowerCase() || '';
+                        if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
+                             alert('결제 처리가 취소되었습니다.');
+                        } else {
+                             alert(`결제 처리 중 요류가 발생했습니다: ${result.error}`);
+                        }
                     }
                 } else {
                     localStorage.removeItem('pending_payment');
-                    alert(`Payment Failed: ${rsp.error_msg}`);
+                    const errorMsg = rsp.error_msg?.toLowerCase() || '';
+                    if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
+                        alert('결제를 취소하셨습니다.');
+                    } else {
+                        alert(`결제 실패: ${rsp.error_msg}`);
+                    }
                 }
             });
         }

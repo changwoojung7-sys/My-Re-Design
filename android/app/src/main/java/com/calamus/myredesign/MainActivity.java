@@ -19,8 +19,36 @@ public class MainActivity extends BridgeActivity {
         // Capacitor 기본 BridgeWebViewClient를 확장하여 intent:// 스키마 등을 제어
         this.bridge.getWebView().setWebViewClient(new BridgeWebViewClient(this.bridge) {
             
-            // --- [NEW] Payment Redirect Interceptor (Stronger via onPageStarted) ---
-            // PG사의 302 자동 리다이렉트도 확실히 잡아채기 위해 로딩 시작 지점을 무조건 가로챕니다.
+            // --- [NEW] Payment Redirect Interceptor (MAXIMUM: shouldInterceptRequest) ---
+            // PG사의 리다이렉트를 가장 밑바닥 네트워크 계층에서 아예 끊어버립니다. (화면 까매짐 100% 차단)
+            @Override
+            public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                if (url != null && url.contains("/functions/v1/payment-redirect")) {
+                    Uri redirectUri = Uri.parse(url);
+                    String query = redirectUri.getQuery();
+                    
+                    String serverUrl = bridge.getServerUrl();
+                    if (serverUrl != null) {
+                        String reloadUrl = serverUrl;
+                        if (query != null && !query.isEmpty()) {
+                            if (!reloadUrl.endsWith("/")) {
+                                reloadUrl += "/";
+                            }
+                            reloadUrl += "?" + query;
+                        }
+                        // UI 스레드로 보내서 앱 로컬 화면으로 강제 이동
+                        final String finalReloadUrl = reloadUrl;
+                        view.post(() -> view.loadUrl(finalReloadUrl));
+                    }
+                    
+                    // 핵심: 외부 서버(Edge Function)의 HTML을 다운로드하지 못하게 '텅 빈 데이터'를 반환하여 통신을 물리적으로 끊음
+                    return new android.webkit.WebResourceResponse("text/plain", "UTF-8", null);
+                }
+                return super.shouldInterceptRequest(view, request);
+            }
+
+            // (결제 관련) 보조 안전장치: 혹시라도 넘어간다면 로딩 시작 시점에서 한 번 더 방어
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 if (url != null && url.contains("/functions/v1/payment-redirect")) {
