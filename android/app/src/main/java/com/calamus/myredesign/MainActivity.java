@@ -18,67 +18,7 @@ public class MainActivity extends BridgeActivity {
         
         // Capacitor 기본 BridgeWebViewClient를 확장하여 intent:// 스키마 등을 제어
         this.bridge.getWebView().setWebViewClient(new BridgeWebViewClient(this.bridge) {
-            
-            // --- [NEW] Payment Redirect Interceptor (MAXIMUM: shouldInterceptRequest) ---
-            // PG사의 리다이렉트를 가장 밑바닥 네트워크 계층에서 아예 끊어버립니다. (화면 까매짐 100% 차단)
-            @Override
-            public android.webkit.WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                if (url != null && url.contains("/functions/v1/payment-redirect")) {
-                    Uri redirectUri = Uri.parse(url);
-                    // 한글 등 특수문자 깨짐을 방지하기 위해 인코딩된 원본 쿼리를 그대로 가져옴
-                    String query = redirectUri.getEncodedQuery(); 
-                    
-                    String serverUrl = bridge.getServerUrl();
-                    if (serverUrl != null) {
-                        String reloadUrl = serverUrl;
-                        if (query != null && !query.isEmpty()) {
-                            if (!reloadUrl.endsWith("/")) {
-                                reloadUrl += "/";
-                            }
-                            reloadUrl += "?" + query;
-                        }
-                        // UI 스레드로 보내서 앱 로컬 화면으로 강제 이동
-                        final String finalReloadUrl = reloadUrl;
-                        view.post(() -> view.loadUrl(finalReloadUrl));
-                    }
-                    
-                    // 버그 픽스: null을 반환하면 안드로이드가 실제 네트워크 응답의 HTML 코드를 텍스트로 읽어버림
-                    // 안전한 텅 빈 HTML을 스트림으로 주입하여 완벽한 방어막을 칩니다.
-                    String emptyHtml = "<html><head></head><body style=\"background-color:#111827;\"></body></html>";
-                    java.io.InputStream dummyData = new java.io.ByteArrayInputStream(emptyHtml.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                    return new android.webkit.WebResourceResponse("text/html", "UTF-8", dummyData);
-                }
-                return super.shouldInterceptRequest(view, request);
-            }
 
-            // (결제 관련) 보조 안전장치: 혹시라도 넘어간다면 로딩 시작 시점에서 한 번 더 방어
-            @Override
-            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
-                if (url != null && url.contains("/functions/v1/payment-redirect")) {
-                    // 즉각 까만 창의 로딩 자체를 강제 정지
-                    view.stopLoading();
-                    
-                    Uri redirectUri = Uri.parse(url);
-                    String query = redirectUri.getQuery();
-                    
-                    String serverUrl = bridge.getServerUrl();
-                    if (serverUrl != null) {
-                        String reloadUrl = serverUrl;
-                        if (query != null && !query.isEmpty()) {
-                            if (!reloadUrl.endsWith("/")) {
-                                reloadUrl += "/";
-                            }
-                            reloadUrl += "?" + query;
-                        }
-                        // 끊어낸 뒤 로컬 앱 뷰로 쿼리를 붙여 덮어씌우기
-                        final String finalReloadUrl = reloadUrl;
-                        view.post(() -> view.loadUrl(finalReloadUrl));
-                    }
-                    return; // 더 이상 진행 방지
-                }
-                super.onPageStarted(view, url, favicon);
-            }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
