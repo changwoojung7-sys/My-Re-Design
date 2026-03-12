@@ -26,7 +26,8 @@ public class MainActivity extends BridgeActivity {
                 String url = request.getUrl().toString();
                 if (url != null && url.contains("/functions/v1/payment-redirect")) {
                     Uri redirectUri = Uri.parse(url);
-                    String query = redirectUri.getQuery();
+                    // 한글 등 특수문자 깨짐을 방지하기 위해 인코딩된 원본 쿼리를 그대로 가져옴
+                    String query = redirectUri.getEncodedQuery(); 
                     
                     String serverUrl = bridge.getServerUrl();
                     if (serverUrl != null) {
@@ -42,8 +43,11 @@ public class MainActivity extends BridgeActivity {
                         view.post(() -> view.loadUrl(finalReloadUrl));
                     }
                     
-                    // 핵심: 외부 서버(Edge Function)의 HTML을 다운로드하지 못하게 '텅 빈 데이터'를 반환하여 통신을 물리적으로 끊음
-                    return new android.webkit.WebResourceResponse("text/plain", "UTF-8", null);
+                    // 버그 픽스: null을 반환하면 안드로이드가 실제 네트워크 응답의 HTML 코드를 텍스트로 읽어버림
+                    // 안전한 텅 빈 HTML을 스트림으로 주입하여 완벽한 방어막을 칩니다.
+                    String emptyHtml = "<html><head></head><body style=\"background-color:#111827;\"></body></html>";
+                    java.io.InputStream dummyData = new java.io.ByteArrayInputStream(emptyHtml.getBytes(java.nio.charset.StandardCharsets.UTF-8));
+                    return new android.webkit.WebResourceResponse("text/html", "UTF-8", dummyData);
                 }
                 return super.shouldInterceptRequest(view, request);
             }
