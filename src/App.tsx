@@ -201,21 +201,58 @@ function App() {
     checkPayment();
 
     let appUrlListener: any = null;
+    let resumeListener: any = null;
+
     if (Capacitor.isNativePlatform()) {
-      CapacitorApp.addListener('appUrlOpen', (event) => {
-        if (event.url.includes('myredesign://')) {
-          checkPayment(event.url);
+      const handlePaymentReturn = async () => {
+        // 1. Cold Start 딥링크 캡처
+        const launch = await CapacitorApp.getLaunchUrl();
+        if (launch?.url && launch.url.includes('myredesign://')) {
+          checkPayment(launch.url);
         }
-      }).then(listener => {
-        appUrlListener = listener;
-      });
+
+        // 2. Background -> Foreground 딥링크 캡처
+        CapacitorApp.addListener('appUrlOpen', ({ url }) => {
+          if (url.includes('myredesign://')) {
+            checkPayment(url);
+          }
+        }).then(listener => appUrlListener = listener);
+
+        // 3. 앱 Resume 캡처 (딥링크 없이 PG사 취소/뒤로가기로 백그라운드에서 돌아올 때)
+        CapacitorApp.addListener('resume', async () => {
+          // 약간의 지연을 주어 appUrlOpen이 먼저 처리될 기회를 줌
+          setTimeout(async () => {
+             const pending = localStorage.getItem('pending_payment');
+             if (pending) {
+               // 딥링크가 안 왔는데 pending이 남아있다면 서버 상태 조회를 통해 복구/취소 처리
+               const { checkPendingPaymentAndRecover } = await import('./lib/payment');
+               const result = await checkPendingPaymentAndRecover();
+               if (result) {
+                 if (result.success) {
+                    alert(t.paymentSuccessAlert || '결제가 성공적으로 복구되었습니다.');
+                    window.location.href = '/';
+                 } else {
+                    const errorMsg = result.error || '';
+                    if (errorMsg.includes('취소') || errorMsg.includes('미완료')) {
+                      // Silently ignore or show brief toast if needed, alert is too aggressive for simple back button
+                      console.log('Payment cancelled/uncompleted on resume.');
+                    } else {
+                      alert(`결제 복구 실패: ${errorMsg}`);
+                    }
+                 }
+               }
+             }
+          }, 1000);
+        }).then(listener => resumeListener = listener);
+      };
+
+      handlePaymentReturn();
     }
 
     return () => {
       subscription.unsubscribe();
-      if (appUrlListener) {
-        appUrlListener.remove();
-      }
+      if (appUrlListener) appUrlListener.remove();
+      if (resumeListener) resumeListener.remove();
     };
   }, []);
 

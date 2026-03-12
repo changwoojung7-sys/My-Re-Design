@@ -244,3 +244,75 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
 
     return null;
 };
+
+// 앱이 Background에서 Foreground로 돌아올 때 (resume) 딥링크 없이 돌아온 경우 대비 서버 검증
+export const checkPendingPaymentAndRecover = async () => {
+    try {
+        const pendingPaymentStr = localStorage.getItem('pending_payment');
+        if (!pendingPaymentStr) return null;
+
+        const { data: userData } = await supabase.auth.getUser();
+        if (!userData?.user) {
+            localStorage.removeItem('pending_payment');
+            return null;
+        }
+
+        // DB에서 최신 pending 결제내역 조회
+        const { data: pendingRecord } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('user_id', userData.user.id)
+            .eq('status', 'pending')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (pendingRecord) {
+            const mode = pendingRecord.merchant_uid.startsWith('pay_') ? 'real' : 'test';
+            
+            try {
+                // 포트원 검증(verify-payment) 호출로 실제 결제 여부 파악
+                const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+                    body: {
+                        imp_uid: mode === 'real' ? undefined : pendingRecord.imp_uid,
+                        payment_id: mode === 'real' ? pendingRecord.imp_uid : undefined,
+                        merchant_uid: pendingRecord.merchant_uid,
+                        mode: mode
+                    }
+                });
+
+                if (verifyError || verifyData?.error) {
+                    // 미완료 또는 검증 실패 -> 취소된 것으로 간주
+                    await processPaymentFailure(pendingRecord.merchant_uid);
+                    localStorage.removeItem('pending_payment');
+                    return { success: false, error: '결제가 취소되었거나 정상적으로 완료되지 않았습니다.' };
+                }
+
+                // 검증 성공 -> JS 레이어에서 못 잡은 딥링크 대신 성공 처리 진행
+                const paymentData = JSON.parse(pendingPaymentStr);
+                localStorage.removeItem('pending_payment');
+
+                return await processPaymentSuccess(
+                    pendingRecord.imp_uid || pendingRecord.merchant_uid,
+                    paymentData.mode,
+                    paymentData.tier,
+                    paymentData.planType,
+                    paymentData.targetCategory,
+                    new Date(paymentData.startDate),
+                    new Date(paymentData.endDate),
+                    pendingRecord.merchant_uid
+                );
+            } catch (e) {
+                console.warn('Could not verify pending payment on resume:', e);
+                return { success: false, error: '서버 상태를 확인하는 중 오류가 발생했습니다.' };
+            }
+        } else {
+            // DB에도 pending 상태가 없으면 지워버림 (이미 콜백 등에서 처리됨)
+            localStorage.removeItem('pending_payment');
+        }
+    } catch (e) {
+        console.error('Error in checkPendingPaymentAndRecover:', e);
+    }
+    return null;
+};
+

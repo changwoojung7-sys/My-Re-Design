@@ -24,18 +24,6 @@ public class MainActivity extends BridgeActivity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 String url = request.getUrl().toString();
                 
-                // 앱 내부 커스텀 스키마 (myredesign://) 직접 처리
-                if (url.startsWith("myredesign://")) {
-                    try {
-                        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                        intent.setPackage(getPackageName()); // 현재 앱으로 명시적 타겟팅
-                        startActivity(intent);
-                        return true;
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-
                 // 외부 앱 (앱카드 등) 호출 인텐트 캡처
                 if (url.startsWith("intent:") || url.startsWith("market:") || url.startsWith("ispmobile:")) {
                     try {
@@ -69,35 +57,29 @@ public class MainActivity extends BridgeActivity {
                     }
                 }
                 
+                // myredesign:// 는 여기서 startActivity 하지 말고 Capacitor/Android intent-filter에 맡김
                 return super.shouldOverrideUrlLoading(view, request);
             }
         });
     }
 
-    // 딥링크 복귀 시 웹뷰 하얀화면 복구 처리
+    // 딥링크 복귀 (JS appUrlOpen 이벤트 전달) 처리
     @Override
     public void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent != null && intent.getData() != null) {
-            Uri uri = intent.getData();
-            // 외부 결제 후 'myredesign://...' 스키마로 복귀 시 유실된 브릿지 세션을 복구
-            if ("myredesign".equals(uri.getScheme())) {
-                WebView view = this.bridge.getWebView();
-                if (view != null) {
-                    String serverUrl = this.bridge.getServerUrl();
-                    if (serverUrl != null) {
-                        String query = uri.getQuery();
-                        String reloadUrl = serverUrl;
-                        if (query != null && !query.isEmpty()) {
-                            if (!reloadUrl.endsWith("/")) {
-                                reloadUrl += "/";
-                            }
-                            reloadUrl += "?" + query;
-                        }
-                        view.loadUrl(reloadUrl);
-                    }
-                }
-            }
+        
+        if (intent == null) return;
+        
+        // 중요: 현재 Activity의 intent 갱신 (JS의 getLaunchUrl() 등이 바라보게 됨)
+        setIntent(intent);
+
+        if (this.bridge != null) {
+            this.bridge.onNewIntent(intent); // Capacitor 기본 딥링크 이벤트 전달
+        }
+
+        Uri uri = intent.getData();
+        if (uri != null) {
+            android.util.Log.d("MYAPP", "onNewIntent uri=" + uri.toString());
         }
     }
 }
