@@ -18,14 +18,15 @@ public class MainActivity extends BridgeActivity {
         
         // Capacitor 기본 BridgeWebViewClient를 확장하여 intent:// 스키마 등을 제어
         this.bridge.getWebView().setWebViewClient(new BridgeWebViewClient(this.bridge) {
+            
+            // --- [NEW] Payment Redirect Interceptor (Stronger via onPageStarted) ---
+            // PG사의 302 자동 리다이렉트도 확실히 잡아채기 위해 로딩 시작 지점을 무조건 가로챕니다.
             @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                
-                // --- [NEW] Payment Redirect Interceptor ---
-                // 외부 PG사에서 결제가 끝나고 리다이렉트될 때, Edge Function HTML 렌더링에 의한
-                // '까만 화면' 이슈를 겪지 않도록 안드로이드 단에서 찰나의 순간에 쿼리를 들고 앱(로컬)으로 강제 복귀시킵니다.
-                if (url.contains("/functions/v1/payment-redirect")) {
+            public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+                if (url != null && url.contains("/functions/v1/payment-redirect")) {
+                    // 즉각 까만 창의 로딩 자체를 강제 정지
+                    view.stopLoading();
+                    
                     Uri redirectUri = Uri.parse(url);
                     String query = redirectUri.getQuery();
                     
@@ -38,13 +39,19 @@ public class MainActivity extends BridgeActivity {
                             }
                             reloadUrl += "?" + query;
                         }
-                        // UI 스레드 안전성 확보를 위해 post 내부에서 loadUrl 호출
+                        // 끊어낸 뒤 로컬 앱 뷰로 쿼리를 붙여 덮어씌우기
                         final String finalReloadUrl = reloadUrl;
                         view.post(() -> view.loadUrl(finalReloadUrl));
-                        return true; // 외부 Edge Function 페이지 접속을 차단하고 낚아챔 완료
                     }
+                    return; // 더 이상 진행 방지
                 }
+                super.onPageStarted(view, url, favicon);
+            }
 
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                String url = request.getUrl().toString();
+                
                 // 앱 내부 커스텀 스키마 (myredesign://) 직접 처리
                 if (url.startsWith("myredesign://")) {
                     try {
