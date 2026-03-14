@@ -83,6 +83,8 @@ function Layout() {
 import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
 import { useLanguage } from './lib/i18n';
 import { usePaymentReturn } from './lib/usePaymentReturn';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 
 function App() {
   const { t } = useLanguage();
@@ -152,6 +154,56 @@ function App() {
       subscription.unsubscribe();
     };
   }, []); // End of auth check useEffect
+
+  // ─────────────────────────────────────────────────────────────
+  // [추가] appUrlOpen — 결제 후 앱 복귀 시 이벤트 수신 (App 최상위 등록)
+  // Paywall이 마운트되기 전에 이벤트가 와도 놓치지 않음
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const listenerPromise = CapacitorApp.addListener('appUrlOpen', async (event) => {
+      console.log('[App] appUrlOpen 수신:', event.url);
+
+      if (!event.url.includes('payment/result')) return;
+
+      const params = new URLSearchParams(event.url.split('?')[1]);
+      const code    = params.get('code');      // SUCCESS | FAILURE_TYPE_PG
+      const message = params.get('message') || params.get('error_msg') || '';
+
+      if (code === 'FAILURE_TYPE_PG') {
+        // ── 결제 취소/실패 ──────────────────────────────────────
+        localStorage.removeItem('pending_payment');
+        const isCancel = message.includes('취소') || message.toLowerCase().includes('cancel');
+        if (isCancel) {
+          alert('결제를 취소하셨습니다.');
+        } else {
+          alert(`결제 실패: ${message || '알 수 없는 오류'}`);
+        }
+
+      } else if (code === 'SUCCESS') {
+        // ── 결제 성공 ─────────────────────────────────────────
+        try {
+          const { checkMobilePaymentResult } = await import('./lib/payment');
+          const result = await checkMobilePaymentResult();
+          if (result?.success) {
+            localStorage.removeItem('pending_payment');
+            alert(t.subscriptionSuccessful || '결제가 성공적으로 완료되었습니다.');
+            window.location.href = '/';
+          } else {
+            alert(`결제 처리 오류: ${result?.error || '서버 오류'}`);
+          }
+        } catch (e: any) {
+          console.error('[App] 결제 성공 처리 오류:', e);
+          alert(`결제 처리 중 오류: ${e.message}`);
+        }
+      }
+    });
+
+    return () => {
+      listenerPromise.then(l => l.remove());
+    };
+  }, [t.subscriptionSuccessful]); // t는 언어 변경 대응용
 
   // --- NEW: Global Payment Result Check via Custom Hook ---
   usePaymentReturn({
