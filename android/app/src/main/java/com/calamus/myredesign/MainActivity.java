@@ -241,10 +241,11 @@ public class MainActivity extends BridgeActivity {
 
     private void cleanupPopupWebView() {
         if (popupWebView != null) {
-            popupWebView.stopLoading();
-            popupWebView.loadUrl("about:blank");
-            popupWebView.destroy();
-            popupWebView = null;
+            WebView toDestroy = popupWebView;
+            popupWebView = null; // 먼저 null로 해서 재진입 방지
+            toDestroy.stopLoading();
+            toDestroy.loadUrl("about:blank");
+            toDestroy.destroy();
         }
     }
 
@@ -290,7 +291,12 @@ public class MainActivity extends BridgeActivity {
                 String fallbackUrl = intent.getStringExtra("browser_fallback_url");
                 if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
                     Log.d(TAG, "Loading browser_fallback_url = " + fallbackUrl);
-                    view.loadUrl(fallbackUrl);
+                    // [수정] view가 null이면(팝업 컨텍스트 등) 메인 WebView에 fallback 로드
+                    WebView target = (view != null) ? view
+                            : (bridge != null ? bridge.getWebView() : null);
+                    if (target != null) {
+                        target.loadUrl(fallbackUrl);
+                    }
                     return true;
                 }
                 String packageName = intent.getPackage();
@@ -313,7 +319,9 @@ public class MainActivity extends BridgeActivity {
 
     private boolean launchExternalIntent(String url) {
         if (url.startsWith("intent:")) {
-            return handleIntentScheme(null, url);
+            // [수정] null 대신 메인 WebView를 전달해 fallback URL 로드 가능하게
+            WebView mainView = (bridge != null) ? bridge.getWebView() : null;
+            return handleIntentScheme(mainView, url);
         }
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
