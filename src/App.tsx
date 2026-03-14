@@ -96,11 +96,27 @@ function App() {
       if (storedVersion !== APP_VERSION) {
         console.log(`[System] New version detected (${storedVersion} -> ${APP_VERSION}). Clearing session.`);
 
+        // [수정] 결제 진행 중이면 버전 업데이트만 하고 로그아웃 건너뜀
+        // restoreApp() 후 React 재초기화 시 진행 중인 결제가 날아가는 것을 방지
+        const pendingPayment = localStorage.getItem('pending_payment');
+        if (pendingPayment) {
+          console.log('[System] Payment in progress, skipping session clear.');
+          localStorage.setItem('app_version', APP_VERSION);
+          return;
+        }
+
         // 1. Sign out from Supabase (clears tokens)
         await supabase.auth.signOut();
 
-        // 2. Clear Local Storage (clears any cached state)
+        // 2. Clear Local Storage — pending_payment는 결제 복구용으로 보존
+        const keysToKeep = ['pending_payment'];
+        const savedValues: Record<string, string> = {};
+        keysToKeep.forEach(k => {
+          const v = localStorage.getItem(k);
+          if (v) savedValues[k] = v;
+        });
         localStorage.clear();
+        Object.entries(savedValues).forEach(([k, v]) => localStorage.setItem(k, v));
 
         // 3. Set new version
         localStorage.setItem('app_version', APP_VERSION);
@@ -116,32 +132,35 @@ function App() {
       console.log(`[Auth] Event: ${event}`, session?.user?.id);
 
       if (event === 'SIGNED_OUT') {
-        // Clear global store if Supabase says we are logged out
+        // [수정] 결제 복귀 직후 WebView 재로드 시 세션이 일시적으로 SIGNED_OUT으로 잡힘
+        // pending_payment가 있으면 결제 중이므로 로그아웃 이벤트 무시
+        if (localStorage.getItem('pending_payment')) {
+          console.log('[Auth] SIGNED_OUT ignored — payment in progress.');
+          return;
+        }
         useStore.getState().setUser(null);
-        // Optional: Clear persisted state manually if needed, but setUser(null) usually triggers UI update
       } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        // Ideally we might want to refresh the user profile here too to ensure data consistency
-        // But for now, ensure we at least have a user
         if (!useStore.getState().user && session?.user) {
-          // We have a session but no store user? Fetch profile.
-          // This handles "Tab Refresh" cases well if persist didn't work, 
-          // BUT since we use persist, this is a fallback.
-          // Let's rely on the Login page to set the full user with profile data.
+          // 세션은 있지만 스토어에 유저가 없는 경우 — Login 페이지에서 처리
         }
       }
     });
 
     // Initial Check: Validate Session
     const validateSession = async () => {
+      // [수정] 결제 복귀 직후 React 재초기화 시 세션이 일시적으로 없을 수 있음
+      // pending_payment가 있으면 결제 진행 중이므로 로그아웃 건너뜀
+      if (localStorage.getItem('pending_payment')) {
+        console.log('[Auth] validateSession: payment in progress, skipping logout check.');
+        return;
+      }
+
       const { data: { session }, error } = await supabase.auth.getSession();
       const currentUser = useStore.getState().user;
 
       if (!session && currentUser) {
         console.warn("[Auth] Stale State Detected: User exists in Store but no active Supabase Session. Logging out.");
-        // We have a UI user, but no Supabase key. This causes the RLS errors.
-        // Action: Clear UI state to force re-login.
         useStore.getState().setUser(null);
-        // supabase.auth.signOut(); // Just to be sure
       } else if (error) {
         console.error("[Auth] Session check error:", error);
       } else if (session) {
@@ -157,7 +176,7 @@ function App() {
 
   // ─────────────────────────────────────────────────────────────
   // [추가] appUrlOpen — 결제 후 앱 복귀 시 이벤트 수신 (App 최상위 등록)
-  // Paywall이 마운트되기 전에 이벤트가 와도 놓치지 않음
+  // Paywall이 마운트되기 전에도 이벤트를 놓치지 않음
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -168,24 +187,30 @@ function App() {
       if (!event.url.includes('payment/result')) return;
 
       const params = new URLSearchParams(event.url.split('?')[1]);
-      const code    = params.get('code');      // SUCCESS | FAILURE_TYPE_PG
+      const code = params.get('code');      // KG이니시스: SUCCESS | FAILURE_TYPE_PG
       const message = params.get('message') || params.get('error_msg') || '';
+      const paymentId = params.get('paymentId'); // 네이버페이 등 V2: pay_xxxxx
+      const txId = params.get('txId');       // 네이버페이 등 V2: uuid
 
-      if (code === 'FAILURE_TYPE_PG') {
-        // ── 결제 취소/실패 ──────────────────────────────────────
+      // 결제 취소/실패: code=FAILURE_TYPE_PG
+      const isFailed = code === 'FAILURE_TYPE_PG';
+      // 결제 성공: KG이니시스(code=SUCCESS) 또는 네이버페이 V2(code 없이 paymentId+txId)
+      const isSuccess = code === 'SUCCESS' || (!code && !!paymentId && !!txId);
+
+      console.log('[App] 판정 — isFailed:', isFailed, 'isSuccess:', isSuccess, 'code:', code, 'paymentId:', paymentId);
+
+      if (isFailed) {
+        // ── 취소/실패 ───────────────────────────────────────────
         localStorage.removeItem('pending_payment');
         const isCancel = message.includes('취소') || message.toLowerCase().includes('cancel');
-        if (isCancel) {
-          alert('결제를 취소하셨습니다.');
-        } else {
-          alert(`결제 실패: ${message || '알 수 없는 오류'}`);
-        }
+        alert(isCancel ? '결제를 취소하셨습니다.' : `결제 실패: ${message || '알 수 없는 오류'}`);
 
-      } else if (code === 'SUCCESS') {
-        // ── 결제 성공 ─────────────────────────────────────────
+      } else if (isSuccess) {
+        // ── 성공 — 서버 검증 후 구독 반영 ─────────────────────
         try {
           const { checkMobilePaymentResult } = await import('./lib/payment');
-          const result = await checkMobilePaymentResult();
+          // event.url 전체를 넘겨 네이버페이 파라미터도 그대로 전달
+          const result = await checkMobilePaymentResult(event.url);
           if (result?.success) {
             localStorage.removeItem('pending_payment');
             alert(t.subscriptionSuccessful || '결제가 성공적으로 완료되었습니다.');
@@ -197,13 +222,15 @@ function App() {
           console.error('[App] 결제 성공 처리 오류:', e);
           alert(`결제 처리 중 오류: ${e.message}`);
         }
+      } else {
+        console.warn('[App] appUrlOpen: 알 수 없는 파라미터', event.url);
       }
     });
 
     return () => {
       listenerPromise.then(l => l.remove());
     };
-  }, [t.subscriptionSuccessful]); // t는 언어 변경 대응용
+  }, [t.subscriptionSuccessful]);
 
   // --- NEW: Global Payment Result Check via Custom Hook ---
   usePaymentReturn({
@@ -230,39 +257,39 @@ function App() {
       if (!pendingRecord) return { status: 'NOT_FOUND' };
 
       if (pendingRecord.status === 'pending') {
-         const mode = orderId.startsWith('pay_') ? 'real' : 'test';
-         const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-             body: {
-                 imp_uid: mode === 'real' ? undefined : pendingRecord.imp_uid,
-                 payment_id: mode === 'real' ? pendingRecord.imp_uid : undefined,
-                 merchant_uid: orderId,
-                 mode: mode
-             }
-         });
+        const mode = orderId.startsWith('pay_') ? 'real' : 'test';
+        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+          body: {
+            imp_uid: mode === 'real' ? undefined : pendingRecord.imp_uid,
+            payment_id: mode === 'real' ? pendingRecord.imp_uid : undefined,
+            merchant_uid: orderId,
+            mode: mode
+          }
+        });
 
-         if (verifyError || verifyData?.error) {
-             const { processPaymentFailure } = await import('./lib/payment');
-             await processPaymentFailure(orderId);
-             return { status: 'FAILED', message: verifyData?.error || '검증 실패' };
-         }
-         
-         // 결제 실제 성공 처리 반영
-         const { processPaymentSuccess } = await import('./lib/payment');
-         const pendingPaymentStr = localStorage.getItem('pending_payment');
-         if (pendingPaymentStr) {
-             const paymentData = JSON.parse(pendingPaymentStr);
-             await processPaymentSuccess(
-                pendingRecord.imp_uid || pendingRecord.merchant_uid,
-                paymentData.mode,
-                paymentData.tier,
-                paymentData.planType,
-                paymentData.targetCategory,
-                new Date(paymentData.startDate),
-                new Date(paymentData.endDate),
-                pendingRecord.merchant_uid
-             );
-         }
-         return { status: 'PAID' }; 
+        if (verifyError || verifyData?.error) {
+          const { processPaymentFailure } = await import('./lib/payment');
+          await processPaymentFailure(orderId);
+          return { status: 'FAILED', message: verifyData?.error || '검증 실패' };
+        }
+
+        // 결제 실제 성공 처리 반영
+        const { processPaymentSuccess } = await import('./lib/payment');
+        const pendingPaymentStr = localStorage.getItem('pending_payment');
+        if (pendingPaymentStr) {
+          const paymentData = JSON.parse(pendingPaymentStr);
+          await processPaymentSuccess(
+            pendingRecord.imp_uid || pendingRecord.merchant_uid,
+            paymentData.mode,
+            paymentData.tier,
+            paymentData.planType,
+            paymentData.targetCategory,
+            new Date(paymentData.startDate),
+            new Date(paymentData.endDate),
+            pendingRecord.merchant_uid
+          );
+        }
+        return { status: 'PAID' };
       }
 
       if (pendingRecord.status === 'paid') return { status: 'PAID' };
