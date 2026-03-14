@@ -101,7 +101,8 @@ public class MainActivity extends BridgeActivity {
 
                         // intent: / market: / ispmobile: 외부 앱 처리
                         if (url.startsWith("intent:")) {
-                            handleIntentScheme(wv, url);
+                            // 외부 메서드나 헬퍼를 통해 처리 가능하게 메서드 위치 공유 필요
+                            launchExternalIntent(url); 
                             return true;
                         }
                         if (url.startsWith("market:") || url.startsWith("ispmobile:")) {
@@ -275,6 +276,55 @@ public class MainActivity extends BridgeActivity {
     }
 
     // ──────────────────────────────────────────────────────────────
+    // 외부 앱 실행 공통 헬퍼 (intent 스킴 포함)
+    // ──────────────────────────────────────────────────────────────
+    private boolean handleIntentScheme(WebView view, String url) {
+        try {
+            Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+            if (intent == null) return true;
+
+            try {
+                startActivity(intent);
+                return true;
+            } catch (ActivityNotFoundException e) {
+                String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
+                    Log.d(TAG, "Loading browser_fallback_url = " + fallbackUrl);
+                    view.loadUrl(fallbackUrl);
+                    return true;
+                }
+                String packageName = intent.getPackage();
+                if (packageName != null && !packageName.isEmpty()) {
+                    startActivity(new Intent(Intent.ACTION_VIEW,
+                            Uri.parse("market://details?id=" + packageName)));
+                    return true;
+                }
+                Log.w(TAG, "No fallbackUrl or packageName for intent url");
+                return true;
+            }
+        } catch (URISyntaxException e) {
+            Log.e(TAG, "Invalid intent URI: " + url, e);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "handleIntentScheme error: " + url, e);
+            return true;
+        }
+    }
+
+    private boolean launchExternalIntent(String url) {
+        if (url.startsWith("intent:")) {
+            return handleIntentScheme(null, url);
+        }
+        try {
+            startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to launch external intent: " + url, e);
+            return true;
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────
     // 메인 WebView 용 WebViewClient
     // ──────────────────────────────────────────────────────────────
     private class SafePaymentWebViewClient extends BridgeWebViewClient {
@@ -340,47 +390,8 @@ public class MainActivity extends BridgeActivity {
             super.onPageStarted(view, url, favicon);
         }
 
-        private boolean handleIntentScheme(WebView view, String url) {
-            try {
-                Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                if (intent == null) return true;
-
-                try {
-                    startActivity(intent);
-                    return true;
-                } catch (ActivityNotFoundException e) {
-                    String fallbackUrl = intent.getStringExtra("browser_fallback_url");
-                    if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
-                        Log.d(TAG, "Loading browser_fallback_url = " + fallbackUrl);
-                        view.loadUrl(fallbackUrl);
-                        return true;
-                    }
-                    String packageName = intent.getPackage();
-                    if (packageName != null && !packageName.isEmpty()) {
-                        startActivity(new Intent(Intent.ACTION_VIEW,
-                                Uri.parse("market://details?id=" + packageName)));
-                        return true;
-                    }
-                    Log.w(TAG, "No fallbackUrl or packageName for intent url");
-                    return true;
-                }
-            } catch (URISyntaxException e) {
-                Log.e(TAG, "Invalid intent URI: " + url, e);
-                return true;
-            } catch (Exception e) {
-                Log.e(TAG, "handleIntentScheme error: " + url, e);
-                return true;
-            }
-        }
-
         private boolean launchExternalIntent(String url) {
-            try {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
-                return true;
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to launch external intent: " + url, e);
-                return true;
-            }
+            return MainActivity.this.launchExternalIntent(url);
         }
     }
 }
