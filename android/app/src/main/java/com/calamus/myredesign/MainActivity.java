@@ -10,6 +10,8 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 import android.webkit.WebSettings;
 import android.os.Message;
+import android.webkit.JsResult;
+import android.webkit.WebChromeClient;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -56,12 +58,38 @@ public class MainActivity extends BridgeActivity {
                 resultMsg.sendToTarget();
                 return true;
             }
+
+            @Override
+            public boolean onJsAlert(WebView view, String url, String message, final JsResult result) {
+                Log.d(TAG, "onJsAlert: " + message);
+                return super.onJsAlert(view, url, message, result);
+            }
+
+            @Override
+            public boolean onJsConfirm(WebView view, String url, String message, final JsResult result) {
+                Log.d(TAG, "onJsConfirm: " + message);
+                return super.onJsConfirm(view, url, message, result);
+            }
         });
+    }
+
+    @Override
+    public void onBackPressed() {
+        WebView webView = bridge.getWebView();
+        if (webView != null && (webView.getUrl() != null && !webView.getUrl().contains("localhost") && !webView.getUrl().contains("127.0.0.1"))) {
+            // 현재 화면이 메인 앱이 아님 (결제창 등 외부 페이지임) -> 앱 홈으로 강제 복귀
+            Log.d(TAG, "Back pressed on external page. Restoring app.");
+            restoreApp(webView);
+            return;
+        }
+        super.onBackPressed();
     }
 
     private void restoreApp(WebView view) {
         if (this.bridge != null) {
-            view.post(() -> view.loadUrl(this.bridge.getServerUrl()));
+            String serverUrl = this.bridge.getServerUrl();
+            Log.d(TAG, "Restoring app UI: " + serverUrl);
+            view.post(() -> view.loadUrl(serverUrl));
         }
     }
 
