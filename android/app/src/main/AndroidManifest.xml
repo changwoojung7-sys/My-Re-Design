@@ -29,6 +29,16 @@
         <package android:name="viva.republica.toss" />
         <package android:name="com.lguplus.paynow" />
         <package android:name="com.kicc.easyPay" />
+        <package android:name="com.kakaopay.app" />
+
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="ispmobile" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="kftc-bankpay" />
+        </intent>
     </queries>
     <application
         android:allowBackup="true"

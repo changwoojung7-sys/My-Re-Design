@@ -81,9 +81,8 @@ function Layout() {
 }
 
 import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
-import { App as CapacitorApp } from '@capacitor/app';
-import { Capacitor } from '@capacitor/core';
 import { useLanguage } from './lib/i18n';
+import { usePaymentReturn } from './lib/usePaymentReturn';
 
 function App() {
   const { t } = useLanguage();
@@ -149,112 +148,89 @@ function App() {
     };
     validateSession();
 
-    // --- NEW: Global Payment Result Check ---
-    const checkPayment = async (customUrl?: string) => {
-      // Import dynamically to avoid circular deps if any, or just import at top
-      const { checkMobilePaymentResult } = await import('./lib/payment');
-      const result = await checkMobilePaymentResult(customUrl);
-
-      if (result) {
-        // Clear URL Params to prevent double-alert on refresh
-        if (!customUrl) {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('imp_success');
-          url.searchParams.delete('error_msg');
-          url.searchParams.delete('imp_uid');
-          url.searchParams.delete('merchant_uid');
-          url.searchParams.delete('paymentId');
-          url.searchParams.delete('code');
-          url.searchParams.delete('message');
-          window.history.replaceState({}, '', url.toString());
-        }
-
-        if (result.success) {
-          const { data } = result;
-          const msg = data
-            ? `${t.paymentSuccessAlert}\n\n📄 상품명: ${data.planName}\n💰 결제금액: ₩${data.amount.toLocaleString()}`
-            : t.paymentSuccessAlert;
-
-          alert(msg);
-
-          // Return to home page to clear state completely
-          window.location.href = '/';
-        } else {
-          // Ensure error message is also localized or clear
-          const errorMsg = result.error || 'Unknown error';
-
-          // Check for specific technical errors and show user-friendly message
-          const isCancelled = 
-            (errorMsg.includes('Payment status is') && (errorMsg.includes('FAILED') || errorMsg.includes('CANCELLED'))) ||
-            errorMsg.toLowerCase().includes('canc') || 
-            errorMsg.includes('취소');
-
-          if (isCancelled) {
-            alert(t.paymentCancelledAlert);
-          } else {
-            alert(t.paymentFailedAlert.replace('{error}', errorMsg));
-          }
-          window.location.href = '/';
-        }
-      }
-    };
-    checkPayment();
-
-    let appUrlListener: any = null;
-    let resumeListener: any = null;
-
-    if (Capacitor.isNativePlatform()) {
-      const handlePaymentReturn = async () => {
-        // 1. Cold Start 딥링크 캡처
-        const launch = await CapacitorApp.getLaunchUrl();
-        if (launch?.url && launch.url.includes('myredesign://')) {
-          checkPayment(launch.url);
-        }
-
-        // 2. Background -> Foreground 딥링크 캡처
-        CapacitorApp.addListener('appUrlOpen', ({ url }) => {
-          if (url.includes('myredesign://')) {
-            checkPayment(url);
-          }
-        }).then(listener => appUrlListener = listener);
-
-        // 3. 앱 Resume 캡처 (딥링크 없이 PG사 취소/뒤로가기로 백그라운드에서 돌아올 때)
-        CapacitorApp.addListener('resume', async () => {
-          // 약간의 지연을 주어 appUrlOpen이 먼저 처리될 기회를 줌
-          setTimeout(async () => {
-             const pending = localStorage.getItem('pending_payment');
-             if (pending) {
-               // 딥링크가 안 왔는데 pending이 남아있다면 서버 상태 조회를 통해 복구/취소 처리
-               const { checkPendingPaymentAndRecover } = await import('./lib/payment');
-               const result = await checkPendingPaymentAndRecover();
-               if (result) {
-                 if (result.success) {
-                    alert(t.paymentSuccessAlert || '결제가 성공적으로 복구되었습니다.');
-                    window.location.href = '/';
-                 } else {
-                    const errorMsg = result.error || '';
-                    if (errorMsg.includes('취소') || errorMsg.includes('미완료')) {
-                      // Silently ignore or show brief toast if needed, alert is too aggressive for simple back button
-                      console.log('Payment cancelled/uncompleted on resume.');
-                    } else {
-                      alert(`결제 복구 실패: ${errorMsg}`);
-                    }
-                 }
-               }
-             }
-          }, 1000);
-        }).then(listener => resumeListener = listener);
-      };
-
-      handlePaymentReturn();
-    }
-
     return () => {
       subscription.unsubscribe();
-      if (appUrlListener) appUrlListener.remove();
-      if (resumeListener) resumeListener.remove();
     };
-  }, []);
+  }, []); // End of auth check useEffect
+
+  // --- NEW: Global Payment Result Check via Custom Hook ---
+  usePaymentReturn({
+    verifyPaymentOnServer: async ({ orderId, paymentKey }) => {
+      // 1. URL 기반 결과 파싱 및 DB 반영 로직 (lib/payment.ts 활용)
+      const { checkMobilePaymentResult } = await import('./lib/payment');
+      // PortOne의 응답 형식처럼 가짜 URL을 만들어 checkMobilePaymentResult가 파싱하게 함
+      const dummyUrl = `myredesign://payment/result?imp_success=true&imp_uid=${paymentKey}&merchant_uid=${orderId}`;
+      const result = await checkMobilePaymentResult(dummyUrl);
+      if (result && !result.success) {
+        throw new Error(result.error);
+      }
+    },
+    fetchPaymentStatus: async (orderId) => {
+      // resume 복구 시 DB에서 현재 트랜잭션의 상태와 검증 수행
+      const { data: pendingRecord } = await supabase
+        .from('payments')
+        .select('*')
+        .or(`merchant_uid.eq.${orderId},imp_uid.eq.${orderId}`)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!pendingRecord) return { status: 'NOT_FOUND' };
+
+      if (pendingRecord.status === 'pending') {
+         const mode = orderId.startsWith('pay_') ? 'real' : 'test';
+         const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+             body: {
+                 imp_uid: mode === 'real' ? undefined : pendingRecord.imp_uid,
+                 payment_id: mode === 'real' ? pendingRecord.imp_uid : undefined,
+                 merchant_uid: orderId,
+                 mode: mode
+             }
+         });
+
+         if (verifyError || verifyData?.error) {
+             const { processPaymentFailure } = await import('./lib/payment');
+             await processPaymentFailure(orderId);
+             return { status: 'FAILED', message: verifyData?.error || '검증 실패' };
+         }
+         
+         // 결제 실제 성공 처리 반영
+         const { processPaymentSuccess } = await import('./lib/payment');
+         const pendingPaymentStr = localStorage.getItem('pending_payment');
+         if (pendingPaymentStr) {
+             const paymentData = JSON.parse(pendingPaymentStr);
+             await processPaymentSuccess(
+                pendingRecord.imp_uid || pendingRecord.merchant_uid,
+                paymentData.mode,
+                paymentData.tier,
+                paymentData.planType,
+                paymentData.targetCategory,
+                new Date(paymentData.startDate),
+                new Date(paymentData.endDate),
+                pendingRecord.merchant_uid
+             );
+         }
+         return { status: 'PAID' }; 
+      }
+
+      if (pendingRecord.status === 'paid') return { status: 'PAID' };
+      if (pendingRecord.status === 'cancelled') return { status: 'CANCELED' };
+      return { status: 'FAILED' };
+    },
+    moveToPaymentCompletePage: (_orderId) => {
+      alert(t.paymentSuccessAlert || '결제가 성공적으로 반영되었습니다.');
+      window.location.href = '/';
+    },
+    moveToPaymentFailPage: ({ orderId: _orderId, code: _code, message }) => {
+      const errorMsg = message?.toLowerCase() || '';
+      if (errorMsg.includes('취소') || errorMsg.includes('cancel')) {
+        console.log('Payment cancelled on resume:', message);
+      } else {
+        alert(t.paymentFailedAlert ? t.paymentFailedAlert.replace('{error}', message || '') : `결제 취소/실패: ${message}`);
+      }
+      window.location.href = '/';
+    }
+  });
 
   return (
     <Router>

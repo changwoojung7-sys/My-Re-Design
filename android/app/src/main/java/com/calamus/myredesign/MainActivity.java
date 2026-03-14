@@ -1,85 +1,183 @@
 package com.calamus.myredesign;
 
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
 
+import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
 import java.net.URISyntaxException;
 
 public class MainActivity extends BridgeActivity {
+
+    private static final String TAG = "MYREDESIGN";
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        // Capacitor 기본 BridgeWebViewClient를 확장하여 intent:// 스키마 등을 제어
-        this.bridge.getWebView().setWebViewClient(new BridgeWebViewClient(this.bridge) {
 
-
-            @Override
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                String url = request.getUrl().toString();
-                
-                // 외부 앱 (앱카드 등) 호출 인텐트 캡처
-                if (url.startsWith("intent:") || url.startsWith("market:") || url.startsWith("ispmobile:")) {
-                    try {
-                        Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                        if (intent != null) {
-                            startActivity(intent);
-                            return true; // 외부 앱 실행 (웹뷰 내부 라우팅 중단)
-                        }
-                    } catch (URISyntaxException e) {
-                        e.printStackTrace();
-                    } catch (Exception e) {
-                        // 앱이 설치되어 있지 않은 경우 fallback_url 또는 마켓으로 자동 이동
-                        if (url.startsWith("intent:")) {
-                            try {
-                                Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-                                String fallbackUrl = intent.getStringExtra("browser_fallback_url");
-                                if (fallbackUrl != null) {
-                                    view.loadUrl(fallbackUrl);
-                                    return true;
-                                } else {
-                                    String packagename = intent.getPackage();
-                                    if (packagename != null) {
-                                        startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + packagename)));
-                                        return true;
-                                    }
-                                }
-                            } catch (Exception ex) {
-                                ex.printStackTrace();
-                            }
-                        }
-                    }
-                }
-                
-                // myredesign:// 는 여기서 startActivity 하지 말고 Capacitor/Android intent-filter에 맡김
-                return super.shouldOverrideUrlLoading(view, request);
-            }
-        });
-    }
-
-    // 딥링크 복귀 (JS appUrlOpen 이벤트 전달) 처리
-    @Override
-    public void onNewIntent(Intent intent) {
-        super.onNewIntent(intent);
-        
-        if (intent == null) return;
-        
-        // 중요: 현재 Activity의 intent 갱신 (JS의 getLaunchUrl() 등이 바라보게 됨)
-        setIntent(intent);
-
-        if (this.bridge != null) {
-            this.bridge.onNewIntent(intent); // Capacitor 기본 딥링크 이벤트 전달
+        final Bridge bridge = this.bridge;
+        if (bridge == null || bridge.getWebView() == null) {
+            Log.w(TAG, "Bridge or WebView is null in onCreate");
+            return;
         }
 
-        Uri uri = intent.getData();
-        if (uri != null) {
-            android.util.Log.d("MYAPP", "onNewIntent uri=" + uri.toString());
+        bridge.getWebView().setWebViewClient(new SafePaymentWebViewClient(bridge));
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+
+        if (intent == null) {
+            return;
+        }
+
+        // 매우 중요: 현재 액티비티의 intent 갱신
+        setIntent(intent);
+
+        // 매우 중요: Capacitor App API(appUrlOpen / getLaunchUrl)로 전달
+        if (this.bridge != null) {
+            this.bridge.onNewIntent(intent);
+        }
+
+        Uri data = intent.getData();
+        if (data != null) {
+            Log.d(TAG, "onNewIntent data = " + data);
+        } else {
+            Log.d(TAG, "onNewIntent with no data");
+        }
+    }
+
+    private class SafePaymentWebViewClient extends BridgeWebViewClient {
+        private final Bridge bridge;
+
+        SafePaymentWebViewClient(Bridge bridge) {
+            super(bridge);
+            this.bridge = bridge;
+        }
+
+        @Override
+        public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            Uri uri = request.getUrl();
+            String url = uri != null ? uri.toString() : "";
+
+            Log.d(TAG, "shouldOverrideUrlLoading = " + url);
+
+            // 1) PG redirect 결과 HTML을 웹뷰 내부에서 보여주지 않음
+            //    여기서 강제 loadUrl 하지 말고, JS에서 딥링크 / resume 로 복구
+            if (url.contains("/functions/v1/payment-redirect") || url.startsWith("myredesign://payment/result")) {
+                Log.d(TAG, "Intercepted payment redirect. Restoring app and firing intent: " + url);
+                try {
+                    Uri originalUri = Uri.parse(url);
+                    String query = originalUri.getEncodedQuery();
+
+                    // myredesign:// 스킴을 앱 자체에서 바로 생성 (Edge Function 폴백 대체)
+                    String newUrl = "myredesign://payment/result" + (query != null ? "?" + query : "");
+                    Intent resultIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(newUrl));
+                    resultIntent.setPackage(getPackageName()); // 본인 패키지명 지정
+                    resultIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+
+                    // 중요 1: WebView 빈 화면이나 리다이렉션 무한루프를 막고 초기 로컬 URL(React App)로 강제 복원
+                    view.loadUrl(bridge.getServerUrl());
+
+                    // 중요 2: Intent를 실행하여 MainActivity의 onNewIntent 가 호출되고 -> appUrlOpen 이벤트를 발생시킴
+                    startActivity(resultIntent);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to parse payment redirect inside WebView", e);
+                }
+                return true;
+            }
+
+            // 2) 외부 결제앱 호출 인텐트 처리
+            if (url.startsWith("intent:")) {
+                return handleIntentScheme(view, url);
+            }
+
+            if (url.startsWith("market:") || url.startsWith("ispmobile:")) {
+                return launchExternalIntent(url);
+            }
+
+            // 3) 우리 앱 스킴은 여기서 다시 startActivity 하지 않음
+            //    Manifest + onNewIntent + Capacitor App API로만 처리
+            if (url.startsWith("myredesign://")) {
+                Log.d(TAG, "Ignore custom scheme inside WebView; Activity/App API will handle it");
+                return true;
+            }
+
+            return super.shouldOverrideUrlLoading(view, request);
+        }
+
+        @Override
+        public void onPageStarted(WebView view, String url, Bitmap favicon) {
+            Log.d(TAG, "onPageStarted = " + url);
+
+            // 혹시라도 redirect html이 열리기 시작하면 중단
+            if (url != null && url.contains("/functions/v1/payment-redirect")) {
+                view.stopLoading();
+                Log.d(TAG, "Stopped loading payment redirect page");
+                return;
+            }
+
+            super.onPageStarted(view, url, favicon);
+        }
+
+        private boolean handleIntentScheme(WebView view, String url) {
+            try {
+                Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
+                if (intent == null) {
+                    return true;
+                }
+
+                try {
+                    startActivity(intent);
+                    return true;
+                } catch (ActivityNotFoundException e) {
+                    String fallbackUrl = intent.getStringExtra("browser_fallback_url");
+                    if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
+                        Log.d(TAG, "Loading browser_fallback_url = " + fallbackUrl);
+                        view.loadUrl(fallbackUrl);
+                        return true;
+                    }
+
+                    String packageName = intent.getPackage();
+                    if (packageName != null && !packageName.isEmpty()) {
+                        Intent marketIntent = new Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("market://details?id=" + packageName)
+                        );
+                        startActivity(marketIntent);
+                        return true;
+                    }
+
+                    Log.w(TAG, "No fallbackUrl or packageName for intent url");
+                    return true;
+                }
+            } catch (URISyntaxException e) {
+                Log.e(TAG, "Invalid intent URI: " + url, e);
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "handleIntentScheme error: " + url, e);
+                return true;
+            }
+        }
+
+        private boolean launchExternalIntent(String url) {
+            try {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                startActivity(intent);
+                return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to launch external intent: " + url, e);
+                return true;
+            }
         }
     }
 }

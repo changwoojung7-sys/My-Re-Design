@@ -9,6 +9,7 @@ import SupportModal from '../../components/layout/SupportModal';
 
 // PortOne Type Definition (Minimal)
 import { processPaymentSuccess, checkMobilePaymentResult } from '../../lib/payment';
+import { savePendingOrder } from '../../lib/usePaymentReturn';
 
 declare global {
     interface Window {
@@ -104,6 +105,7 @@ export default function Paywall({ onClose }: PaywallProps) {
             const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
 
             const paymentId = `pay_${new Date().getTime()}`;
+            savePendingOrder(paymentId); // NEW: 딥링크 / resume 대비 트랜잭션 기록
 
             try {
                 const response = await window.PortOne.requestPayment({
@@ -165,10 +167,13 @@ export default function Paywall({ onClose }: PaywallProps) {
 
         } else {
             // --- PortOne V1 (Test) ---
+            const merchantUid = `mid_${new Date().getTime()}`;
+            savePendingOrder(merchantUid); // NEW: 딥링크 / resume 대비 트랜잭션 기록
+
             IMP.request_pay({
                 pg: 'html5_inicis', // PG Provider
                 pay_method: 'card', // Payment Method
-                merchant_uid: `mid_${new Date().getTime()}`, // Unique Order ID
+                merchant_uid: merchantUid, // Unique Order ID
                 name: `MyReDesign Premium - ${plan.name}`,
                 amount: plan.amount,
                 buyer_email: user?.email,
