@@ -5,6 +5,7 @@ import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import { useState, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import SupportModal from '../../components/layout/SupportModal';
 
 // PortOne Type Definition (Minimal)
@@ -55,7 +56,35 @@ export default function Paywall({ onClose }: PaywallProps) {
             }
         };
         checkMobileResult();
-    }, []);
+
+        // --- NEW: Global Payment Result Check via App API (appUrlOpen) ---
+        const listener = App.addListener('appUrlOpen', (event) => {
+            console.log('[Paywall] appUrlOpen 수신:', event.url);
+            
+            // myredesign://payment/result?code=...&message=...
+            if (event.url.includes('payment/result')) {
+                const params = new URLSearchParams(event.url.split('?')[1]);
+                const code    = params.get('code');    // FAILURE_TYPE_PG or SUCCESS
+                const message = params.get('message') || params.get('error_msg');
+                const imp_success = params.get('imp_success');
+
+                if (code === 'FAILURE_TYPE_PG' || imp_success === 'false') {
+                    // 결제 취소/실패 처리
+                    console.log('결제 취소:', message);
+                    alert(`결제 취소: ${message || '사용자가 결제를 취소했습니다.'}`);
+                } else if (code === 'SUCCESS' || imp_success === 'true' || event.url.includes('imp_success=true')) {
+                    // 결제 성공 처리
+                    console.log('결제 성공');
+                    alert(t.subscriptionSuccessful || '결제가 성공적으로 반영되었습니다.');
+                    window.location.href = '/';
+                }
+            }
+        });
+
+        return () => {
+            listener.then(l => l.remove());
+        };
+    }, [t.subscriptionSuccessful]);
 
     const plans = [
         { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 3000, save: '24%' },

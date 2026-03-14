@@ -33,6 +33,7 @@ public class MainActivity extends BridgeActivity {
     // ──────────────────────────────────────────────────
     private WebView  popupWebView;
     private Dialog   popupDialog;
+    private boolean  isHandlingRedirect = false; // 결제 redirect 중복 처리 방지
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -241,26 +242,36 @@ public class MainActivity extends BridgeActivity {
 
     private void cleanupPopupWebView() {
         if (popupWebView != null) {
-            WebView toDestroy = popupWebView;
-            popupWebView = null; // 먼저 null로 해서 재진입 방지
-            toDestroy.stopLoading();
-            toDestroy.loadUrl("about:blank");
-            toDestroy.destroy();
+            popupWebView.stopLoading();
+            popupWebView.loadUrl("about:blank");
+            popupWebView.destroy();
+            popupWebView = null;
         }
     }
 
     private void restoreApp(WebView view) {
-        if (this.bridge != null) {
-            String serverUrl = this.bridge.getServerUrl();
-            Log.d(TAG, "Restoring app UI: " + serverUrl);
-            view.post(() -> view.loadUrl(serverUrl));
+        if (this.bridge == null || view == null) return;
+        // getServerUrl()이 null을 반환하는 Capacitor 버전 대응 - localhost 폴백
+        String serverUrl = this.bridge.getServerUrl();
+        if (serverUrl == null || serverUrl.isEmpty()) {
+            serverUrl = "http://localhost";
         }
+        final String finalUrl = serverUrl;
+        Log.d(TAG, "Restoring app UI: " + finalUrl);
+        view.post(() -> view.loadUrl(finalUrl));
     }
 
     // ──────────────────────────────────────────────────────────────
     // 결제 redirect 처리 (팝업/메인 양쪽에서 호출)
     // ──────────────────────────────────────────────────────────────
     private void handlePaymentRedirect(String url) {
+        // 중복 호출 방지 (KG이니시스가 동일 URL을 2회 연속 발송하는 경우 대응)
+        if (isHandlingRedirect) {
+            Log.w(TAG, "handlePaymentRedirect: already handling, skip");
+            return;
+        }
+        isHandlingRedirect = true;
+
         try {
             Uri originalUri = Uri.parse(url);
             String query = originalUri.getEncodedQuery();
@@ -273,6 +284,9 @@ public class MainActivity extends BridgeActivity {
             startActivity(resultIntent);
         } catch (Exception e) {
             Log.e(TAG, "handlePaymentRedirect error", e);
+        } finally {
+            // 1초 후 플래그 해제 (다음 결제를 위해)
+            bridge.getWebView().postDelayed(() -> isHandlingRedirect = false, 1000);
         }
     }
 
@@ -291,12 +305,7 @@ public class MainActivity extends BridgeActivity {
                 String fallbackUrl = intent.getStringExtra("browser_fallback_url");
                 if (fallbackUrl != null && !fallbackUrl.isEmpty()) {
                     Log.d(TAG, "Loading browser_fallback_url = " + fallbackUrl);
-                    // [수정] view가 null이면(팝업 컨텍스트 등) 메인 WebView에 fallback 로드
-                    WebView target = (view != null) ? view
-                            : (bridge != null ? bridge.getWebView() : null);
-                    if (target != null) {
-                        target.loadUrl(fallbackUrl);
-                    }
+                    view.loadUrl(fallbackUrl);
                     return true;
                 }
                 String packageName = intent.getPackage();
@@ -319,9 +328,7 @@ public class MainActivity extends BridgeActivity {
 
     private boolean launchExternalIntent(String url) {
         if (url.startsWith("intent:")) {
-            // [수정] null 대신 메인 WebView를 전달해 fallback URL 로드 가능하게
-            WebView mainView = (bridge != null) ? bridge.getWebView() : null;
-            return handleIntentScheme(mainView, url);
+            return handleIntentScheme(null, url);
         }
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(url)));
