@@ -12,6 +12,7 @@ import android.webkit.WebView;
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+import com.getcapacitor.BridgeWebChromeClient;
 
 import java.net.URISyntaxException;
 
@@ -30,6 +31,16 @@ public class MainActivity extends BridgeActivity {
         }
 
         bridge.getWebView().setWebViewClient(new SafePaymentWebViewClient(bridge));
+        
+        // 중요: 결제창 X 버튼(window.close) 클릭 시 앱 홈으로 복원 로직 추가
+        bridge.getWebView().setWebChromeClient(new BridgeWebChromeClient(bridge) {
+            @Override
+            public void onCloseWindow(WebView window) {
+                super.onCloseWindow(window);
+                Log.d(TAG, "onCloseWindow intercepted (PG Cancel). Restoring app.");
+                window.loadUrl(bridge.getServerUrl());
+            }
+        });
     }
 
     @Override
