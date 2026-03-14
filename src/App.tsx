@@ -155,7 +155,7 @@ function App() {
 
   // --- NEW: Global Payment Result Check via Custom Hook ---
   usePaymentReturn({
-    verifyPaymentOnServer: async ({ orderId, paymentKey }) => {
+    verifyPaymentOnServer: async ({ orderId, paymentKey }: { orderId: string; paymentKey: string }) => {
       // 1. URL 기반 결과 파싱 및 DB 반영 로직 (lib/payment.ts 활용)
       const { checkMobilePaymentResult } = await import('./lib/payment');
       // PortOne의 응답 형식처럼 가짜 URL을 만들어 checkMobilePaymentResult가 파싱하게 함
@@ -165,7 +165,7 @@ function App() {
         throw new Error(result.error);
       }
     },
-    fetchPaymentStatus: async (orderId) => {
+    fetchPaymentStatus: async (orderId: string) => {
       // resume 복구 시 DB에서 현재 트랜잭션의 상태와 검증 수행
       const { data: pendingRecord } = await supabase
         .from('payments')
@@ -217,11 +217,11 @@ function App() {
       if (pendingRecord.status === 'cancelled') return { status: 'CANCELED' };
       return { status: 'FAILED' };
     },
-    moveToPaymentCompletePage: (_orderId) => {
+    moveToPaymentCompletePage: (_orderId: string) => {
       alert(t.paymentSuccessAlert || '결제가 성공적으로 반영되었습니다.');
       window.location.href = '/';
     },
-    moveToPaymentFailPage: ({ orderId: _orderId, code: _code, message }) => {
+    moveToPaymentFailPage: ({ orderId: _orderId, code: _code, message }: { orderId: string; code?: string; message?: string }) => {
       const errorMsg = message?.toLowerCase() || '';
       if (errorMsg.includes('취소') || errorMsg.includes('cancel')) {
         console.log('Payment cancelled on resume:', message);
