@@ -31,9 +31,8 @@ public class MainActivity extends BridgeActivity {
     // ──────────────────────────────────────────────────
     // [수정 1] 팝업 WebView와 Dialog를 멤버 변수로 관리
     // ──────────────────────────────────────────────────
-    private WebView  popupWebView;
-    private Dialog   popupDialog;
-    private boolean  isHandlingRedirect = false; // 결제 redirect 중복 처리 방지
+    private WebView popupWebView;
+    private Dialog popupDialog;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -62,14 +61,14 @@ public class MainActivity extends BridgeActivity {
 
             // ──────────────────────────────────────────────────────────────
             // [수정 2] onCreateWindow: 새 WebView를 만들어 Dialog에 넣고 표시
-            //          KG이니시스는 window.open()으로 팝업을 띄우므로
-            //          반드시 신규 WebView 인스턴스가 필요합니다.
-            //          기존 코드처럼 transport.setWebView(view)를 사용하면
-            //          메인 WebView 자체가 결제 URL로 덮여서 복귀 불가.
+            // KG이니시스는 window.open()으로 팝업을 띄우므로
+            // 반드시 신규 WebView 인스턴스가 필요합니다.
+            // 기존 코드처럼 transport.setWebView(view)를 사용하면
+            // 메인 WebView 자체가 결제 URL로 덮여서 복귀 불가.
             // ──────────────────────────────────────────────────────────────
             @Override
             public boolean onCreateWindow(WebView view, boolean isDialog,
-                                          boolean isUserGesture, Message resultMsg) {
+                    boolean isUserGesture, Message resultMsg) {
                 Log.d(TAG, "onCreateWindow: creating popup WebView in Dialog");
 
                 // 이전에 혹시 남은 팝업이 있으면 먼저 정리
@@ -103,7 +102,7 @@ public class MainActivity extends BridgeActivity {
                         // intent: / market: / ispmobile: 외부 앱 처리
                         if (url.startsWith("intent:")) {
                             // 외부 메서드나 헬퍼를 통해 처리 가능하게 메서드 위치 공유 필요
-                            launchExternalIntent(url); 
+                            launchExternalIntent(url);
                             return true;
                         }
                         if (url.startsWith("market:") || url.startsWith("ispmobile:")) {
@@ -169,14 +168,14 @@ public class MainActivity extends BridgeActivity {
 
             @Override
             public boolean onJsAlert(WebView view, String url,
-                                     String message, JsResult result) {
+                    String message, JsResult result) {
                 Log.d(TAG, "onJsAlert: " + message);
                 return super.onJsAlert(view, url, message, result);
             }
 
             @Override
             public boolean onJsConfirm(WebView view, String url,
-                                       String message, JsResult result) {
+                    String message, JsResult result) {
                 Log.d(TAG, "onJsConfirm: " + message);
                 return super.onJsConfirm(view, url, message, result);
             }
@@ -214,7 +213,8 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if (intent == null) return;
+        if (intent == null)
+            return;
 
         setIntent(intent);
 
@@ -250,8 +250,9 @@ public class MainActivity extends BridgeActivity {
     }
 
     private void restoreApp(WebView view) {
-        if (this.bridge == null || view == null) return;
-        // getServerUrl()이 null을 반환하는 Capacitor 버전 대응 - localhost 폴백
+        if (this.bridge == null || view == null)
+            return;
+
         String serverUrl = this.bridge.getServerUrl();
         if (serverUrl == null || serverUrl.isEmpty()) {
             serverUrl = "http://localhost";
@@ -265,13 +266,6 @@ public class MainActivity extends BridgeActivity {
     // 결제 redirect 처리 (팝업/메인 양쪽에서 호출)
     // ──────────────────────────────────────────────────────────────
     private void handlePaymentRedirect(String url) {
-        // 중복 호출 방지 (KG이니시스가 동일 URL을 2회 연속 발송하는 경우 대응)
-        if (isHandlingRedirect) {
-            Log.w(TAG, "handlePaymentRedirect: already handling, skip");
-            return;
-        }
-        isHandlingRedirect = true;
-
         try {
             Uri originalUri = Uri.parse(url);
             String query = originalUri.getEncodedQuery();
@@ -284,9 +278,6 @@ public class MainActivity extends BridgeActivity {
             startActivity(resultIntent);
         } catch (Exception e) {
             Log.e(TAG, "handlePaymentRedirect error", e);
-        } finally {
-            // 1초 후 플래그 해제 (다음 결제를 위해)
-            bridge.getWebView().postDelayed(() -> isHandlingRedirect = false, 1000);
         }
     }
 
@@ -296,7 +287,8 @@ public class MainActivity extends BridgeActivity {
     private boolean handleIntentScheme(WebView view, String url) {
         try {
             Intent intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME);
-            if (intent == null) return true;
+            if (intent == null)
+                return true;
 
             try {
                 startActivity(intent);
@@ -360,12 +352,24 @@ public class MainActivity extends BridgeActivity {
             if (url.contains("/functions/v1/payment-redirect")
                     || url.startsWith("myredesign://payment/result")) {
                 Log.d(TAG, "Intercepted payment redirect: " + url);
-                // [수정 5] 팝업이 열려있으면 먼저 닫고, 앱 복원 후 intent 발송
+
                 if (popupDialog != null && popupDialog.isShowing()) {
                     dismissPopup();
                 }
+
+                // ── 핵심 실행 순서 ─────────────────────────────────────
+                // 1) restoreApp()으로 WebView를 localhost(React 앱)로 먼저 복원
+                // 2) React가 마운트되고 appUrlOpen 리스너가 등록될 때까지 대기
+                // 3) 그 이후 handlePaymentRedirect()로 deeplink intent 발송
+                // ※ 순서가 바뀌면 React 리스너 미등록 상태에서 이벤트 유실 → 하얀 화면
                 restoreApp(view);
-                handlePaymentRedirect(url);
+
+                final String redirectUrl = url;
+                view.postDelayed(() -> {
+                    Log.d(TAG, "Delayed handlePaymentRedirect: " + redirectUrl);
+                    handlePaymentRedirect(redirectUrl);
+                }, 2000); // React 마운트 완료 대기 (2초)
+
                 return true;
             }
 
@@ -394,8 +398,8 @@ public class MainActivity extends BridgeActivity {
 
         // ──────────────────────────────────────────────────────────────
         // [수정 6] onPageStarted에서 stopLoading() 제거
-        //          shouldOverrideUrlLoading 이 이미 redirect를 차단하므로
-        //          여기서 중단하면 정상 페이지 로드까지 끊길 수 있습니다.
+        // shouldOverrideUrlLoading 이 이미 redirect를 차단하므로
+        // 여기서 중단하면 정상 페이지 로드까지 끊길 수 있습니다.
         // ──────────────────────────────────────────────────────────────
         @Override
         public void onPageStarted(WebView view, String url, Bitmap favicon) {

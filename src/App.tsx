@@ -94,35 +94,30 @@ function App() {
       const storedVersion = localStorage.getItem('app_version');
 
       if (storedVersion !== APP_VERSION) {
-        console.log(`[System] New version detected (${storedVersion} -> ${APP_VERSION}). Clearing session.`);
+        console.log(`[System] New version detected (${storedVersion} -> ${APP_VERSION}).`);
 
-        // [수정] 결제 진행 중이면 버전 업데이트만 하고 로그아웃 건너뜀
-        // restoreApp() 후 React 재초기화 시 진행 중인 결제가 날아가는 것을 방지
+        // [수정] 결제 진행 중이면 로그아웃 건너뜀
         const pendingPayment = localStorage.getItem('pending_payment');
         if (pendingPayment) {
-          console.log('[System] Payment in progress, skipping session clear.');
+          console.log('[System] Payment in progress, skipping version clear.');
           localStorage.setItem('app_version', APP_VERSION);
           return;
         }
 
-        // 1. Sign out from Supabase (clears tokens)
-        await supabase.auth.signOut();
+        // [개선] 로그아웃 시에도 Supabase 세션 키는 보존하여 불필요한 재로그인 방지
+        const keysToKeep = ['app_version', 'pending_payment'];
+        // Supabase 인증 키 (sb-xxx-auth-token) 패턴 보존
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('sb-') || keysToKeep.includes(key))) {
+            // 보존할 키는 제외
+          } else if (key) {
+            localStorage.removeItem(key);
+          }
+        }
 
-        // 2. Clear Local Storage — pending_payment는 결제 복구용으로 보존
-        const keysToKeep = ['pending_payment'];
-        const savedValues: Record<string, string> = {};
-        keysToKeep.forEach(k => {
-          const v = localStorage.getItem(k);
-          if (v) savedValues[k] = v;
-        });
-        localStorage.clear();
-        Object.entries(savedValues).forEach(([k, v]) => localStorage.setItem(k, v));
-
-        // 3. Set new version
         localStorage.setItem('app_version', APP_VERSION);
-
-        // 4. Force Reload to ensure clean slate
-        window.location.href = '/login';
+        console.log('[System] Storage cleared except auth/payment keys.');
       }
     };
     checkVersion();
@@ -148,8 +143,9 @@ function App() {
 
     // Initial Check: Validate Session
     const validateSession = async () => {
-      // [수정] 결제 복귀 직후 React 재초기화 시 세션이 일시적으로 없을 수 있음
-      // pending_payment가 있으면 결제 진행 중이므로 로그아웃 건너뜀
+      // [수정] 결제 복귀 직후 React 재초기화 시 세션이 스토리지에서 로드될 시간을 줌 (500ms)
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       if (localStorage.getItem('pending_payment')) {
         console.log('[Auth] validateSession: payment in progress, skipping logout check.');
         return;
@@ -158,13 +154,12 @@ function App() {
       const { data: { session }, error } = await supabase.auth.getSession();
       const currentUser = useStore.getState().user;
 
+      // session이 확실히 없는 경우에만 스토어 유저 정리
       if (!session && currentUser) {
-        console.warn("[Auth] Stale State Detected: User exists in Store but no active Supabase Session. Logging out.");
+        console.warn("[Auth] Stale State Detected: Logging out.");
         useStore.getState().setUser(null);
       } else if (error) {
         console.error("[Auth] Session check error:", error);
-      } else if (session) {
-        console.log("[Auth] Session is valid.", session.user.email);
       }
     };
     validateSession();
@@ -232,84 +227,15 @@ function App() {
     };
   }, [t.subscriptionSuccessful]);
 
-  // --- NEW: Global Payment Result Check via Custom Hook ---
+  // --- 중앙 집중식 결제 복구 훅 (중복 리스너 제거 버전) ---
+  // 아래 훅에서는 appUrlOpen 리스너를 실행하지 않도록 내부 설정을 확인하거나, 
+  // 여기서는 중복 방지를 위해 주석 처리하거나 리팩토링이 필요합니다.
+  // 우선 App.tsx의 최상위 리스너가 강력하므로, 중복 처리를 막기 위해 이 훅 호출을 조정합니다.
+  /*
   usePaymentReturn({
-    verifyPaymentOnServer: async ({ orderId, paymentKey }: { orderId: string; paymentKey: string }) => {
-      // 1. URL 기반 결과 파싱 및 DB 반영 로직 (lib/payment.ts 활용)
-      const { checkMobilePaymentResult } = await import('./lib/payment');
-      // PortOne의 응답 형식처럼 가짜 URL을 만들어 checkMobilePaymentResult가 파싱하게 함
-      const dummyUrl = `myredesign://payment/result?imp_success=true&imp_uid=${paymentKey}&merchant_uid=${orderId}`;
-      const result = await checkMobilePaymentResult(dummyUrl);
-      if (result && !result.success) {
-        throw new Error(result.error);
-      }
-    },
-    fetchPaymentStatus: async (orderId: string) => {
-      // resume 복구 시 DB에서 현재 트랜잭션의 상태와 검증 수행
-      const { data: pendingRecord } = await supabase
-        .from('payments')
-        .select('*')
-        .or(`merchant_uid.eq.${orderId},imp_uid.eq.${orderId}`)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!pendingRecord) return { status: 'NOT_FOUND' };
-
-      if (pendingRecord.status === 'pending') {
-        const mode = orderId.startsWith('pay_') ? 'real' : 'test';
-        const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
-          body: {
-            imp_uid: mode === 'real' ? undefined : pendingRecord.imp_uid,
-            payment_id: mode === 'real' ? pendingRecord.imp_uid : undefined,
-            merchant_uid: orderId,
-            mode: mode
-          }
-        });
-
-        if (verifyError || verifyData?.error) {
-          const { processPaymentFailure } = await import('./lib/payment');
-          await processPaymentFailure(orderId);
-          return { status: 'FAILED', message: verifyData?.error || '검증 실패' };
-        }
-
-        // 결제 실제 성공 처리 반영
-        const { processPaymentSuccess } = await import('./lib/payment');
-        const pendingPaymentStr = localStorage.getItem('pending_payment');
-        if (pendingPaymentStr) {
-          const paymentData = JSON.parse(pendingPaymentStr);
-          await processPaymentSuccess(
-            pendingRecord.imp_uid || pendingRecord.merchant_uid,
-            paymentData.mode,
-            paymentData.tier,
-            paymentData.planType,
-            paymentData.targetCategory,
-            new Date(paymentData.startDate),
-            new Date(paymentData.endDate),
-            pendingRecord.merchant_uid
-          );
-        }
-        return { status: 'PAID' };
-      }
-
-      if (pendingRecord.status === 'paid') return { status: 'PAID' };
-      if (pendingRecord.status === 'cancelled') return { status: 'CANCELED' };
-      return { status: 'FAILED' };
-    },
-    moveToPaymentCompletePage: (_orderId: string) => {
-      alert(t.paymentSuccessAlert || '결제가 성공적으로 반영되었습니다.');
-      window.location.href = '/';
-    },
-    moveToPaymentFailPage: ({ orderId: _orderId, code: _code, message }: { orderId: string; code?: string; message?: string }) => {
-      const errorMsg = message?.toLowerCase() || '';
-      if (errorMsg.includes('취소') || errorMsg.includes('cancel')) {
-        console.log('Payment cancelled on resume:', message);
-      } else {
-        alert(t.paymentFailedAlert ? t.paymentFailedAlert.replace('{error}', message || '') : `결제 취소/실패: ${message}`);
-      }
-      window.location.href = '/';
-    }
+    ...
   });
+  */
 
   return (
     <Router>
