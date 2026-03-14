@@ -28,6 +28,12 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        final Bridge bridge = this.bridge;
+        if (bridge == null || bridge.getWebView() == null) {
+            Log.w(TAG, "Bridge or WebView is null in onCreate");
+            return;
+        }
+
         WebView webView = bridge.getWebView();
         
         // --- 결제 연동을 위한 WebView 설정 최적화 ---
