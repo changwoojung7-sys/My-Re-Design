@@ -8,6 +8,8 @@ import android.os.Bundle;
 import android.util.Log;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
+import android.webkit.WebSettings;
+import android.os.Message;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -24,23 +26,43 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        final Bridge bridge = this.bridge;
-        if (bridge == null || bridge.getWebView() == null) {
-            Log.w(TAG, "Bridge or WebView is null in onCreate");
-            return;
-        }
-
-        bridge.getWebView().setWebViewClient(new SafePaymentWebViewClient(bridge));
+        WebView webView = bridge.getWebView();
         
-        // 중요: 결제창 X 버튼(window.close) 클릭 시 앱 홈으로 복원 로직 추가
-        bridge.getWebView().setWebChromeClient(new BridgeWebChromeClient(bridge) {
+        // --- 결제 연동을 위한 WebView 설정 최적화 ---
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
+        settings.setSupportMultipleWindows(true); // 팝발창 및 PG 내부 팝업 대응
+        settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+
+        webView.setWebViewClient(new SafePaymentWebViewClient(bridge));
+        
+        // Window.close() 및 팝업창을 현재 창에서 처리하기 위한 WebChromeClient 설정
+        webView.setWebChromeClient(new BridgeWebChromeClient(bridge) {
             @Override
             public void onCloseWindow(WebView window) {
                 super.onCloseWindow(window);
-                Log.d(TAG, "onCloseWindow intercepted (PG Cancel). Restoring app.");
-                window.loadUrl(bridge.getServerUrl());
+                Log.d(TAG, "onCloseWindow intercepted. Restoring app.");
+                restoreApp(window);
+            }
+
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+                // 새 창(팝업) 요청 시 현재 웹뷰에서 그대로 열리도록 설정 (결제창 대응)
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(view);
+                resultMsg.sendToTarget();
+                return true;
             }
         });
+    }
+
+    private void restoreApp(WebView view) {
+        if (this.bridge != null) {
+            view.post(() -> view.loadUrl(this.bridge.getServerUrl()));
+        }
     }
 
     @Override
@@ -97,7 +119,7 @@ public class MainActivity extends BridgeActivity {
                     resultIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
 
                     // 중요 1: WebView 빈 화면이나 리다이렉션 무한루프를 막고 초기 로컬 URL(React App)로 강제 복원
-                    view.loadUrl(bridge.getServerUrl());
+                    restoreApp(view);
 
                     // 중요 2: Intent를 실행하여 MainActivity의 onNewIntent 가 호출되고 -> appUrlOpen 이벤트를 발생시킴
                     startActivity(resultIntent);
@@ -109,7 +131,12 @@ public class MainActivity extends BridgeActivity {
 
             // 2) 외부 결제앱 호출 인텐트 처리
             if (url.startsWith("intent:")) {
-                return handleIntentScheme(view, url);
+                boolean handled = handleIntentScheme(view, url);
+                if (handled) {
+                    // 외부 앱 이동 시 웹뷰 화면을 미리 앱 홈으로 돌려놓아 복귀 시 하얀 화면 방지
+                    restoreApp(view);
+                }
+                return handled;
             }
 
             if (url.startsWith("market:") || url.startsWith("ispmobile:")) {
