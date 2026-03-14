@@ -82,7 +82,7 @@ function Layout() {
 
 import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
 import { useLanguage } from './lib/i18n';
-import { usePaymentReturn } from './lib/usePaymentReturn';
+// import { usePaymentReturn } from './lib/usePaymentReturn'; // 제거됨
 import { Capacitor } from '@capacitor/core';
 import { App as CapacitorApp } from '@capacitor/app';
 
