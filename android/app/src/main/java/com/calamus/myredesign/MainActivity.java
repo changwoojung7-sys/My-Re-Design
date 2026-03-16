@@ -357,22 +357,30 @@ public class MainActivity extends BridgeActivity {
                     dismissPopup();
                 }
 
-                // ── 핵심 실행 순서 ─────────────────────────────────────
-                // 1) restoreApp()으로 WebView를 localhost(React 앱)로 먼저 복원
-                // 2) React가 마운트되고 appUrlOpen 리스너가 등록될 때까지 대기
-                // 3) 그 이후 handlePaymentRedirect()로 deeplink intent 발송
-                // ※ 순서가 바뀌면 React 리스너 미등록 상태에서 이벤트 유실 → 하얀 화면
-                restoreApp(view);
-
+                // ── 결제 결과를 localStorage에 저장 후 앱 복원 ──────────────
+                // appUrlOpen/Intent 방식 대신 localStorage 폴링 방식 사용
+                // 이유: restoreApp() 후 세션 체크 타이밍 문제로 로그아웃 발생
                 final String redirectUrl = url;
-                view.postDelayed(() -> {
-                    Log.d(TAG, "Delayed handlePaymentRedirect: " + redirectUrl);
-                    handlePaymentRedirect(redirectUrl);
-                }, 2000); // React 마운트 완료 대기 (2초)
+                try {
+                    Uri resultUri = Uri.parse(redirectUrl.contains("payment-redirect")
+                            ? "myredesign://payment/result?" + Uri.parse(redirectUrl).getEncodedQuery()
+                            : redirectUrl);
+                    String query = resultUri.getEncodedQuery() != null
+                            ? resultUri.getEncodedQuery()
+                            : "";
+                    String escapedQuery = query.replace("'", "\\'");
+                    // localStorage에 결제 결과 저장 (React가 마운트 후 읽어감)
+                    String js = "localStorage.setItem('payment_return_result', '"
+                            + escapedQuery + "');";
+                    view.evaluateJavascript(js, null);
+                    Log.d(TAG, "Payment result saved to localStorage: " + escapedQuery);
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to save payment result", e);
+                }
 
+                restoreApp(view); // 세션 재로드 없이 앱 화면만 복원
                 return true;
             }
-
             // 2) 외부 결제앱 intent: 처리
             if (url.startsWith("intent:")) {
                 boolean handled = handleIntentScheme(view, url);

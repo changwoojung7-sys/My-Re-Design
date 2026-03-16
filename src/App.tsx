@@ -83,8 +83,7 @@ function Layout() {
 import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
 import { useLanguage } from './lib/i18n';
 // import { usePaymentReturn } from './lib/usePaymentReturn'; // 제거됨
-import { Capacitor } from '@capacitor/core';
-import { App as CapacitorApp } from '@capacitor/app';
+
 
 function App() {
   const { t } = useLanguage();
@@ -174,38 +173,37 @@ function App() {
   // Paywall이 마운트되기 전에도 이벤트를 놓치지 않음
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!Capacitor.isNativePlatform()) return;
+    // ── localStorage 폴링 방식으로 결제 결과 수신 ──────────────
+    // appUrlOpen/Intent 타이밍 문제 없이 React 마운트 후 안전하게 처리
+    const checkPaymentResult = async () => {
+      const resultQuery = localStorage.getItem('payment_return_result');
+      if (!resultQuery) return;
 
-    const listenerPromise = CapacitorApp.addListener('appUrlOpen', async (event) => {
-      console.log('[App] appUrlOpen 수신:', event.url);
+      // 즉시 제거해서 중복 처리 방지
+      localStorage.removeItem('payment_return_result');
+      console.log('[App] payment_return_result 감지:', resultQuery);
 
-      if (!event.url.includes('payment/result')) return;
-
-      const params = new URLSearchParams(event.url.split('?')[1]);
-      const code = params.get('code');      // KG이니시스: SUCCESS | FAILURE_TYPE_PG
+      const params = new URLSearchParams(resultQuery);
+      const code = params.get('code');
       const message = params.get('message') || params.get('error_msg') || '';
-      const paymentId = params.get('paymentId'); // 네이버페이 등 V2: pay_xxxxx
-      const txId = params.get('txId');       // 네이버페이 등 V2: uuid
+      const paymentId = params.get('paymentId');
+      const txId = params.get('txId');
 
-      // 결제 취소/실패: code=FAILURE_TYPE_PG
       const isFailed = code === 'FAILURE_TYPE_PG';
-      // 결제 성공: KG이니시스(code=SUCCESS) 또는 네이버페이 V2(code 없이 paymentId+txId)
       const isSuccess = code === 'SUCCESS' || (!code && !!paymentId && !!txId);
 
-      console.log('[App] 판정 — isFailed:', isFailed, 'isSuccess:', isSuccess, 'code:', code, 'paymentId:', paymentId);
+      console.log('[App] 결제 판정 — isFailed:', isFailed, 'isSuccess:', isSuccess);
 
       if (isFailed) {
-        // ── 취소/실패 ───────────────────────────────────────────
         localStorage.removeItem('pending_payment');
         const isCancel = message.includes('취소') || message.toLowerCase().includes('cancel');
         alert(isCancel ? '결제를 취소하셨습니다.' : `결제 실패: ${message || '알 수 없는 오류'}`);
 
       } else if (isSuccess) {
-        // ── 성공 — 서버 검증 후 구독 반영 ─────────────────────
         try {
           const { checkMobilePaymentResult } = await import('./lib/payment');
-          // event.url 전체를 넘겨 네이버페이 파라미터도 그대로 전달
-          const result = await checkMobilePaymentResult(event.url);
+          const fullUrl = 'myredesign://payment/result?' + resultQuery;
+          const result = await checkMobilePaymentResult(fullUrl);
           if (result?.success) {
             localStorage.removeItem('pending_payment');
             alert(t.subscriptionSuccessful || '결제가 성공적으로 완료되었습니다.');
@@ -214,17 +212,16 @@ function App() {
             alert(`결제 처리 오류: ${result?.error || '서버 오류'}`);
           }
         } catch (e: any) {
-          console.error('[App] 결제 성공 처리 오류:', e);
           alert(`결제 처리 중 오류: ${e.message}`);
         }
-      } else {
-        console.warn('[App] appUrlOpen: 알 수 없는 파라미터', event.url);
       }
-    });
-
-    return () => {
-      listenerPromise.then(l => l.remove());
     };
+
+    // 마운트 직후 + 500ms 후 두 번 체크 (restoreApp 타이밍 대응)
+    checkPaymentResult();
+    const timer = setTimeout(checkPaymentResult, 500);
+    return () => clearTimeout(timer);
+
   }, [t.subscriptionSuccessful]);
 
   // --- 중앙 집중식 결제 복구 훅 (중복 리스너 제거 버전) ---
