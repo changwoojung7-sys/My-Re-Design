@@ -349,6 +349,14 @@
   - **Android 11+ (API 30+) 앱 가시성 확보**:
     - 보안 강화로 인해 외부 결제 앱(토스, 카드사 앱 등) 호출 시 `AndroidManifest.xml`에 `<queries>` 태그 필수 작성 완료.
   - **State Preservation (Session Loss 방지)**: 리다이렉트 시 상태 유실 방지를 위해 결제 요청 전 `payments` 테이블에 `status='pending'`으로 레코드를 미리 저장.
+  - **결제 후 로그아웃 & 구독 미저장 버그 해결 (2026-03-22)**:
+    - **원인 1 – `http` vs `https` localhost Origin 불일치**: `MainActivity.java`에서 결제 후 앱 복원 시 `http://localhost`로 `loadUrl()`을 호출했는데, Capacitor의 실제 origin은 `https://localhost`임. 이 두 origin은 브라우저 보안 정책상 완전히 별개의 localStorage를 사용하므로 Supabase 세션 토큰(`sb-*`)이 보이지 않아 자동 로그아웃 발생.
+    - **원인 2 – 결제 결과 전달 방식 불일치**: Java가 결제 결과를 `localStorage('payment_return_result')`에 저장했으나 React는 URL 파라미터(`?payment_result=...`)만 읽어서 결과가 누락됨.
+    - **원인 3 – 세션 복원 타이밍**: `loadUrl()` 후 앱 재초기화 시 Supabase 세션 복원에 수 초가 걸리는데 그 이전에 `processPaymentSuccess()` 내 `getUser()`가 `null`을 반환해 DB 저장 실패.
+    - **해결 1**: `MainActivity.java`의 팝업 WebView, 메인 WebView, `restoreApp()` 모두 `https://localhost`로 통일.
+    - **해결 2**: Java에서 결제 결과를 `https://localhost/?payment_result=Uri.encode(query)` URL 파라미터 방식으로 전달. React의 기존 파싱 로직과 정합.
+    - **해결 3**: `App.tsx`에서 결제 처리 전 `supabase.auth.getSession()` 폴링(500ms × 최대 12회)으로 세션 복원 대기 후 진행.
+    - **해결 4**: `App.tsx`의 결제 성공 판정 로직을 V1(`imp_success`, `imp_uid`, `merchant_uid`)과 V2(`paymentId`, `code`) 파라미터를 모두 올바르게 처리하도록 개선.
 
 #### 결제 흐름 (Unified Logic: `src/lib/payment.ts`)
 
@@ -414,4 +422,5 @@
 - **i18n**: `src/lib/i18n.ts`에서 다국어 지원 (한국어/영어)
 - **데모 모드**: `user.id === 'demo123'` 시 결제 차단 + 목업 데이터 사용
 - **Auth 동기화**: `onAuthStateChange` 리스너로 세션 만료 시 자동 로그아웃
+- **Capacitor localhost origin**: Capacitor는 반드시 `https://localhost`를 사용. `http://localhost`로 `loadUrl()` 호출 시 다른 localStorage origin이 되어 Supabase 세션 토큰 유실 → 결제/인증 버그 유발. Android 네이티브 코드에서 URL 로드 시 항상 `https://localhost` 사용할 것.
 - **사업자 정보**: 유진에이아이(YujinAI) / 대표: 정창우 / 사업자번호: 519-77-00622

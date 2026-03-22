@@ -1,3 +1,38 @@
+# 📢 [업데이트] v2.1.5 (Version Code 35) 배포 안내
+
+안녕하세요, **My Re Design**입니다!
+안드로이드 앱에서 결제 완료 후 로그아웃되거나 구독 정보가 저장되지 않던 심각한 버그를 수정한 **v2.1.5** 업데이트를 배포했습니다.
+
+### 💳 안드로이드 결제 후 로그아웃 & 구독 미저장 오류 수정
+
+#### 1. 결제 완료 후 자동 로그아웃 문제 해결
+
+* **문제**: 안드로이드 앱에서 결제 완료/취소 후 앱으로 돌아올 때 로그인이 풀리는 현상. 웹에서는 정상 동작.
+* **원인**: `MainActivity.java`에서 결제 후 앱 복원 시 `http://localhost`로 WebView를 로드했는데, Capacitor의 실제 origin은 `https://localhost`임. 이 두 origin은 브라우저 보안 정책상 완전히 별개의 localStorage를 사용하므로 Supabase 세션 토큰(`sb-*-auth-token`)이 보이지 않아 자동 로그아웃 발생.
+* **수정 사항**: `MainActivity.java`의 팝업 WebView, 메인 WebView, `restoreApp()` fallback 등 모든 URL 로드를 `https://localhost`로 통일.
+
+#### 2. 결제 결과 누락 문제 해결
+
+* **문제**: 결제 성공/실패 정보가 앱에 전달되지 않아 구독이 활성화되지 않는 현상.
+* **원인**: Java가 결제 결과를 `localStorage`에 저장했으나, React는 URL 파라미터(`?payment_result=...`)만 파싱해서 결과가 누락됨.
+* **수정 사항**: Java에서 결제 결과를 `https://localhost/?payment_result=...` URL 파라미터 방식으로 전달하도록 통일.
+
+#### 3. 세션 복원 타이밍 문제 해결
+
+* **문제**: 결제 후 앱 재초기화 시 Supabase 세션 복원 전에 결제 처리가 실행되어 DB 저장 실패.
+* **수정 사항**: `App.tsx`에서 결제 처리 전 세션 복원 대기 폴링(500ms × 최대 12회)을 추가. 세션이 확인된 후 결제 처리를 진행.
+
+#### 4. V1/V2 결제 판정 로직 개선
+
+* PortOne V1(`imp_success`, `imp_uid`, `merchant_uid`)과 V2(`paymentId`, `code`) 파라미터를 모두 올바르게 처리하도록 `App.tsx` 결제 성공/실패 판정 로직 개선.
+
+### 🚀 버전 정보
+
+* **Version Name**: `2.1.5`
+* **Version Code**: `35`
+
+---
+
 # 📢 [업데이트] v2.1.4 (Version Code 31) 배포 안내
 
 안녕하세요, **My Re Design**입니다!
