@@ -82,6 +82,8 @@ function Layout() {
 
 import KakaoRedirectHandler from './components/common/KakaoRedirectHandler';
 import { useLanguage } from './lib/i18n';
+import { App as CapApp } from '@capacitor/app';
+import { Browser } from '@capacitor/browser';
 // import { usePaymentReturn } from './lib/usePaymentReturn'; // 제거됨
 
 
@@ -167,6 +169,90 @@ function App() {
       subscription.unsubscribe();
     };
   }, []); // End of auth check useEffect
+
+  // ─────────────────────────────────────────────────────────────
+  // [구글 로그인] Capacitor 앱 딥링크 콜백 처리
+  // Android에서 myredesign://auth/callback?code=... 딥링크로 복귀 시
+  // Supabase code를 세션으로 교환하여 로그인 처리
+  // ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const handleGoogleCallback = async (url: string) => {
+      if (!url.includes('auth/callback')) return;
+
+      console.log('[Google OAuth] 콜백 URL 수신:', url);
+
+      try {
+        // 인앱 브라우저 닫기
+        await Browser.close();
+      } catch (e) {
+        // 이미 닫혀있으면 무시
+      }
+
+      // URL에서 code 파라미터 추출
+      const urlObj = new URL(url);
+      const code = urlObj.searchParams.get('code');
+      const errorParam = urlObj.searchParams.get('error');
+
+      if (errorParam) {
+        console.error('[Google OAuth] 오류:', errorParam);
+        alert('구글 로그인이 취소되었거나 오류가 발생했습니다.');
+        return;
+      }
+
+      if (!code) {
+        console.warn('[Google OAuth] code 파라미터 없음');
+        return;
+      }
+
+      try {
+        // Code → 세션 교환
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) throw error;
+
+        if (data.session?.user) {
+          const authUser = data.session.user;
+          console.log('[Google OAuth] 로그인 성공:', authUser.id);
+
+          // 프로필 조회 및 스토어 업데이트
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
+
+          let nickname = profile?.nickname;
+          if (!nickname) {
+            nickname = authUser.email?.split('@')[0] || 'User';
+          }
+
+          useStore.getState().setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            nickname,
+            age: profile?.age,
+            gender: profile?.gender,
+            custom_free_trial_days: profile?.custom_free_trial_days,
+            full_name: profile?.full_name || authUser.user_metadata?.full_name,
+          });
+        }
+      } catch (err: any) {
+        console.error('[Google OAuth] 세션 교환 실패:', err);
+        alert(err.message || '구글 로그인 처리 중 오류가 발생했습니다.');
+      }
+    };
+
+    // Capacitor appUrlOpen 이벤트 리스너 등록
+    let listenerHandle: any;
+    CapApp.addListener('appUrlOpen', async ({ url }) => {
+      await handleGoogleCallback(url);
+    }).then(handle => {
+      listenerHandle = handle;
+    });
+
+    return () => {
+      listenerHandle?.remove();
+    };
+  }, []);
 
   // ─────────────────────────────────────────────────────────────
   // [핵심 수정] 결제 후 앱 복귀 처리
