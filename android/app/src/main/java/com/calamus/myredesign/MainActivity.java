@@ -102,11 +102,12 @@ public class MainActivity extends BridgeActivity {
                             }
 
                             // 결제 결과를 ?payment_result= URL 파라미터로 앱에 전달
-                            // (App.tsx의 URL 파라미터 파싱 로직과 연결)
+                            // ⚠️ 반드시 https://localhost 사용 (Capacitor 기본 origin)
+                            // http://localhost 사용 시 다른 localStorage origin이 되어 세션 소실
                             try {
                                 String query = Uri.parse(url).getEncodedQuery();
                                 if (query == null) query = "";
-                                String targetUrl = "http://localhost/?payment_result=" + Uri.encode(query);
+                                String targetUrl = "https://localhost/?payment_result=" + Uri.encode(query);
                                 Log.d(TAG, "[popup] Restoring app with payment result URL: " + targetUrl);
                                 if (bridge != null && bridge.getWebView() != null) {
                                     bridge.getWebView().post(() -> bridge.getWebView().loadUrl(targetUrl));
@@ -114,7 +115,7 @@ public class MainActivity extends BridgeActivity {
                             } catch (Exception e) {
                                 Log.e(TAG, "[popup] Failed to build payment result URL", e);
                                 if (bridge != null && bridge.getWebView() != null) {
-                                    bridge.getWebView().post(() -> bridge.getWebView().loadUrl("http://localhost/"));
+                                    bridge.getWebView().post(() -> bridge.getWebView().loadUrl("https://localhost/"));
                                 }
                             }
                             return true;
@@ -274,9 +275,11 @@ public class MainActivity extends BridgeActivity {
         if (this.bridge == null || view == null)
             return;
 
+        // ⚠️ 반드시 https://localhost 사용 (Capacitor 기본 origin)
+        // bridge.getServerUrl()이 https://localhost를 반환하므로 활용
         String serverUrl = this.bridge.getServerUrl();
         if (serverUrl == null || serverUrl.isEmpty()) {
-            serverUrl = "http://localhost";
+            serverUrl = "https://localhost"; // http → https 수정
         }
         final String finalUrl = serverUrl;
         Log.d(TAG, "Restoring app UI: " + finalUrl);
@@ -379,11 +382,12 @@ public class MainActivity extends BridgeActivity {
                 }
 
                 // 결제 결과를 ?payment_result= URL 파라미터로 앱에 전달
-                // (localStorage 방식 제거 → App.tsx의 URL 파라미터 파싱과 연결)
+                // ⚠️ 반드시 https://localhost 사용 (Capacitor 기본 origin)
+                // http://localhost 사용 시 다른 localStorage origin이 되어 세션 소실
                 try {
                     String query = Uri.parse(url).getEncodedQuery();
                     if (query == null) query = "";
-                    String targetUrl = "http://localhost/?payment_result=" + Uri.encode(query);
+                    String targetUrl = "https://localhost/?payment_result=" + Uri.encode(query);
                     Log.d(TAG, "[main] Restoring app with payment result URL: " + targetUrl);
                     view.loadUrl(targetUrl);
                 } catch (Exception e) {
