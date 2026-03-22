@@ -169,40 +169,85 @@ function App() {
   }, []); // End of auth check useEffect
 
   // ─────────────────────────────────────────────────────────────
-  // [추가] appUrlOpen — 결제 후 앱 복귀 시 이벤트 수신 (App 최상위 등록)
-  // Paywall이 마운트되기 전에도 이벤트를 놓치지 않음
+  // [핵심 수정] 결제 후 앱 복귀 처리
+  // Java(MainActivity)가 ?payment_result=... URL 파라미터로 결과를 전달하면
+  // 세션 복원을 기다린 후 결제 성공/실패를 처리
   // ─────────────────────────────────────────────────────────────
   useEffect(() => {
-    // ── localStorage 폴링 방식으로 결제 결과 수신 ──────────────
-    // appUrlOpen/Intent 타이밍 문제 없이 React 마운트 후 안전하게 처리
-    const checkPaymentResult = async () => {
-      const resultQuery = localStorage.getItem('payment_return_result');
-      if (!resultQuery) return;
+    // URL 파라미터에서 결제 결과 읽기 (Java가 ?payment_result=... 로 로드)
+    const searchParams = new URLSearchParams(window.location.search);
+    const paymentResult = searchParams.get('payment_result');
 
-      // 즉시 제거해서 중복 처리 방지
-      localStorage.removeItem('payment_return_result');
-      console.log('[App] payment_return_result 감지:', resultQuery);
+    if (!paymentResult) return;
 
-      const params = new URLSearchParams(resultQuery);
-      const code = params.get('code');
-      const message = params.get('message') || params.get('error_msg') || '';
-      const paymentId = params.get('paymentId');
-      const txId = params.get('txId');
+    // URL에서 파라미터 제거 (새로고침 시 재처리 방지)
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, '', cleanUrl);
 
-      const isFailed = code === 'FAILURE_TYPE_PG';
-      const isSuccess = code === 'SUCCESS' || (!code && !!paymentId && !!txId);
+    console.log('[App] payment_result URL 파라미터 감지:', paymentResult);
 
-      console.log('[App] 결제 판정 — isFailed:', isFailed, 'isSuccess:', isSuccess);
+    // Java가 URI.encode()한 값을 decode
+    let decodedResult: string;
+    try {
+      decodedResult = decodeURIComponent(paymentResult);
+    } catch {
+      decodedResult = paymentResult;
+    }
 
-      if (isFailed) {
-        localStorage.removeItem('pending_payment');
-        const isCancel = message.includes('취소') || message.toLowerCase().includes('cancel');
-        alert(isCancel ? '결제를 취소하셨습니다.' : `결제 실패: ${message || '알 수 없는 오류'}`);
+    const params = new URLSearchParams(decodedResult);
+    const imp_success = params.get('imp_success') || params.get('success');
+    const code = params.get('code');
+    const message = params.get('message') || params.get('error_msg') || '';
+    const imp_uid = params.get('imp_uid');
+    const merchant_uid = params.get('merchant_uid');
+    const paymentId = params.get('paymentId');
 
-      } else if (isSuccess) {
+    // V1: imp_success 기준 / V2: code 없으면 성공
+    const isFailed =
+      imp_success === 'false' ||
+      code === 'FAILURE_TYPE_PG' ||
+      (!imp_success && !paymentId && !imp_uid && !merchant_uid);
+    const isSuccess =
+      imp_success === 'true' ||
+      (paymentId && !code) ||
+      (imp_uid && imp_success !== 'false');
+
+    console.log('[App] 결제 판정 — isFailed:', isFailed, 'isSuccess:', isSuccess, 'params:', decodedResult);
+
+    if (isFailed) {
+      localStorage.removeItem('pending_payment');
+      const isCancel = message.includes('취소') || message.toLowerCase().includes('cancel');
+      alert(isCancel ? '결제를 취소하셨습니다.' : `결제 실패: ${message || '알 수 없는 오류'}`);
+      return;
+    }
+
+    if (isSuccess) {
+      (async () => {
         try {
+          // [핵심] 앱 재초기화 후 Supabase 세션이 localStorage에서 복원될 때까지 대기
+          // loadUrl() 후 세션 복원에 수 초가 걸리므로 폴링으로 확인
+          const waitForSession = async (): Promise<boolean> => {
+            console.log('[App] 세션 복원 대기 시작...');
+            for (let i = 0; i < 12; i++) {
+              const { data: { session } } = await supabase.auth.getSession();
+              if (session?.user) {
+                console.log(`[App] 세션 복원 확인 (${(i + 1) * 500}ms):`, session.user.id);
+                return true;
+              }
+              await new Promise(r => setTimeout(r, 500));
+            }
+            console.warn('[App] 세션 복원 타임아웃 (6초 경과)');
+            return false;
+          };
+
+          const hasSession = await waitForSession();
+          if (!hasSession) {
+            alert('로그인 세션이 만료되었습니다. 다시 로그인 후 구독 내역을 확인해 주세요.');
+            return;
+          }
+
           const { checkMobilePaymentResult } = await import('./lib/payment');
-          const fullUrl = 'myredesign://payment/result?' + resultQuery;
+          const fullUrl = 'myredesign://payment/result?' + decodedResult;
           const result = await checkMobilePaymentResult(fullUrl);
           if (result?.success) {
             localStorage.removeItem('pending_payment');
@@ -212,17 +257,13 @@ function App() {
             alert(`결제 처리 오류: ${result?.error || '서버 오류'}`);
           }
         } catch (e: any) {
+          console.error('[App] 결제 처리 중 오류:', e);
           alert(`결제 처리 중 오류: ${e.message}`);
         }
-      }
-    };
+      })();
+    }
+  }, []); // 마운트 시 한 번만 실행
 
-    // 마운트 직후 + 500ms 후 두 번 체크 (restoreApp 타이밍 대응)
-    checkPaymentResult();
-    const timer = setTimeout(checkPaymentResult, 500);
-    return () => clearTimeout(timer);
-
-  }, [t.subscriptionSuccessful]);
 
   // --- 중앙 집중식 결제 복구 훅 (중복 리스너 제거 버전) ---
   // 아래 훅에서는 appUrlOpen 리스너를 실행하지 않도록 내부 설정을 확인하거나, 

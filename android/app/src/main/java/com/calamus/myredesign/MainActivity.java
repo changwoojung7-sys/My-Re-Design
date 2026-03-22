@@ -94,8 +94,29 @@ public class MainActivity extends BridgeActivity {
                         // 결제 완료/취소 후 redirect 처리
                         if (url.contains("/functions/v1/payment-redirect")
                                 || url.startsWith("myredesign://payment/result")) {
-                            dismissPopup();
-                            handlePaymentRedirect(url);
+                            Log.d(TAG, "Intercepted payment redirect (popup): " + url);
+
+                            // 팝업 닫기
+                            if (popupDialog != null && popupDialog.isShowing()) {
+                                dismissPopup();
+                            }
+
+                            // 결제 결과를 ?payment_result= URL 파라미터로 앱에 전달
+                            // (App.tsx의 URL 파라미터 파싱 로직과 연결)
+                            try {
+                                String query = Uri.parse(url).getEncodedQuery();
+                                if (query == null) query = "";
+                                String targetUrl = "http://localhost/?payment_result=" + Uri.encode(query);
+                                Log.d(TAG, "[popup] Restoring app with payment result URL: " + targetUrl);
+                                if (bridge != null && bridge.getWebView() != null) {
+                                    bridge.getWebView().post(() -> bridge.getWebView().loadUrl(targetUrl));
+                                }
+                            } catch (Exception e) {
+                                Log.e(TAG, "[popup] Failed to build payment result URL", e);
+                                if (bridge != null && bridge.getWebView() != null) {
+                                    bridge.getWebView().post(() -> bridge.getWebView().loadUrl("http://localhost/"));
+                                }
+                            }
                             return true;
                         }
 
@@ -351,34 +372,24 @@ public class MainActivity extends BridgeActivity {
             // 1) 결제 redirect (Edge Function URL 또는 커스텀 스킴)
             if (url.contains("/functions/v1/payment-redirect")
                     || url.startsWith("myredesign://payment/result")) {
-                Log.d(TAG, "Intercepted payment redirect: " + url);
+                Log.d(TAG, "Intercepted payment redirect (main WebView): " + url);
 
                 if (popupDialog != null && popupDialog.isShowing()) {
                     dismissPopup();
                 }
 
-                // ── 결제 결과를 localStorage에 저장 후 앱 복원 ──────────────
-                // appUrlOpen/Intent 방식 대신 localStorage 폴링 방식 사용
-                // 이유: restoreApp() 후 세션 체크 타이밍 문제로 로그아웃 발생
-                final String redirectUrl = url;
+                // 결제 결과를 ?payment_result= URL 파라미터로 앱에 전달
+                // (localStorage 방식 제거 → App.tsx의 URL 파라미터 파싱과 연결)
                 try {
-                    Uri resultUri = Uri.parse(redirectUrl.contains("payment-redirect")
-                            ? "myredesign://payment/result?" + Uri.parse(redirectUrl).getEncodedQuery()
-                            : redirectUrl);
-                    String query = resultUri.getEncodedQuery() != null
-                            ? resultUri.getEncodedQuery()
-                            : "";
-                    String escapedQuery = query.replace("'", "\\'");
-                    // localStorage에 결제 결과 저장 (React가 마운트 후 읽어감)
-                    String js = "localStorage.setItem('payment_return_result', '"
-                            + escapedQuery + "');";
-                    view.evaluateJavascript(js, null);
-                    Log.d(TAG, "Payment result saved to localStorage: " + escapedQuery);
+                    String query = Uri.parse(url).getEncodedQuery();
+                    if (query == null) query = "";
+                    String targetUrl = "http://localhost/?payment_result=" + Uri.encode(query);
+                    Log.d(TAG, "[main] Restoring app with payment result URL: " + targetUrl);
+                    view.loadUrl(targetUrl);
                 } catch (Exception e) {
-                    Log.e(TAG, "Failed to save payment result", e);
+                    Log.e(TAG, "[main] Failed to build payment result URL", e);
+                    restoreApp(view);
                 }
-
-                restoreApp(view); // 세션 재로드 없이 앱 화면만 복원
                 return true;
             }
             // 2) 외부 결제앱 intent: 처리
