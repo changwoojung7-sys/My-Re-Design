@@ -31,13 +31,14 @@
 
 ---
 
-## 3. 작업 완료 및 Git 배포 워크플로우
+## 3. 단위 작업 완료 시 자동 Git 배포 워크플로우 (Auto-Push)
 
-파일 수정 및 빌드 확인 후 반드시 아래 3단계를 수행합니다:
+모든 단위 작업(기능 추가, 버그 수정, 설정 변경 등)이 완료되면 **사용자가 별도로 요청하지 않아도 에이전트가 자동으로** 아래 3단계를 수행하여 원격에 즉시 반영합니다:
 
 1. `git add .` (모든 변경사항 스테이징)
-2. `git commit -m "<명확하고 직관적인 커밋 메시지>"`
-3. `git push` (`https://github.com/changwoojung7-sys/My-Re-Design.git` 반영)
+2. `git commit -m "<작업 내용을 명확하게 명시한 커밋 메시지>"`
+3. `git push origin main` (`https://github.com/changwoojung7-sys/My-Re-Design.git` 반영)
+
 
 ---
 
