@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { Bot, X, Send, Sparkles } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useStore } from '../../lib/store';
@@ -15,6 +15,7 @@ interface ReflectionPopupProps {
 export default function ReflectionPopup({ isOpen, onClose, goalCategory, date, onSaved }: ReflectionPopupProps) {
     const { user } = useStore();
     const [reflection, setReflection] = useState('');
+    const [existingAiResponse, setExistingAiResponse] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
 
@@ -195,6 +196,12 @@ export default function ReflectionPopup({ isOpen, onClose, goalCategory, date, o
                                             오늘 미션을 모두 완료하셨네요! 수고하셨습니다. 🎉<br/><br/>
                                             진행하면서 느낀 점이나 어려웠던 부분, 내일은 어떻게 더 발전하고 싶은지 편하게 남겨주세요. 남겨주신 회고는 다음 AI 코칭에 반영됩니다.
                                         </p>
+                                        {existingAiResponse && (
+                                            <div className="mt-3 pt-3 border-t border-white/10 text-xs text-primary flex items-start gap-2">
+                                                <Sparkles size={14} className="shrink-0 mt-0.5" />
+                                                <span>{existingAiResponse}</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     <div className="relative">
