@@ -31,43 +31,29 @@ CREATE INDEX IF NOT EXISTS idx_buddy_logs_user_date
 -- ② RLS 활성화
 ALTER TABLE public.buddy_challenge_logs ENABLE ROW LEVEL SECURITY;
 
--- ③ SELECT: 챌린지 참여자(creator/partner) 모두 조회 가능
-CREATE POLICY "Participants can view buddy challenge logs"
+-- ③ SELECT: 인증된 유저 조회 허용
+CREATE POLICY "Users can view buddy challenge logs"
   ON public.buddy_challenge_logs FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.buddy_challenges bc
-      WHERE bc.id = buddy_challenge_id
-        AND (bc.creator_id = auth.uid() OR bc.partner_id = auth.uid())
-    )
-  );
+  USING (auth.role() = 'authenticated');
 
--- ④ INSERT: 본인 데이터만, 챌린지 참여자여야 함
-CREATE POLICY "Participants can insert own buddy challenge logs"
+-- ④ INSERT: 본인 데이터만 등록 가능
+CREATE POLICY "Users can insert own buddy challenge logs"
   ON public.buddy_challenge_logs FOR INSERT
-  WITH CHECK (
-    auth.uid() = user_id
-    AND EXISTS (
-      SELECT 1 FROM public.buddy_challenges bc
-      WHERE bc.id = buddy_challenge_id
-        AND (bc.creator_id = auth.uid() OR bc.partner_id = auth.uid())
-        AND bc.status = 'active'
-    )
-  );
+  WITH CHECK (auth.uid() = user_id);
 
--- ⑤ UPDATE: 본인 데이터만
+-- ⑤ UPDATE: 본인 데이터만 수정 가능
 CREATE POLICY "Users can update own buddy challenge logs"
   ON public.buddy_challenge_logs FOR UPDATE
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- ⑥ DELETE: 본인 데이터만
+-- ⑥ DELETE: 본인 데이터만 삭제 가능
 CREATE POLICY "Users can delete own buddy challenge logs"
   ON public.buddy_challenge_logs FOR DELETE
   USING (auth.uid() = user_id);
 
 -- ⑦ 권한 부여
-GRANT SELECT, INSERT, UPDATE, DELETE ON public.buddy_challenge_logs TO authenticated;
+GRANT ALL ON public.buddy_challenge_logs TO authenticated;
 GRANT ALL ON public.buddy_challenge_logs TO service_role;
 
 -- ⑧ 적용 확인
