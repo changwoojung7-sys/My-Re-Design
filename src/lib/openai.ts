@@ -1,3 +1,5 @@
+import { supabase } from './supabase';
+
 // Intelligent 3-Mission Generator for Demo & Fallback
 function generateDynamicCategoryMissions(category: string, goalText: string = '', language: string = 'ko'): MissionData[] {
     const text = (goalText || '').toLowerCase();

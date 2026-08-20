@@ -149,17 +149,18 @@ serve(async (req: Request) => {
             // Determine requested categories
             const requested = payload.goalList && Object.keys(payload.goalList).length > 0
                 ? Object.keys(payload.goalList)
-                : ['body_wellness', 'growth_career', 'mind_connection'];
+                : ['body_wellness', 'growth_career', 'mind_connection', 'funplay'];
 
             // Assign goals only if requested
             const bwGoal = requested.includes('body_wellness') ? (payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리') : null;
             const gcGoal = requested.includes('growth_career') ? (payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발') : null;
             const mcGoal = requested.includes('mind_connection') ? (payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정') : null;
+            const fpGoal = requested.includes('funplay') ? (payload.goalList?.funplay || goalMap['funplay'] || '즐거움 및 기분전환') : null;
 
             // 🔍 DEBUG: Log goal resolution
             console.log('[DEBUG] Goal Resolution:', {
                 'requested': requested,
-                'resolved': { bwGoal, gcGoal, mcGoal }
+                'resolved': { bwGoal, gcGoal, mcGoal, fpGoal }
             });
 
             // Helper to pick N random items
@@ -188,6 +189,7 @@ serve(async (req: Request) => {
             if (bwGoal) goalsSection += `- body_wellness_goal: "${bwGoal}"\n`;
             if (gcGoal) goalsSection += `- growth_career_goal: "${gcGoal}"\n`;
             if (mcGoal) goalsSection += `- mind_connection_goal: "${mcGoal}"\n`;
+            if (fpGoal) goalsSection += `- funplay_goal: "${fpGoal}"\n`;
 
             // Construct Pattern Library Section
             let patternsSection = '═══ PATTERN LIBRARY (METHOD HINT) ═══\n';
@@ -226,6 +228,14 @@ it is INVALID and must be rewritten internally before output.
 Do not produce generic productivity advice.
 Do not produce category-only missions ignoring the goal.
 Generate missions ONLY for the categories listed in USER GOALS.
+
+Output MUST be a JSON object containing a "missions" array.
+Each mission object MUST have:
+- "category" (exactly one of: body_wellness, growth_career, mind_connection, funplay)
+- "content" (the mission text)
+- "verification_type" (checkbox, text, or image)
+- "reasoning" (object with "expected_impact" key)
+- "trust_score" (integer between 90 and 99)
 
 Output strictly valid JSON only.`;
 

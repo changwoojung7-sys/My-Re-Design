@@ -162,25 +162,27 @@ export default function Today() {
     // Rerun fetch when Date or Goal changes
     useEffect(() => {
         if (user && selectedGoalId && !checkingSubs) {
-            // Load refresh count from DB (synced across devices)
-            fetchRefreshCountFromDB();
+            const loadInit = async () => {
+                const currentCount = await fetchRefreshCountFromDB();
 
-            // Check Ad Cooldown (1 Hour)
-            const adKey = `ad_unlocked_${user.id}_${selectedGoalId}_${selectedDate}`;
-            const adTimestamp = localStorage.getItem(adKey);
-            if (adTimestamp) {
-                const diff = Date.now() - parseInt(adTimestamp);
-                if (diff < 60 * 60 * 1000) { // 1 Hour
-                    setIsAdUnlocked(true);
+                // Check Ad Cooldown (1 Hour)
+                const adKey = `ad_unlocked_${user.id}_${selectedGoalId}_${selectedDate}`;
+                const adTimestamp = localStorage.getItem(adKey);
+                if (adTimestamp) {
+                    const diff = Date.now() - parseInt(adTimestamp);
+                    if (diff < 60 * 60 * 1000) { // 1 Hour
+                        setIsAdUnlocked(true);
+                    } else {
+                        setIsAdUnlocked(false);
+                    }
                 } else {
                     setIsAdUnlocked(false);
                 }
-            } else {
-                setIsAdUnlocked(false);
-            }
 
-            fetchMissions();
-            checkReflectionStatus();
+                await fetchMissions(undefined, currentCount);
+                checkReflectionStatus();
+            };
+            loadInit();
         }
     }, [selectedDate, selectedGoalId, checkingSubs]);
 
@@ -199,8 +201,8 @@ export default function Today() {
                     .select('id')
                     .eq('user_id', user.id)
                     .eq('mission_date', selectedDate)
-                    .maybeSingle();
-                setHasSubmittedReflection(!!data);
+                    .limit(1);
+                setHasSubmittedReflection(!!data?.length);
             } catch (err) {
                 setHasSubmittedReflection(false);
             }
@@ -211,7 +213,7 @@ export default function Today() {
 
     // Fetch refresh count from DB for cross-device sync (Always based on TODAY, physical time)
     const fetchRefreshCountFromDB = async () => {
-        if (!user || !selectedGoal) return;
+        if (!user || !selectedGoal) return 0;
 
         const now = new Date();
         const yyyy = now.getFullYear();
@@ -226,11 +228,15 @@ export default function Today() {
                 .eq('user_id', user.id)
                 .eq('mission_date', todayStr)
                 .eq('category', selectedGoal.category)
-                .maybeSingle();
-            setRefreshCount(data?.refresh_count || 0);
+                .limit(1);
+            
+            const count = data?.[0]?.refresh_count || 0;
+            setRefreshCount(count);
+            return count;
         } catch (e) {
             console.error('Failed to fetch refresh count from DB:', e);
             setRefreshCount(0);
+            return 0;
         }
     };
 
@@ -340,7 +346,7 @@ export default function Today() {
     }
     };
 
-    const fetchMissions = async (forceAdUnlocked?: boolean) => {
+    const fetchMissions = async (forceAdUnlocked?: boolean, passedCount?: number) => {
         if (!selectedGoal || !user) return;
         setLoading(true);
 
@@ -405,8 +411,12 @@ export default function Today() {
                     && !(isAdUnlocked || forceAdUnlocked);
 
                 // Allow generation if selected date is Today or Future AND paywall is not blocking
+                const isLimitReached = (passedCount !== undefined ? passedCount : refreshCount) >= 3;
+
                 if (selectedDate >= today && !shouldBlockForPaywall) {
-                    await generateDraftPlan();
+                    if (!isLimitReached || (missions.length === 0 && draftMissions.length === 0)) {
+                        await generateDraftPlan();
+                    }
                 } else if (shouldBlockForPaywall) {
                     // Critical Fix: Explicitly stop loading if paywall blocks it, so the UI can render the Paywall warning
                     setLoading(false);
@@ -446,7 +456,7 @@ export default function Today() {
         }
 
         const mapped = newMissions.map((m: any, i: number) => ({
-            id: `draft-${i}`,
+            id: `draft-${Date.now()}-${i}`,
             user_id: user!.id,
             content: m.content,
             category: m.category,
@@ -501,8 +511,14 @@ export default function Today() {
 
     const executeRefresh = async () => {
         setLoading(true);
+        
+        // 즉각적인 UI 반영을 위해 카운트를 먼저 올립니다.
+        const tempCount = refreshCount + 1;
+        setRefreshCount(tempCount);
+
         // Clear existing missions so new drafts become visible (isPreview = true)
         setMissions([]);
+        setDraftMissions([]);
         await generateDraftPlan(true); // Pass true for refresh
 
         if (user && user.id !== 'demo123' && selectedGoal) {
@@ -516,7 +532,7 @@ export default function Today() {
                     .eq('category', selectedGoal.category)
                     .maybeSingle();
 
-                const nextCount = (existingLog?.refresh_count || 0) + 1;
+                const nextCount = (existingLog?.refresh_count || tempCount - 1) + 1;
                 await supabase.from('mission_refresh_log').upsert({
                     user_id: user.id,
                     mission_date: todayStr,
@@ -527,7 +543,7 @@ export default function Today() {
                 setRefreshCount(nextCount);
             } catch (err) {
                 console.error('Refresh log update error:', err);
-                setRefreshCount(prev => Math.min(3, prev + 1));
+                setRefreshCount(prev => Math.min(3, prev)); // 이미 선반영 했으므로 유지
             }
         }
         setLoading(false);
@@ -577,7 +593,7 @@ export default function Today() {
             } else {
                 // Check if user already submitted reflection today to prevent repeat popup
                 const dateStr = formatLocalYMD(new Date());
-                const localKey = `ai_reflections_${user?.id}_${dateStr}_${selectedGoal?.category}`;
+                const localKey = `ai_reflections_${user?.id}_${dateStr}`;
                 if (!localStorage.getItem(localKey)) {
                     setShowReflection(true);
                 }
@@ -1224,7 +1240,7 @@ export default function Today() {
                                     <button
                                         key={level}
                                         onClick={async () => {
-                                            if (!user) return;
+                                            if (!user || loading) return;
                                             try {
                                                 if (user.id !== 'demo123') {
                                                     await supabase.from('profiles').update({ condition_today: level }).eq('id', user.id);
@@ -1233,9 +1249,11 @@ export default function Today() {
 
                                                 // If in preview or no confirmed missions, immediately regenerate draft tailored to this mood
                                                 if (isPreview || missions.length === 0) {
-                                                    setLoading(true);
-                                                    await generateDraftPlan();
-                                                    setLoading(false);
+                                                    if (refreshCount >= 3) {
+                                                        alert("하루 미션 변경 횟수(3회)를 모두 사용했습니다.");
+                                                        return;
+                                                    }
+                                                    await handleRefresh();
                                                 }
                                             } catch (e) {
                                                 console.error(e);

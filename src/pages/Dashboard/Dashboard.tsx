@@ -42,18 +42,35 @@ export default function Dashboard() {
 
     const fetchReflections = async () => {
         if (!user) return;
+        
+        const filterUniqueByDate = (items: any[]) => {
+            const unique: any[] = [];
+            const seenDates = new Set();
+            for (const item of items) {
+                const dateKey = item.mission_date || item.date;
+                if (!seenDates.has(dateKey)) {
+                    seenDates.add(dateKey);
+                    unique.push(item);
+                }
+            }
+            return unique;
+        };
+
         if (user.id !== 'demo123') {
             const { data } = await supabase
                 .from('ai_reflections')
                 .select('*')
                 .eq('user_id', user.id)
-                .order('mission_date', { ascending: false })
-                .limit(10);
+                .order('created_at', { ascending: false }) // Use created_at to get the absolute latest first
+                .limit(20);
+                
             if (data && data.length > 0) {
-                setReflections(data);
+                const uniqueData = filterUniqueByDate(data);
+                setReflections(uniqueData.slice(0, 10)); // Keep only latest 10 unique days
                 return;
             }
         }
+        
         // Fallback: check local storage keys
         const localReflections: any[] = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -66,7 +83,8 @@ export default function Dashboard() {
             }
         }
         localReflections.sort((a, b) => (b.mission_date || '').localeCompare(a.mission_date || ''));
-        setReflections(localReflections);
+        const uniqueLocal = filterUniqueByDate(localReflections);
+        setReflections(uniqueLocal.slice(0, 10));
     };
 
     const fetchGoals = async () => {
