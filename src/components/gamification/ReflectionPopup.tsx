@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, X, Send, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useStore } from '../../lib/store';
@@ -15,7 +15,6 @@ interface ReflectionPopupProps {
 export default function ReflectionPopup({ isOpen, onClose, goalCategory, date, onSaved }: ReflectionPopupProps) {
     const { user } = useStore();
     const [reflection, setReflection] = useState('');
-    const [existingAiResponse, setExistingAiResponse] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
     const [saved, setSaved] = useState(false);
 

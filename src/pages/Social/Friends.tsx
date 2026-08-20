@@ -250,6 +250,19 @@ export default function Friends() {
     const [incomingNudgeToast, setIncomingNudgeToast] = useState<string | null>(null);
     const [incomingCancelRequest, setIncomingCancelRequest] = useState<any | null>(null);
 
+    const nudgeBuddy = async (challengeId: string, partnerId: string, partnerName: string) => {
+        try {
+            // optimistic update
+            setNudgedMap(prev => ({ ...prev, [challengeId]: true }));
+            
+            // 실제 구현이 필요한 경우 Supabase에 저장하거나 Notification 전송
+            // 현재는 넛지 버튼 상태 업데이트용 가짜 함수
+            console.log(`Nudged ${partnerName} for challenge ${challengeId}`);
+        } catch (e) {
+            console.error('Nudge failed', e);
+        }
+    };
+
     useEffect(() => {
         if (!user) return;
         // 1. Check if there is an incoming nudge for me

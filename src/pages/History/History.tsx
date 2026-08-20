@@ -11,7 +11,7 @@ type GoalCategory = 'all' | 'body_wellness' | 'growth_career' | 'mind_connection
 
 export default function History() {
     const { user } = useStore();
-    const { t } = useLanguage();
+    const { t, language } = useLanguage();
     const [selectedCategory, setSelectedCategory] = useState<GoalCategory>('all');
     const [filterStatus, setFilterStatus] = useState<'active' | 'completed'>('active');
     const [historyGoals, setHistoryGoals] = useState<any[]>([]);

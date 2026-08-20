@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../../lib/store';
-import { generateMissions, generateFunPlayMissions } from '../../lib/openai';
+import { generateMissions } from '../../lib/openai';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb, Share2 } from 'lucide-react';
@@ -96,7 +96,7 @@ export default function Today() {
     const [showReflection, setShowReflection] = useState(false);
     const [hasSubmittedReflection, setHasSubmittedReflection] = useState(false);
     const [showShareCard, setShowShareCard] = useState(false);
-    const [pendingBuddyCount, setPendingBuddyCount] = useState(0);
+    const [pendingBuddyCount] = useState(0);
 
     // Derived State
     const selectedGoal = userGoals.find(g => g.id === selectedGoalId);
