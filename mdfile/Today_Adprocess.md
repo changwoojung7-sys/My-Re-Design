@@ -52,12 +52,16 @@ setIsTrialExpired(diffDays > userFreeDays);
 
 ---
 
-## 2. 미션 리프레시 (미션 변경) 규칙
+## 2. 미션 리프레시 (미션 변경 & 컨디션 변경) 규칙
 
 [Today.tsx](file:///c:/calamusAppBuild/MyReDesign_App/src/pages/Home/Today.tsx)
 
+* **컨디션 변경 & 미션 변경 공통 적용**: 오늘의 컨디션(1~5) 이모티콘을 탭하거나 '미션 변경' 버튼을 누르면 AI가 당일 컨디션에 맞춰 미션을 재구성하며, **일일 3회 한도 내에서 1회씩 차감**됩니다.
+* **DB 및 로컬 영구 동기화**: `mission_generations` 테이블에 즉시 카운트가 업데이트되어 다른 탭 이동 후 복귀 시에도 정확한 잔여 횟수가 유지됩니다.
+* **애니메이션 동기화**: 새로고침 시작 즉시 이전 카드가 비워지고 로딩 화면이 표시되어 화면 잔류 버그가 발생하지 않습니다.
+
 ```typescript
-const handleRefresh = async () => {
+const handleRefresh = async (customCondition?: number) => {
     // 1. 데모 유저: 로컬 스토리지 기준 일일 3회 제한
     if (user?.id === 'demo123') {
         const today = formatLocalYMD(new Date());
@@ -67,11 +71,14 @@ const handleRefresh = async () => {
             return;
         }
         localStorage.setItem(`demo_refresh_count_${today}`, String(count + 1));
-        executeRefresh();
+        executeRefresh(customCondition);
         return;
     }
 
-    if (refreshCount >= 3) return; // 하루 최대 3회
+    if (refreshCount >= 3) {
+        alert('오늘의 미션 변경 횟수(3회)를 모두 사용하셨습니다.');
+        return;
+    }
 
     const isInitialGeneration = missions.length === 0 && draftMissions.length === 0;
 
@@ -83,7 +90,7 @@ const handleRefresh = async () => {
     }
 
     // 3. Pro 구독자 및 무료 체험(Day 1~7) 유저는 광고 없이 즉시 미션 변경 실행
-    executeRefresh();
+    executeRefresh(customCondition);
 };
 ```
 

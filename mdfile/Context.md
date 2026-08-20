@@ -82,15 +82,19 @@
 - **만료 판단**: `duration_months` 값 기반 (0.25=7일, 0.5=14일, 1+=월×30일)
 - **최신 우선**: 카테고리별 최신 목표만 유지 (`latestGoalsMap`)
 
-#### 미션 생성 (Mission Generation)
+#### 미션 생성 및 새로고침 (Mission Generation & Refresh)
 
-- **AI 생성**: `generateMissions()` / `generateFunPlayMissions()` (src/lib/openai.ts)
+- **AI 생성**: `generateMissions()` (src/lib/openai.ts) → Supabase Edge Function `generate-mission`
+- **4대 카테고리 지원**: Body, Mind, Growth, FunPlay 전 카테고리에 대해 사용자 `target_text`를 AI 프롬프트(`*_goal`)로 주입
 - **2단계 프로세스**:
   1. `generateDraftPlan()`: AI가 미션 초안 생성 → `isPreview = true`로 미리보기 표시
   2. `confirmPlan()`: 사용자 "확인 및 시작" 클릭 → DB 저장 → 미션 시작
-- **미션 변경(Refresh)**: 일일 3회 제한. `mission_generations` 테이블에서 카운트 추적
+- **미션 변경(Refresh) 및 컨디션 반영**:
+  - 일일 3회 제한. `mission_generations` 테이블에서 카운트 추적
+  - 오늘의 컨디션 이모티콘 변경 또는 미션 변경 버튼 클릭 시 즉시 1회씩 차감되고 DB에 영구 기록
+  - 새로고침 트리거 시 기존 미션/드래프트 배열을 즉시 초기화하고 고유 키(`Date.now()`)를 부여하여 로딩 애니메이션 동기화
 - **최근 미션 참조**: 반복 방지를 위해 최근 7일 미션 데이터를 AI에 전달
-- **데모 모드**: `user.id === 'demo123'` 시 목업 데이터 사용
+- **데모 모드**: `user.id === 'demo123'` 시 로컬 스토리지 기반 카운트 및 목업 데이터 사용
 
 #### 미션 인증 (Verification)
 
@@ -99,7 +103,7 @@
 - **텍스트 입력**: `missions.proof_text` 필드에 저장
 - **인증 편집**: 완료된 미션도 hover 시 수정/삭제 가능 (`handleDeleteMedia`)
 - **완료 효과**: `canvas-confetti` 축하 효과 (작은 효과 + 전체 미션 완료 시 큰 효과)
-- **챌린지 완료**: 모든 미션 완료 시 "Loop Closed!" 축하 메시지
+- **챌린지 완료**: 모든 미션 완료 시 "Loop Closed!" 축하 메시지 및 단일 일일 회고 팝업 발생
 
 #### 날짜 이동
 
@@ -116,7 +120,7 @@
 
 ### B. My Loop (Dashboard.tsx) - Growth 탭 `/dashboard`
 
-목표별 진행 상황과 AI 코칭을 제공합니다.
+목표별 진행 상황과 AI 코칭 및 회고 히스토리를 제공합니다.
 
 #### 통계 대시보드
 
@@ -124,17 +128,19 @@
 - **완료율**: 전체 미션 대비 완료 비율
 - **총 완료 수**: 누적 완료 미션 개수
 - **이번 달 미션**: 현재 월 미션 수
+- **레벨 & XP 배지**: 게이미피케이션 경험치 및 티어 시각화
 
-#### 캘린더 뷰
+#### 캘린더 뷰 & 에너지 레이더 차트
 
-- **월별 보기**: 달력 형태로 미션 수행 날짜 표시
-- **연도별 보기**: 월별 완료율 그리드
-- **네비게이션**: 이전/다음 월/년 이동
+- **주간/월간 뷰**: 달력 형태로 미션 수행 날짜 및 멀티 카테고리 컬러 잼 표시
+- **에너지 레이더 차트 (EnergyRadarChart)**: 4개 영역 밸런스 방사형 차트
 
-#### AI 코칭 인사이트
+#### AI 코칭 인사이트 & AI 회고 기록
 
 - `generateCoaching()` 호출 → 목표와 미션 기록 기반 맞춤 코칭 메시지 생성
-- 목표별 개별 코칭 제공
+- **AI 회고 히스토리 (AI Daily Reflection Log)**:
+  - 사용자가 작성한 일일 회고와 AI 피드백 표시
+  - 일자(`mission_date`)별 중복 필터링(`filterUniqueByDate`)을 적용하여 1일 최신 1건만 깔끔하게 노출
 
 #### 목표 선택
 

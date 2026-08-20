@@ -244,9 +244,10 @@ userGoals?.forEach(g => { goalMap[g.category] = g.target_text; });
 ```
 
 ```typescript
-const bwGoal = payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리';
-const gcGoal = payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발';
-const mcGoal = payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정';
+const bwGoal = requested.includes('body_wellness') ? (payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리') : null;
+const gcGoal = requested.includes('growth_career') ? (payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발') : null;
+const mcGoal = requested.includes('mind_connection') ? (payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정') : null;
+const fpGoal = requested.includes('funplay') ? (payload.goalList?.funplay || goalMap['funplay'] || '즐거움 및 기분전환') : null;
 ```
 
 ### Step 6: 패턴 랜덤 선택
@@ -384,6 +385,15 @@ it is INVALID and must be rewritten internally before output.
 
 Do not produce generic productivity advice.
 Do not produce category-only missions ignoring the goal.
+Generate missions ONLY for the categories listed in USER GOALS.
+
+Output MUST be a JSON object containing a "missions" array.
+Each mission object MUST have:
+- "category" (exactly one of: body_wellness, growth_career, mind_connection, funplay)
+- "content" (the mission text)
+- "verification_type" (checkbox, text, or image)
+- "reasoning" (object with "expected_impact" key)
+- "trust_score" (integer between 90 and 99)
 
 Output strictly valid JSON only.
 ```
@@ -400,10 +410,11 @@ User Profile:
 - condition_today: {condition_today (1~5)}
 - language: {ko|en}
 
-═══ USER GOALS (TOPIC — these determine WHAT each mission is about) ═══
+═══ USER GOALS (TOPIC — create missions ONLY for these) ═══
 - body_wellness_goal: "{bwGoal}"
 - growth_career_goal: "{gcGoal}"
 - mind_connection_goal: "{mcGoal}"
+- funplay_goal: "{fpGoal}"
 - buddy_challenge_goal: "{buddyGoal (if applicable)}"
 
 Context Knobs:
