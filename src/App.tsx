@@ -14,6 +14,7 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import History from './pages/History/History';
 import Friends from './pages/Social/Friends';
 import MyPage from './pages/MyPage/MyPage';
+import PreTrialOnboarding from './pages/Onboarding/PreTrialOnboarding';
 import Admin from './pages/Admin/Admin';
 import BottomNav from './components/layout/BottomNav';
 import SupportModal from './components/layout/SupportModal';
@@ -45,6 +46,9 @@ function Layout() {
 
         {/* Reset Password Route */}
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* Pre-Trial Onboarding */}
+        <Route path="/pre-trial" element={<PreTrialOnboarding />} />
 
         {/* Main App Routes */}
         <Route path="/" element={user ? <MyPage /> : <Navigate to="/login" replace />} />

@@ -51,20 +51,37 @@ serve(async (req: Request) => {
 
         const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-        // Get user from JWT
-        const authHeader = req.headers.get('Authorization')!;
-        const { data: { user }, error: authError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-        if (authError || !user) throw new Error('Unauthorized');
+        const bodyJson = await req.json();
+        const { type, payload } = bodyJson;
 
-        const { type, payload } = await req.json();
-        const userId = user.id;
+        // Get user from JWT
+        let userId = 'demo123';
+        const authHeader = req.headers.get('Authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            const token = authHeader.replace('Bearer ', '');
+            if (token && token !== 'demo123' && token !== 'undefined') {
+                const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+                if (user && !authError) {
+                    userId = user.id;
+                }
+            }
+        }
+
+        // If not authenticated and not demo user
+        if (userId !== 'demo123' && (!payload?.userProfile?.id || payload.userProfile.id !== 'demo123')) {
+            // Keep fallback
+        }
+        if (payload?.userProfile?.id === 'demo123') {
+            userId = 'demo123';
+        }
+
         console.log('[DEBUG] type:', type, 'userId:', userId);
 
         // --- 1. Check Refresh Limits ---
         const today = new Date().toISOString().split('T')[0];
         // Use actual category for per-category tracking (fallback to type for funplay/coaching)
         const refreshCategory = payload.refreshCategory || payload.category || type;
-        if (payload.refresh) {
+        if (payload.refresh && userId !== 'demo123') {
             const { data: refreshLog } = await supabase
                 .from('mission_refresh_log')
                 .select('refresh_count')
@@ -82,26 +99,35 @@ serve(async (req: Request) => {
         }
 
         // --- 2. Fetch History (Fingerprints, last 7 days) ---
-        const { data: fingerprints } = await supabase
-            .from('mission_fingerprint')
-            .select('*')
-            .eq('user_id', userId)
-            .gte('mission_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+        let fingerprints: any[] = [];
+        if (userId !== 'demo123') {
+            const { data } = await supabase
+                .from('mission_fingerprint')
+                .select('*')
+                .eq('user_id', userId)
+                .gte('mission_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
+            fingerprints = data || [];
+        }
 
         const recentMissionsJson = JSON.stringify(fingerprints || []);
 
-        // --- 3. Fetch User Goals from DB ---
-        const { data: userGoals } = await supabase
-            .from('user_goals')
-            .select('category, target_text, details')
-            .eq('user_id', userId)
-            .eq('is_completed', false);
-
-        // Build goal map: category -> target_text
+        // --- 3. Fetch User Goals from DB (or from payload for demo) ---
         const goalMap: Record<string, string> = {};
-        if (userGoals) {
-            for (const g of userGoals) {
-                goalMap[g.category] = g.target_text || '';
+        if (payload.goalList && typeof payload.goalList === 'object') {
+            Object.assign(goalMap, payload.goalList);
+        }
+
+        if (userId !== 'demo123') {
+            const { data: userGoals } = await supabase
+                .from('user_goals')
+                .select('category, target_text, details')
+                .eq('user_id', userId)
+                .eq('is_completed', false);
+
+            if (userGoals) {
+                for (const g of userGoals) {
+                    if (g.target_text) goalMap[g.category] = g.target_text;
+                }
             }
         }
 
@@ -207,6 +233,10 @@ Output strictly valid JSON only.`;
 User Profile:
 - age: ${userProfile?.age || 25}
 - gender: ${userProfile?.gender || 'any'}
+- height: ${userProfile?.height ? `${userProfile.height}cm` : 'not specified'}
+- weight: ${userProfile?.weight ? `${userProfile.weight}kg` : 'not specified'}
+- job: ${userProfile?.job || 'not specified'}
+- condition_today: ${userProfile?.condition_today || 'normal'}
 - language: ${payload.language || 'ko'}
 
 ${goalsSection}
@@ -380,7 +410,7 @@ Output JSON:
         const content = JSON.parse(aiData.choices[0].message.content);
 
         // --- 6. Persistence & Refresh Update ---
-        if (payload.refresh) {
+        if (payload.refresh && userId !== 'demo123') {
             await supabase.rpc('increment_refresh_count', {
                 p_user_id: userId,
                 p_date: today,
@@ -408,20 +438,22 @@ Output JSON:
         }
 
         // Save Fingerprints
-        const missions = content.missions || [content];
-        for (const m of missions) {
-            if (m.fingerprint) {
-                await supabase.from('mission_fingerprint').upsert({
-                    user_id: userId,
-                    mission_date: today,
-                    category: m.category,
-                    pattern_id: m.pattern_id,
-                    primary_action: m.fingerprint.primary_action,
-                    tool: m.fingerprint.tool,
-                    place: m.fingerprint.place,
-                    social_context: m.fingerprint.social_context,
-                    mechanic: m.fingerprint.mechanic
-                }, { onConflict: 'user_id,mission_date,category' });
+        if (userId !== 'demo123') {
+            const missions = content.missions || [content];
+            for (const m of missions) {
+                if (m.fingerprint) {
+                    await supabase.from('mission_fingerprint').upsert({
+                        user_id: userId,
+                        mission_date: today,
+                        category: m.category,
+                        pattern_id: m.pattern_id,
+                        primary_action: m.fingerprint.primary_action,
+                        tool: m.fingerprint.tool,
+                        place: m.fingerprint.place,
+                        social_context: m.fingerprint.social_context,
+                        mechanic: m.fingerprint.mechanic
+                    }, { onConflict: 'user_id,mission_date,category' });
+                }
             }
         }
 

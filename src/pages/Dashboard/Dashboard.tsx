@@ -2,8 +2,13 @@ import { useEffect, useState, useMemo } from 'react';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import { generateCoaching } from '../../lib/openai';
-import { Flame, Trophy, Calendar, Target, TrendingUp, Sparkles, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Flame, Trophy, Calendar, Target, TrendingUp, Sparkles, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
+import LevelBadge from '../../components/gamification/LevelBadge';
+import TrophyRoom from '../../components/gamification/TrophyRoom';
+import EnergyRadarChart from '../../components/dashboard/EnergyRadarChart';
+import { calculateWeeklyEnergy } from '../../lib/energyScore';
+import type { EnergyScore } from '../../lib/energyScore';
 
 export default function Dashboard() {
     const { user } = useStore();
@@ -18,15 +23,51 @@ export default function Dashboard() {
     const [coachLoading, setCoachLoading] = useState(false);
 
     // Chart Mode
-    const [chartMode, setChartMode] = useState<'week' | 'month' | 'overall'>('week');
+    const [chartMode, setChartMode] = useState<'week' | 'month' | 'energy'>('week');
     // For Month/Overall View Navigation
     const [viewDate, setViewDate] = useState(new Date());
+
+    // Phase 2: Weekly Energy
+    const [energyData, setEnergyData] = useState<EnergyScore[]>([]);
+
+    // Phase 4: AI Reflections Log
+    const [reflections, setReflections] = useState<any[]>([]);
 
     useEffect(() => {
         if (user) {
             fetchGoals();
+            fetchReflections();
         }
     }, [user]);
+
+    const fetchReflections = async () => {
+        if (!user) return;
+        if (user.id !== 'demo123') {
+            const { data } = await supabase
+                .from('ai_reflections')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('mission_date', { ascending: false })
+                .limit(10);
+            if (data && data.length > 0) {
+                setReflections(data);
+                return;
+            }
+        }
+        // Fallback: check local storage keys
+        const localReflections: any[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(`ai_reflections_${user.id}_`)) {
+                try {
+                    const item = JSON.parse(localStorage.getItem(key) || '{}');
+                    localReflections.push(item);
+                } catch (e) {}
+            }
+        }
+        localReflections.sort((a, b) => (b.mission_date || '').localeCompare(a.mission_date || ''));
+        setReflections(localReflections);
+    };
 
     const fetchGoals = async () => {
         // Fetch ALL goals first
@@ -99,6 +140,9 @@ export default function Dashboard() {
                 // Trigger AI Coach analysis
                 generateCoachInsight(goal, goalMissions);
             }
+
+            // 전체 미션 데이터로 주간 에너지 점수 계산
+            calculateWeeklyEnergy(user!.id, data).then(setEnergyData);
         }
     };
 
@@ -215,29 +259,6 @@ export default function Dashboard() {
         return days;
     };
 
-    // Get Year Months Data
-    const getYearMonths = () => {
-        const year = viewDate.getFullYear();
-        const months = [];
-
-        for (let m = 0; m < 12; m++) {
-            const date = new Date(year, m, 1);
-            const monthName = date.toLocaleString('default', { month: 'short' });
-
-            // Stats for this month
-            const monthMissions = missions.filter(ms => {
-                const d = new Date(ms.date);
-                return d.getFullYear() === year && d.getMonth() === m;
-            });
-            const total = monthMissions.length;
-            const completed = monthMissions.filter(ms => ms.is_completed).length;
-            const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-            months.push({ name: monthName, total, completed, percentage });
-        }
-        return months;
-    };
-
     // --- Chart Data Preparation (Only for Week mode effectively now) ---
     const chartData = useMemo(() => {
         const data = [];
@@ -344,6 +365,14 @@ export default function Dashboard() {
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto no-scrollbar pb-32 min-h-0 pt-2">
+
+                {/* 🎮 Level Badge - Phase 3 */}
+                {user && (
+                    <div className="mb-4">
+                        <LevelBadge totalXp={user.total_xp ?? 0} />
+                    </div>
+                )}
+
                 {/* Stats Grid */}
                 <div className="grid grid-cols-3 gap-3 mb-4">
                     <div className="bg-white/5 rounded-2xl py-3 px-3 flex items-center justify-center gap-3 border border-white/5 shadow-sm">
@@ -392,10 +421,10 @@ export default function Dashboard() {
                                 {t.month_label}
                             </button>
                             <button
-                                onClick={() => setChartMode('overall')}
-                                className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'overall' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
+                                onClick={() => setChartMode('energy')}
+                                className={`text-[10px] px-3 py-1.5 rounded-md font-bold transition-all ${chartMode === 'energy' ? 'bg-primary text-black shadow-md' : 'text-slate-500 hover:text-white'}`}
                             >
-                                {t.overall}
+                                에너지 분석
                             </button>
                         </div>
                     </div>
@@ -461,18 +490,34 @@ export default function Dashboard() {
                                     if (!date) return <div key={i} />;
 
                                     const ymd = toYMD(date);
-                                    const dayMissions = missions.filter(m => m.date === ymd);
-                                    const isDone = dayMissions.some(m => m.is_completed);
+                                    const dayMissions = missions.filter(m => m.date === ymd && m.is_completed);
+                                    const isDone = dayMissions.length > 0;
                                     const isToday = ymd === toYMD(new Date());
+
+                                    // Color Jam Logic
+                                    let bgStyle = {};
+                                    if (isDone) {
+                                        const cats = Array.from(new Set(dayMissions.map(m => m.category)));
+                                        const catColors: Record<string, string> = {
+                                            body: '#FF5757', mind: '#8B5CF6', growth: '#06B6D4', funplay: '#F97316'
+                                        };
+                                        if (cats.length === 1) {
+                                            const c = catColors[cats[0]] || '#10B981';
+                                            bgStyle = { background: c, boxShadow: `0 0 10px ${c}66` };
+                                        } else {
+                                            const step = 100 / cats.length;
+                                            const gradientParts = cats.map((cat, idx) => `${catColors[cat] || '#10B981'} ${idx * step}% ${(idx + 1) * step}%`);
+                                            bgStyle = { background: `conic-gradient(${gradientParts.join(', ')})`, boxShadow: `0 0 10px rgba(255,255,255,0.2)` };
+                                        }
+                                    }
 
                                     return (
                                         <div key={i} className={`
-                                            aspect-square rounded-full flex items-center justify-center text-xs font-medium relative
-                                            ${isDone ? 'bg-gradient-to-br from-green-400 to-green-600 text-black shadow-lg shadow-green-500/20' :
+                                            aspect-square rounded-full flex items-center justify-center text-xs font-bold relative
+                                            ${isDone ? 'text-white' :
                                                 isToday ? 'bg-white/10 text-white border border-primary' : 'text-slate-500 hover:bg-white/5'}
-                                        `}>
+                                        `} style={bgStyle}>
                                             {date.getDate()}
-                                            {isDone && <CheckCircle2 size={10} className="absolute -bottom-1 -right-1 text-white bg-black rounded-full" />}
                                         </div>
                                     );
                                 })}
@@ -496,43 +541,16 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {/* 3. YEARLY GRID */}
-                    {chartMode === 'overall' && (
-                        <div className="animate-in fade-in duration-300">
-                            {/* Nav */}
-                            <div className="flex items-center justify-between mb-4 px-2">
-                                <button onClick={() => navigateView('prev')} className="p-1 hover:bg-white/10 rounded-full text-slate-400">
-                                    <ChevronLeft size={16} />
-                                </button>
-                                <span className="text-sm font-bold text-white uppercase tracking-wider">
-                                    {viewDate.getFullYear()}
-                                </span>
-                                <button onClick={() => navigateView('next')} className="p-1 hover:bg-white/10 rounded-full text-slate-400">
-                                    <ChevronRight size={16} />
-                                </button>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3">
-                                {getYearMonths().map((m, i) => (
-                                    <div key={i} className={`bg-white/5 rounded-xl p-2 flex flex-col items-center justify-center border border-white/5
-                                        ${m.percentage === 100 ? 'border-green-500/30 bg-green-500/5' : ''}
-                                    `}>
-                                        <span className="text-xs font-bold text-slate-300 mb-1">{m.name}</span>
-                                        <div className="relative w-10 h-10 flex items-center justify-center">
-                                            {/* Circular Progress (CSS conic gradient) */}
-                                            <div
-                                                className="absolute inset-0 rounded-full"
-                                                style={{ background: `conic-gradient(var(--color-primary, #a855f7) ${m.percentage}%, transparent 0)` }}
-                                            />
-                                            <div className="absolute inset-1 bg-slate-900 rounded-full" />
-                                            <span className="relative text-[10px] font-bold text-white">{m.percentage}%</span>
-                                        </div>
-                                        <span className="text-[9px] text-slate-500 mt-1">{m.completed}/{m.total}</span>
-                                    </div>
-                                ))}
+                    {/* 3. ENERGY RADAR CHART */}
+                    {chartMode === 'energy' && (
+                        <div className="animate-in fade-in duration-300 flex flex-col items-center">
+                            <EnergyRadarChart data={energyData} />
+                            <div className="mt-2 text-center">
+                                <p className="text-xs text-slate-400">최근 7일간의 카테고리별 달성률 기반</p>
                             </div>
                         </div>
                     )}
+
 
                     {/* AI Coach Insight */}
                     <div className="relative p-[1px] rounded-3xl bg-gradient-to-br from-green-400/50 via-emerald-500/20 to-transparent">
@@ -544,7 +562,9 @@ export default function Dashboard() {
                                     <Sparkles size={16} />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-white text-base">AI Coach Insight</h3>
+                                    <h3 className="font-bold text-white text-base">
+                                        {chartMode === 'energy' ? 'AI Weekly Vibe Report' : 'AI Coach Insight'}
+                                    </h3>
                                     <p className="text-[10px] text-slate-400">Personalized Analysis</p>
                                 </div>
                             </div>
@@ -572,6 +592,49 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* 📝 AI Daily Reflection History Log */}
+                {reflections.length > 0 && (
+                    <div className="bg-slate-900/50 p-4 rounded-3xl border border-white/5 mb-4 shadow-xl">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                <span>📝 나의 AI 회고 기록</span>
+                                <span className="text-[10px] bg-primary/20 text-primary px-2 py-0.5 rounded-full font-bold">{reflections.length}건</span>
+                            </h3>
+                            <span className="text-[10px] text-slate-400">최근 기록</span>
+                        </div>
+                        <div className="space-y-2.5">
+                            {reflections.slice(0, 5).map((ref, idx) => (
+                                <div key={idx} className="bg-white/5 p-3 rounded-2xl border border-white/5 text-left">
+                                    <div className="flex justify-between items-center mb-1.5">
+                                        <span className="text-[10px] text-slate-400 font-medium">
+                                            📅 {ref.mission_date || ref.date || '오늘'}
+                                            {ref.category && <span className="ml-1.5 text-primary/80 uppercase font-bold">[{ref.category}]</span>}
+                                        </span>
+                                        <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">작성완료</span>
+                                    </div>
+                                    <p className="text-xs text-slate-200 leading-snug font-medium mb-2">
+                                        "{ref.answer || ref.reflection_text}"
+                                    </p>
+                                    {(ref.ai_response) && (
+                                        <div className="bg-black/30 p-2 rounded-xl text-[11px] text-slate-400 border border-white/5 flex items-start gap-1.5">
+                                            <Sparkles size={12} className="text-primary shrink-0 mt-0.5" />
+                                            <span className="leading-tight">{ref.ai_response}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* 🏆 Trophy Room - Phase 3 */}
+                {user && (
+                    <div className="mt-4">
+                        <TrophyRoom userId={user.id} />
+                    </div>
+                )}
+
             </div>
         </div>
     );

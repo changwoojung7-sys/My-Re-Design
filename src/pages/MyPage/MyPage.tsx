@@ -45,6 +45,13 @@ export default function MyPage() {
         if (!hasSeen) {
             setShowGuide(true);
         }
+
+        const searchParams = new URLSearchParams(window.location.search);
+        const editParam = searchParams.get('edit');
+        if (editParam) {
+            setSelectedCategory(editParam as GoalCategory);
+            setIsEditing(true);
+        }
     }, []);
 
     // Settings Modal State
@@ -152,7 +159,10 @@ export default function MyPage() {
     const isCategoryUnlocked = (category: string) => {
         if (category === 'funplay') return true;
 
-        // 1. Check if user has explicit subscription
+        // 1. Check if user is Pro
+        if (user?.plan_type === 'pro_monthly' || user?.plan_type === 'pro_yearly') return true;
+
+        // Legacy subscription check (if still relying on DB table)
         const hasAllAccess = activeSubscriptions.some(s => s.type === 'all');
         const hasMissionAccess = activeSubscriptions.some(s => s.type === 'mission' && s.target_id === category);
         if (hasAllAccess || hasMissionAccess) return true;
@@ -278,11 +288,12 @@ export default function MyPage() {
             .eq('user_id', user.id)
             .order('created_at', { ascending: false });
 
-        if (data) {
+        let newGoals = JSON.parse(JSON.stringify(INITIAL_GOALS));
+
+        if (data && data.length > 0) {
             // Store all goals for completed view
             setAllGoals(data);
 
-            const newGoals = JSON.parse(JSON.stringify(INITIAL_GOALS));
             const maxSeqMap: Record<string, number> = {};
 
             // Find max seq for each category (active view)
@@ -296,8 +307,28 @@ export default function MyPage() {
                     }
                 }
             });
-            setGoals(newGoals);
         }
+
+        if (user.id === 'demo123') {
+            const demoGoalsStr = localStorage.getItem('demo_user_goals') || localStorage.getItem('demo_goals');
+            if (demoGoalsStr) {
+                try {
+                    const parsed = JSON.parse(demoGoalsStr);
+                    if (typeof parsed === 'object') {
+                        Object.keys(parsed).forEach(cat => {
+                            if (newGoals[cat as GoalCategory]) {
+                                newGoals[cat as GoalCategory] = {
+                                    ...newGoals[cat as GoalCategory],
+                                    ...(typeof parsed[cat] === 'string' ? { target_text: parsed[cat] } : parsed[cat])
+                                };
+                            }
+                        });
+                    }
+                } catch(e) {}
+            }
+        }
+
+        setGoals(newGoals);
     };
 
 
@@ -673,12 +704,29 @@ export default function MyPage() {
         if (!user) return;
         setLoading(true);
         try {
+            const current = goals[selectedCategory];
+            const nextSeq = (current.seq || 1) + (isNewChallenge ? 1 : 0);
+
+            if (user.id === 'demo123') {
+                const updatedDemoGoals = {
+                    ...goals,
+                    [selectedCategory]: {
+                        ...current,
+                        id: current.id || `demo-goal-${selectedCategory}`,
+                        seq: nextSeq,
+                        created_at: current.created_at || new Date().toISOString()
+                    }
+                };
+                localStorage.setItem('demo_user_goals', JSON.stringify(updatedDemoGoals));
+                setGoals(updatedDemoGoals);
+                setIsEditing(false);
+                alert(isNewChallenge ? t.alertNextChallenge : t.alertDesignSaved);
+                return;
+            }
+
             // Logic:
             // 1. If isNewChallenge=true, we insert a NEW row with seq = current.seq + 1
             // 2. If isNewChallenge=false, we upsert/update the CURRENT row (same ID or specific seq)
-
-            const current = goals[selectedCategory];
-            const nextSeq = (current.seq || 1) + (isNewChallenge ? 1 : 0);
 
             // Prepare Data
             const goalData: any = {
@@ -700,11 +748,6 @@ export default function MyPage() {
             const { error: goalError } = await supabase
                 .from('user_goals')
                 .upsert(goalData, { onConflict: 'id' }); // Use ID for upserting specific row
-
-            // Note: If we just insert, onConflict might be tricky if we had a unique constraint on (user_id, category).
-            // But we changed logic to allow multiple. So simple INSERT is fine for new challenge.
-            // Wait, supabase upsert without onConflict usually works if primary key is present.
-            // If isNewChallenge is true, 'id' is undefined, so it inserts.
 
             if (goalError) throw goalError;
 
@@ -820,6 +863,27 @@ export default function MyPage() {
 
         setLoading(true);
         try {
+            if (user.id === 'demo123') {
+                const updatedDemoGoals = {
+                    ...goals,
+                    [selectedCategory]: {
+                        id: '',
+                        user_id: user.id,
+                        category: selectedCategory,
+                        target_text: '',
+                        duration_months: 1,
+                        details: {},
+                        created_at: '',
+                        seq: 1
+                    }
+                };
+                localStorage.setItem('demo_user_goals', JSON.stringify(updatedDemoGoals));
+                setGoals(updatedDemoGoals);
+                setIsEditing(false);
+                alert(t.alertPlanDeleted);
+                return;
+            }
+
             // 2. Explicitly Delete All Associated Data (Reverse Order of Dependencies)
 
             // A. Friend Permissions (Requests tied to this specific goal)

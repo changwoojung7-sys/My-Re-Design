@@ -2,78 +2,202 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ================================================================
+   MyReDesign Design System v2.0
+   다크 슬레이트 + 네온 하이라이트 팔레트
+================================================================ */
+
 :root {
-  --background: #0f172a;
-  /* Slate 900 */
-  --foreground: #f8fafc;
-  /* Slate 50 */
-  --primary: #8b5cf6;
-  /* Violet 500 */
-  --secondary: #64748b;
-  /* Slate 500 */
-  --accent: #ec4899;
-  /* Pink 500 */
+  /* ── 배경 레이어 ── */
+  --bg-base:      #0B1120;   /* Deep Dark Navy */
+  --bg-surface:   #131C2E;   /* Card 배경 */
+  --bg-elevated:  #1A2540;   /* Elevated Card */
+  --bg-glass:     rgba(255, 255, 255, 0.04);
+
+  /* ── 브랜드 컬러 ── */
+  --brand-mint:   #10B981;   /* Electric Mint */
+  --brand-lime:   #A3E635;   /* Neon Lime */
+  --brand-glow:   rgba(16, 185, 129, 0.25);
+
+  /* ── 4대 카테고리 팝 컬러 ── */
+  --cat-body:     #FF5757;   /* Hot Coral - Body Wellness */
+  --cat-mind:     #8B5CF6;   /* Lavender Purple - Mind Connection */
+  --cat-growth:   #06B6D4;   /* Electric Cyan - Growth Career */
+  --cat-funplay:  #F97316;   /* Bright Sunset Orange - FunPlay */
+
+  /* ── 텍스트 ── */
+  --text-primary:   #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted:     #475569;
+
+  /* ── 테두리 ── */
+  --border-subtle:  rgba(255, 255, 255, 0.07);
+  --border-glass:   rgba(255, 255, 255, 0.12);
+
+  /* ── 레거시 (Tailwind 토큰 호환) ── */
+  --background: var(--bg-base);
+  --foreground: var(--text-primary);
+  --primary:    var(--brand-mint);
+  --secondary:  #64748b;
+  --accent:     var(--cat-mind);
 }
+
+/* ================================================================
+   Base Styles
+================================================================ */
 
 body {
   @apply bg-background text-foreground;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: 'Pretendard Variable', 'Pretendard', 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
-  
-  /* Capacitor / iOS / Android Notches SafeArea Support */
-  padding-top: env(safe-area-inset-top, 0px);
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--bg-base);
+
+  /* Capacitor / iOS / Android Notches SafeArea */
+  padding-top:    env(safe-area-inset-top,    0px);
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  padding-left: env(safe-area-inset-left, 0px);
-  padding-right: env(safe-area-inset-right, 0px);
+  padding-left:   env(safe-area-inset-left,   0px);
+  padding-right:  env(safe-area-inset-right,  0px);
 }
 
-/* Premium Animations */
+/* ================================================================
+   Glassmorphism Utility Classes
+================================================================ */
+
+.glass-card {
+  background: var(--bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+  border-radius: 24px;
+}
+
+.glass-card-sm {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 16px;
+}
+
+/* ================================================================
+   Neon Glow Effects
+================================================================ */
+
+.neon-mint {
+  box-shadow: 0 0 16px var(--brand-glow), 0 0 4px rgba(16, 185, 129, 0.4);
+}
+
+.neon-body {
+  box-shadow: 0 0 16px rgba(255, 87, 87, 0.25), 0 0 4px rgba(255, 87, 87, 0.3);
+}
+
+.neon-mind {
+  box-shadow: 0 0 16px rgba(139, 92, 246, 0.25), 0 0 4px rgba(139, 92, 246, 0.3);
+}
+
+.neon-growth {
+  box-shadow: 0 0 16px rgba(6, 182, 212, 0.25), 0 0 4px rgba(6, 182, 212, 0.3);
+}
+
+.neon-funplay {
+  box-shadow: 0 0 16px rgba(249, 115, 22, 0.25), 0 0 4px rgba(249, 115, 22, 0.3);
+}
+
+/* ================================================================
+   Gradient Utilities
+================================================================ */
+
+.gradient-brand {
+  background: linear-gradient(135deg, var(--brand-mint) 0%, var(--brand-lime) 100%);
+}
+
+.gradient-body   { background: linear-gradient(135deg, #FF5757 0%, #FF8C8C 100%); }
+.gradient-mind   { background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%); }
+.gradient-growth { background: linear-gradient(135deg, #06B6D4 0%, #38BDF8 100%); }
+.gradient-funplay{ background: linear-gradient(135deg, #F97316 0%, #FB923C 100%); }
+
+.gradient-text-brand {
+  background: linear-gradient(135deg, var(--brand-mint), var(--brand-lime));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ================================================================
+   Micro Animations
+================================================================ */
+
+/* 미션 완료 폭죽 */
 @keyframes explode {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-
-  100% {
-    transform: scale(1);
-    opacity: 0;
-  }
+  0%   { transform: scale(0); opacity: 0; }
+  50%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
 }
 
-/* Custom Scrollbar Utility */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* 네온 펄스 */
+@keyframes neon-pulse {
+  0%, 100% { box-shadow: 0 0 8px var(--brand-glow); }
+  50%       { box-shadow: 0 0 24px var(--brand-glow), 0 0 48px rgba(16, 185, 129, 0.15); }
 }
 
+/* 불꽃 흔들기 (스트릭) */
+@keyframes flame-shake {
+  0%, 100% { transform: rotate(-3deg) scale(1); }
+  25%       { transform: rotate(3deg) scale(1.05); }
+  75%       { transform: rotate(-2deg) scale(1.02); }
+}
+
+/* 위로 올라오기 */
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* 반짝이기 */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+/* XP 게이지 채우기 */
+@keyframes fill-bar {
+  from { width: 0%; }
+}
+
+.animate-neon-pulse { animation: neon-pulse 2s ease-in-out infinite; }
+.animate-flame      { animation: flame-shake 0.6s ease-in-out infinite; }
+.animate-slide-up   { animation: slide-up 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* ================================================================
+   Card Radius System
+================================================================ */
+.rounded-card  { border-radius: 24px; }
+.rounded-card-sm { border-radius: 16px; }
+.rounded-badge { border-radius: 12px; }
+
+/* ================================================================
+   Custom Scrollbar
+================================================================ */
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar {
   -ms-overflow-style: none;
-  /* IE and Edge */
   scrollbar-width: none;
-  /* Firefox */
 }
 
-/* Admin Table Scroll: Vertical Hidden, Horizontal Visible */
-.admin-table-scroll::-webkit-scrollbar {
-  width: 0px;
-  /* Vertical hidden */
-  height: 6px;
-  /* Horizontal visible */
-}
-
-.admin-table-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
+/* Admin Table Scroll */
+.admin-table-scroll::-webkit-scrollbar { width: 0px; height: 6px; }
+.admin-table-scroll::-webkit-scrollbar-track { background: transparent; }
 .admin-table-scroll::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 3px;
 }
-
 .admin-table-scroll::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.4);
-}
+}

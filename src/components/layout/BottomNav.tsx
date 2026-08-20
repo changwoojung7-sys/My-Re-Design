@@ -1,67 +1,121 @@
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, Calendar, Trophy, Users, ArrowUpRight } from 'lucide-react';
+import { Home, Calendar, TrendingUp, Play, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface BottomNavProps {
     onOpenSupport: (view?: 'main' | 'terms' | 'privacy' | 'refund') => void;
 }
 
-export default function BottomNav({ onOpenSupport }: BottomNavProps) {
-    const navigate = useNavigate();
-    const location = useLocation();
+const navItems = [
+    { path: '/',          label: 'My Loop', icon: Home,        color: '#10B981' },
+    { path: '/today',     label: 'Today',   icon: Calendar,    color: '#8B5CF6' },
+    { path: '/dashboard', label: 'Growth',  icon: TrendingUp,  color: '#06B6D4' },
+    { path: '/history',   label: 'History', icon: Play,        color: '#F97316' },
+    { path: '/friends',   label: 'Friends', icon: Users,       color: '#FF5757' },
+];
 
-    const navItems = [
-        { path: '/', label: 'My Loop', icon: Home },
-        { path: '/today', label: 'Today', icon: Calendar },
-        { path: '/dashboard', label: 'Growth', icon: ArrowUpRight },
-        { path: '/history', label: 'History', icon: Trophy },
-        { path: '/friends', label: 'Friends', icon: Users },
-    ];
+export default function BottomNav({ onOpenSupport }: BottomNavProps) {
+    const navigate  = useNavigate();
+    const location  = useLocation();
 
     return (
-        <div className="w-full bg-slate-900/90 backdrop-blur-md border-t border-white/5 pb-1 pt-2 relative flex flex-col items-center">
-            {/* Tab Navigation */}
-            <div className="w-full flex justify-around items-center mb-0.5">
+        <div className="w-full flex flex-col items-center pb-safe">
+            {/* ── Floating Island Bar ── */}
+            <div
+                className="mx-4 mb-2 px-3 py-2 flex justify-around items-center w-[calc(100%-2rem)]"
+                style={{
+                    background:       'rgba(13, 20, 38, 0.85)',
+                    backdropFilter:   'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                    border:           '1px solid rgba(255, 255, 255, 0.08)',
+                    borderRadius:     '28px',
+                    boxShadow:        '0 8px 32px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3)',
+                }}
+            >
                 {navItems.map((item) => {
                     const isActive = location.pathname === item.path;
-                    const Icon = item.icon;
+                    const Icon     = item.icon;
 
                     return (
                         <button
                             key={item.path}
+                            id={`nav-${item.label.toLowerCase()}`}
                             onClick={() => navigate(item.path)}
-                            className="relative flex flex-col items-center justify-center p-2 w-14"
+                            className="relative flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 min-w-[52px]"
                         >
-                            <div className={`relative p-1.5 rounded-xl transition-all duration-300 ${isActive ? 'bg-primary/20 text-primary scale-110' : 'text-slate-400 hover:text-slate-200'}`}>
-                                <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                            {/* 슬라이딩 배경 인디케이터 */}
+                            {isActive && (
+                                <motion.div
+                                    layoutId="floating-nav-bg"
+                                    className="absolute inset-0 rounded-2xl"
+                                    style={{ backgroundColor: `${item.color}18` }}
+                                    transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                                />
+                            )}
+
+                            {/* 아이콘 */}
+                            <motion.div
+                                animate={isActive
+                                    ? { scale: 1.15, y: -1 }
+                                    : { scale: 1,    y: 0  }
+                                }
+                                transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                                className="relative z-10"
+                            >
+                                {/* 활성 시 glow */}
                                 {isActive && (
-                                    <motion.div
-                                        layoutId="nav-glow"
-                                        className="absolute inset-0 bg-primary/20 blur-lg rounded-full"
-                                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                    <div
+                                        className="absolute inset-0 blur-md rounded-full"
+                                        style={{ backgroundColor: `${item.color}40` }}
                                     />
                                 )}
-                            </div>
-                            <span className={`text-[9px] mt-0.5 font-medium transition-colors ${isActive ? 'text-primary' : 'text-slate-500'}`}>
+                                <Icon
+                                    size={20}
+                                    strokeWidth={isActive ? 2.5 : 1.8}
+                                    color={isActive ? item.color : '#64748b'}
+                                    className="relative z-10 transition-colors duration-200"
+                                />
+                            </motion.div>
+
+                            {/* 라벨 */}
+                            <span
+                                className="text-[9px] font-semibold relative z-10 transition-all duration-200"
+                                style={{ color: isActive ? item.color : '#475569' }}
+                            >
                                 {item.label}
                             </span>
+
+                            {/* 활성 점 인디케이터 */}
+                            {isActive && (
+                                <motion.div
+                                    layoutId="floating-nav-dot"
+                                    className="absolute -bottom-1 w-1 h-1 rounded-full"
+                                    style={{ backgroundColor: item.color }}
+                                    transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                                />
+                            )}
                         </button>
                     );
                 })}
             </div>
 
-            {/* Business Info / Support Links (Compact) */}
-            <div className="w-full flex items-center justify-center gap-2 text-[9px] text-slate-600 pb-1">
-                <button onClick={() => onOpenSupport('main')} className="hover:text-slate-400 transition-colors">
-                    문의하기
+            {/* ── 법적 링크 (최소화) ── */}
+            <div className="flex items-center justify-center gap-2 text-[8px] text-slate-700 pb-1">
+                <button
+                    id="nav-support-btn"
+                    onClick={() => onOpenSupport('main')}
+                    className="hover:text-slate-500 transition-colors"
+                >
+                    문의
                 </button>
-                <span className="text-slate-800">|</span>
-                <div className="flex gap-2">
-                    <button onClick={() => onOpenSupport('terms')} className="hover:text-slate-400 transition-colors">이용약관</button>
-                    <button onClick={() => onOpenSupport('privacy')} className="hover:text-slate-400 transition-colors">개인정보처리방침</button>
-                    <button onClick={() => onOpenSupport('refund')} className="hover:text-slate-400 transition-colors">환불정책</button>
-                </div>
+                <span className="text-slate-800">·</span>
+                <button onClick={() => onOpenSupport('terms')}   className="hover:text-slate-500 transition-colors">이용약관</button>
+                <span className="text-slate-800">·</span>
+                <button onClick={() => onOpenSupport('privacy')} className="hover:text-slate-500 transition-colors">개인정보</button>
+                <span className="text-slate-800">·</span>
+                <button onClick={() => onOpenSupport('refund')}  className="hover:text-slate-500 transition-colors">환불정책</button>
             </div>
         </div>
     );
 }
+

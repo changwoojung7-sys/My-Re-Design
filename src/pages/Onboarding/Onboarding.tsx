@@ -13,8 +13,9 @@ import { useLanguage } from '../../lib/i18n';
 export default function Onboarding() {
     const navigate = useNavigate();
     const { user, setUser } = useStore();
+    const isDemo = user?.id === 'demo123';
     const { t } = useLanguage();
-    const [step, setStep] = useState(0);
+    const [step, setStep] = useState(isDemo ? 1 : 0);
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -36,6 +37,27 @@ export default function Onboarding() {
             }
         };
         fetchMeta();
+
+        // 선체험 데이터 연동
+        const preTrial = localStorage.getItem('preTrialData');
+        if (preTrial) {
+            try {
+                const parsed = JSON.parse(preTrial);
+                if (parsed.goal) {
+                    setFormData(prev => ({
+                        ...prev,
+                        goals: {
+                            ...prev.goals,
+                            body_wellness: parsed.goal
+                        }
+                    }));
+                }
+            } catch (e) {
+                console.error("Failed to parse preTrialData");
+            }
+            // 완료 후 삭제
+            localStorage.removeItem('preTrialData');
+        }
     }, []);
 
     const updateGoal = (key: keyof typeof formData.goals, value: string) => {
@@ -54,9 +76,10 @@ export default function Onboarding() {
         try {
             // Demo User Bypass
             if (user.id === 'demo123') {
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                alert(t.demoLimit);
-                navigate('/');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                localStorage.setItem('demo_goals', JSON.stringify(formData.goals));
+                setUser({ ...user, age: formData.age, gender: formData.gender });
+                navigate('/mypage?edit=body_wellness');
                 return;
             }
 
@@ -143,8 +166,6 @@ export default function Onboarding() {
         }
     };
 
-    const isDemo = user?.id === 'demo123';
-
     const steps = [
         // Step 0: Welcome
         <div key="step0" className="text-center space-y-6">
@@ -168,9 +189,8 @@ export default function Onboarding() {
                 <input
                     type="range" min="10" max="80" value={formData.age}
                     title={`${t.age}: ${formData.age}`}
-                    onChange={(e) => !isDemo && setFormData({ ...formData, age: Number(e.target.value) })}
-                    disabled={isDemo}
-                    className={`w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary ${isDemo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onChange={(e) => setFormData({ ...formData, age: Number(e.target.value) })}
+                    className={`w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-primary`}
                 />
             </div>
             <div>
@@ -179,18 +199,16 @@ export default function Onboarding() {
                     {['male', 'female', 'other'].map((g) => (
                         <button
                             key={g}
-                            onClick={() => !isDemo && setFormData({ ...formData, gender: g })}
-                            disabled={isDemo}
+                            onClick={() => setFormData({ ...formData, gender: g })}
                             className={`flex-1 py-3 rounded-xl border transition-all capitalized 
-                                ${formData.gender === g ? 'border-primary bg-primary/20 text-white' : 'border-white/10 text-slate-500'}
-                                ${isDemo ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                ${formData.gender === g ? 'border-primary bg-primary/20 text-white' : 'border-white/10 text-slate-500'}`}
                         >
                             {t[g as keyof typeof t] || g}
                         </button>
                     ))}
                 </div>
             </div>
-            <button onClick={nextStep} className="w-full bg-white text-black font-bold py-3 rounded-xl mt-4">{t.next}</button>
+            <button onClick={isDemo ? finish : nextStep} className="w-full bg-white text-black font-bold py-3 rounded-xl mt-4">{t.next}</button>
         </div>,
 
         // Step 2: Body & Wellness + Growth & Career
@@ -203,20 +221,18 @@ export default function Onboarding() {
                     <label className="text-sm text-primary font-bold">{t.body_wellness || "Body & Wellness"}</label>
                     <input
                         type="text" placeholder={t.healthPlaceholder || "e.g. Lose 5kg, Run 10km"}
-                        value={isDemo ? (t.healthPlaceholder || "") : formData.goals.body_wellness}
+                        value={formData.goals.body_wellness}
                         onChange={(e) => updateGoal('body_wellness', e.target.value)}
-                        disabled={isDemo}
-                        className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:outline-none ${isDemo ? 'italic text-slate-400 opacity-80 cursor-not-allowed' : ''}`}
+                        className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:outline-none`}
                     />
                 </div>
                 <div>
                     <label className="text-sm text-accent font-bold">{t.growth_career || "Growth & Career"}</label>
                     <input
                         type="text" placeholder={t.growthPlaceholder || "e.g. Learn Python"}
-                        value={isDemo ? (t.growthPlaceholder || "") : formData.goals.growth_career}
+                        value={formData.goals.growth_career}
                         onChange={(e) => updateGoal('growth_career', e.target.value)}
-                        disabled={isDemo}
-                        className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-accent focus:outline-none ${isDemo ? 'italic text-slate-400 opacity-80 cursor-not-allowed' : ''}`}
+                        className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-accent focus:outline-none`}
                     />
                 </div>
             </div>
@@ -232,11 +248,10 @@ export default function Onboarding() {
                 <div>
                     <label className="text-sm text-pink-500 font-bold">{t.mind_connection || "Mind & Connection"}</label>
                     <input
-                        type="text" placeholder={t.mindsetPlaceholder || "e.g. Daily Affirmation"}
-                        value={isDemo ? (t.mindsetPlaceholder || "") : formData.goals.mind_connection}
+                        type="text" placeholder={t.mindsetPlaceholder || "e.g. Read 1 book/week"}
+                        value={formData.goals.mind_connection}
                         onChange={(e) => updateGoal('mind_connection', e.target.value)}
-                        disabled={isDemo}
-                        className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-pink-500 focus:outline-none ${isDemo ? 'italic text-slate-400 opacity-80 cursor-not-allowed' : ''}`}
+                        className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-400 focus:outline-none`}
                     />
                 </div>
             </div>

@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, UserPlus, Share2, User, Trophy, Heart, MessageCircle, Send, Trash2, X, Users, Plus, Check } from 'lucide-react';
+import { Search, UserPlus, Share2, User, Trophy, Heart, MessageCircle, Send, Trash2, X, Users, Plus, Check, Swords } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import HistoryDetail from '../History/HistoryDetail';
+import BuddyChallengeModal from '../../components/social/BuddyChallengeModal';
 
 export default function Friends() {
     const { user } = useStore();
@@ -39,12 +40,316 @@ export default function Friends() {
     const [commentInput, setCommentInput] = useState('');
     const [viewingGoal, setViewingGoal] = useState<any | null>(null);
 
+    // Buddy Challenge
+    const [isBuddyModalOpen, setIsBuddyModalOpen] = useState(false);
+    const [selectedBuddy, setSelectedBuddy] = useState<any | null>(null);
+    const [buddyChallenges, setBuddyChallenges] = useState<any[]>([]);
+
+    // Buddy Challenge Logs (일일 인증)
+    const [buddyLogs, setBuddyLogs] = useState<Record<string, any[]>>({}); // challengeId -> logs[]
+    const [verifyingBuddyId, setVerifyingBuddyId] = useState<string | null>(null); // challengeId
+    const [buddyProofText, setBuddyProofText] = useState('');
+    const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null); // 히스토리 펼친 챌린지 ID
+    const [uploadingBuddy, setUploadingBuddy] = useState(false);
+
     useEffect(() => {
         if (user) {
             fetchGroups();
             fetchFriends();
+            fetchBuddyChallenges();
         }
     }, [user]);
+
+    const fetchBuddyChallenges = async () => {
+        if (!user || user.id === 'demo123') return;
+        try {
+            const { data } = await supabase
+                .from('buddy_challenges')
+                .select('*')
+                .or(`creator_id.eq.${user.id},partner_id.eq.${user.id}`)
+                .order('created_at', { ascending: false });
+
+            const dismissedKey = `dismissed_buddy_challenges_${user.id}`;
+            const dismissedIds: string[] = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+
+            if (data && data.length > 0) {
+                const filteredData = data.filter(c => !dismissedIds.includes(c.id));
+                const allUserIds = Array.from(new Set(filteredData.flatMap(c => [c.creator_id, c.partner_id])));
+                const { data: userProfiles } = await supabase.from('profiles').select('id, nickname, profile_image_url').in('id', allUserIds);
+                const userMap = new Map((userProfiles || []).map(p => [p.id, p]));
+
+                const enriched = filteredData.map(c => ({
+                    ...c,
+                    creator: userMap.get(c.creator_id) || { nickname: '친구' },
+                    partner: userMap.get(c.partner_id) || { nickname: '친구' },
+                    isIncoming: c.partner_id === user.id && c.status === 'pending'
+                }));
+                setBuddyChallenges(enriched);
+
+                // active 챌린지 로그 자동 로드
+                const activeChallengeIds = filteredData.filter(c => c.status === 'active').map(c => c.id);
+                if (activeChallengeIds.length > 0) {
+                    fetchBuddyLogs(activeChallengeIds);
+                }
+            } else {
+                setBuddyChallenges([]);
+            }
+        } catch (e) {
+            console.error('Failed to fetch buddy challenges:', e);
+        }
+    };
+
+    const fetchBuddyLogs = async (challengeIds: string[]) => {
+        if (!user || challengeIds.length === 0) return;
+        try {
+            const { data } = await supabase
+                .from('buddy_challenge_logs')
+                .select('*')
+                .in('buddy_challenge_id', challengeIds)
+                .order('log_date', { ascending: false });
+            if (data) {
+                const logsMap: Record<string, any[]> = {};
+                challengeIds.forEach(id => { logsMap[id] = []; });
+                data.forEach(log => {
+                    if (!logsMap[log.buddy_challenge_id]) logsMap[log.buddy_challenge_id] = [];
+                    logsMap[log.buddy_challenge_id].push(log);
+                });
+                setBuddyLogs(prev => ({ ...prev, ...logsMap }));
+            }
+        } catch (e) { console.error('Failed to fetch buddy logs:', e); }
+    };
+
+    const getTodayStr = () => {
+        const now = new Date();
+        return `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    };
+    const getMyTodayLog = (challengeId: string) => {
+        const logs = buddyLogs[challengeId] || [];
+        return logs.find(l => l.user_id === user?.id && l.log_date === getTodayStr());
+    };
+    const getPartnerTodayLog = (challengeId: string, partnerId: string) => {
+        const logs = buddyLogs[challengeId] || [];
+        return logs.find(l => l.user_id === partnerId && l.log_date === getTodayStr());
+    };
+
+    const submitBuddyProofText = async (challengeId: string) => {
+        if (!buddyProofText.trim() || !user) return;
+        const myLog = getMyTodayLog(challengeId);
+        try {
+            if (myLog) {
+                const { error } = await supabase
+                    .from('buddy_challenge_logs')
+                    .update({
+                        is_completed: true,
+                        proof_text: buddyProofText.trim(),
+                        proof_type: 'text',
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', myLog.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('buddy_challenge_logs')
+                    .insert({
+                        buddy_challenge_id: challengeId,
+                        user_id: user.id,
+                        log_date: getTodayStr(),
+                        is_completed: true,
+                        proof_text: buddyProofText.trim(),
+                        proof_type: 'text'
+                    });
+                if (error) throw error;
+            }
+            alert('오늘의 대결 미션 인증이 완료되었습니다! 🔥');
+            setBuddyProofText('');
+            setVerifyingBuddyId(null);
+            await fetchBuddyLogs([challengeId]);
+        } catch (e: any) {
+            console.error('submitBuddyProofText error:', e);
+            alert(`인증 저장 실패: ${e.message}`);
+        }
+    };
+
+    const submitBuddyProofImage = async (challengeId: string, file: File) => {
+        if (!user) return;
+        setUploadingBuddy(true);
+        const myLog = getMyTodayLog(challengeId);
+        try {
+            const fileName = `${user.id}/buddy_${challengeId}_${getTodayStr()}_${Date.now()}`;
+            const { error: upErr } = await supabase.storage.from('mission-proofs').upload(fileName, file);
+            if (upErr) throw upErr;
+            const publicUrl = supabase.storage.from('mission-proofs').getPublicUrl(fileName).data.publicUrl;
+            const proofType = file.type.startsWith('video') ? 'video' : 'image';
+            if (myLog) {
+                const { error } = await supabase
+                    .from('buddy_challenge_logs')
+                    .update({
+                        is_completed: true,
+                        image_url: publicUrl,
+                        proof_type: proofType,
+                        updated_at: new Date().toISOString()
+                    })
+                    .eq('id', myLog.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('buddy_challenge_logs')
+                    .insert({
+                        buddy_challenge_id: challengeId,
+                        user_id: user.id,
+                        log_date: getTodayStr(),
+                        is_completed: true,
+                        image_url: publicUrl,
+                        proof_type: proofType
+                    });
+                if (error) throw error;
+            }
+            alert('오늘의 대결 미션 사진 인증이 완료되었습니다! 📸🔥');
+            setVerifyingBuddyId(null);
+            await fetchBuddyLogs([challengeId]);
+        } catch (e: any) {
+            console.error('submitBuddyProofImage error:', e);
+            alert(`사진 업로드 실패: ${e.message}`);
+        } finally {
+            setUploadingBuddy(false);
+        }
+    };
+
+    const acceptBuddyChallenge = async (challengeId: string) => {
+        try {
+            const { error } = await supabase.from('buddy_challenges').update({ status: 'active' }).eq('id', challengeId);
+            if (error) throw error;
+            alert('버디 챌린지를 수락했습니다! 함께 목표를 달성해보세요! 🔥');
+            fetchBuddyChallenges();
+        } catch (e) {
+            alert('수락 처리 중 오류가 발생했습니다.');
+        }
+    };
+
+    const declineBuddyChallenge = async (challengeId: string) => {
+        if (!window.confirm('버디 챌린지 요청을 거절하시겠습니까?')) return;
+        try {
+            await supabase.from('buddy_challenges').update({ status: 'cancelled' }).eq('id', challengeId);
+            await supabase.from('buddy_challenges').delete().eq('id', challengeId);
+            
+            const dismissedKey = `dismissed_buddy_challenges_${user?.id}`;
+            const existingDismissed = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+            if (!existingDismissed.includes(challengeId)) {
+                existingDismissed.push(challengeId);
+                localStorage.setItem(dismissedKey, JSON.stringify(existingDismissed));
+            }
+
+            setBuddyChallenges(prev => prev.filter(c => c.id !== challengeId));
+            fetchBuddyChallenges();
+        } catch (e) {
+            alert('거절 처리 중 오류가 발생했습니다.');
+        }
+    };
+
+    const [nudgedMap, setNudgedMap] = useState<Record<string, boolean>>({});
+    const [incomingNudgeToast, setIncomingNudgeToast] = useState<string | null>(null);
+    const [incomingCancelRequest, setIncomingCancelRequest] = useState<any | null>(null);
+
+    useEffect(() => {
+        if (!user) return;
+        // 1. Check if there is an incoming nudge for me
+        const nudgeKey = `buddy_nudge_received_${user.id}`;
+        const nudgeData = localStorage.getItem(nudgeKey);
+        if (nudgeData) {
+            try {
+                const parsed = JSON.parse(nudgeData);
+                if (Date.now() - parsed.time < 3600000) {
+                    setIncomingNudgeToast(`${parsed.sender_name || '친구'}님이 "오늘 미션 잊지 말고 같이 완수하자! 🔥" 넛지(찌르기)를 보냈습니다!`);
+                    localStorage.removeItem(nudgeKey);
+                }
+            } catch (e) {}
+        }
+
+        // 2. Check if there is an incoming challenge cancellation request for me
+        const cancelKey = `buddy_cancel_req_${user.id}`;
+        const cancelData = localStorage.getItem(cancelKey);
+        if (cancelData) {
+            try {
+                const parsed = JSON.parse(cancelData);
+                setIncomingCancelRequest(parsed);
+            } catch (e) {}
+        }
+    }, [user]);
+
+    // 1. Cancel pending request (Creator can cancel unilaterally before partner accepts)
+    const cancelPendingRequest = async (challengeId: string) => {
+        if (!window.confirm('보낸 챌린지 요청을 취소하시겠습니까?')) return;
+        try {
+            await supabase.from('buddy_challenges').delete().eq('id', challengeId);
+            await supabase.from('buddy_challenges').update({ status: 'cancelled' }).eq('id', challengeId);
+            
+            const dismissedKey = `dismissed_buddy_challenges_${user?.id}`;
+            const existingDismissed = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+            if (!existingDismissed.includes(challengeId)) {
+                existingDismissed.push(challengeId);
+                localStorage.setItem(dismissedKey, JSON.stringify(existingDismissed));
+            }
+
+            setBuddyChallenges(prev => prev.filter(c => c.id !== challengeId));
+            alert('챌린지 요청이 취소되었습니다.');
+            fetchBuddyChallenges();
+        } catch (e) {
+            alert('요청 취소 중 오류가 발생했습니다.');
+        }
+    };
+
+    const [myCancelRequestedMap, setMyCancelRequestedMap] = useState<Record<string, boolean>>({});
+
+    // 2. Request mutual cancellation for an ACTIVE challenge
+    const requestMutualCancellation = async (challengeId: string, partnerId: string, challengeName: string) => {
+        if (!window.confirm(`상대방에게 "${challengeName || '1:1 버디 챌린지'}" 중단 요청을 보내시겠습니까?\n\n상대방이 [동의]해야 챌린지가 안전하게 종료됩니다.`)) return;
+        try {
+            const cancelKey = `buddy_cancel_req_${partnerId}`;
+            localStorage.setItem(cancelKey, JSON.stringify({
+                challenge_id: challengeId,
+                requester_id: user?.id,
+                requester_name: (user as any)?.nickname || user?.email || '친구',
+                challenge_name: challengeName || '1:1 버디 챌린지',
+                time: Date.now()
+            }));
+
+            setMyCancelRequestedMap(prev => ({ ...prev, [challengeId]: true }));
+            alert('상대방에게 중단 요청을 전송했습니다. 상대방이 동의하면 챌린지가 종료됩니다.');
+        } catch (e: any) {
+            console.error('Request cancellation error:', e);
+            alert('중단 요청 중 오류가 발생했습니다.');
+        }
+    };
+
+    // 3. Partner Agrees to cancel active challenge
+    const agreeCancelChallenge = async (challengeId: string) => {
+        try {
+            await supabase.from('buddy_challenges').update({ status: 'cancelled' }).eq('id', challengeId);
+            await supabase.from('buddy_challenges').delete().eq('id', challengeId);
+            
+            const dismissedKey = `dismissed_buddy_challenges_${user?.id}`;
+            const existingDismissed = JSON.parse(localStorage.getItem(dismissedKey) || '[]');
+            if (!existingDismissed.includes(challengeId)) {
+                existingDismissed.push(challengeId);
+                localStorage.setItem(dismissedKey, JSON.stringify(existingDismissed));
+            }
+
+            setBuddyChallenges(prev => prev.filter(c => c.id !== challengeId));
+            if (user) localStorage.removeItem(`buddy_cancel_req_${user.id}`);
+            setIncomingCancelRequest(null);
+            alert('상호 동의하여 버디 챌린지가 종료되었습니다.');
+            fetchBuddyChallenges();
+        } catch (e) {
+            alert('종료 처리 중 오류가 발생했습니다.');
+        }
+    };
+
+    // 4. Partner Rejects cancellation request
+    const rejectCancelChallenge = () => {
+        if (user) localStorage.removeItem(`buddy_cancel_req_${user.id}`);
+        setIncomingCancelRequest(null);
+        alert('중단 요청을 거절하였습니다. 챌린지를 계속 진행합니다! 🔥');
+    };
 
     const fetchGroups = async () => {
         const { data } = await supabase.from('friend_groups').select('*').eq('user_id', user!.id).order('created_at');
@@ -713,6 +1018,364 @@ export default function Friends() {
                 </div>
             )}
 
+            {/* ⚔️ INCOMING BUDDY CHALLENGE REQUESTS */}
+            {buddyChallenges.filter(c => c.isIncoming).length > 0 && (
+                <div className="mb-4 space-y-2 animate-in fade-in slide-in-from-top-2 shrink-0">
+                    <div className="flex items-center gap-1.5 px-1">
+                        <span className="text-sm">⚔️</span>
+                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">도착한 버디 챌린지 요청</h3>
+                        <span className="text-[10px] bg-accent/20 text-accent font-bold px-1.5 py-0.2 rounded-full">
+                            {buddyChallenges.filter(c => c.isIncoming).length}
+                        </span>
+                    </div>
+                    {buddyChallenges.filter(c => c.isIncoming).map((challenge) => (
+                        <div key={challenge.id} className="p-3.5 bg-gradient-to-r from-purple-900/40 to-slate-900/60 rounded-2xl border border-primary/40 shadow-lg flex flex-col gap-2.5">
+                            <div className="flex justify-between items-start">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+                                        ⚔️
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-white">
+                                            <span className="text-primary">{challenge.creator?.nickname || '친구'}</span>님의 1:1 챌린지 요청!
+                                        </p>
+                                        <p className="text-[11px] text-slate-300">
+                                            {challenge.challenge_name || `[${challenge.goal_category}] 7일 습관 달성 대결`}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30">
+                                    {challenge.goal_category}
+                                </span>
+                            </div>
+                            <div className="flex gap-2 pt-1 border-t border-white/5">
+                                <button
+                                    onClick={() => acceptBuddyChallenge(challenge.id)}
+                                    className="flex-1 py-2 bg-primary hover:bg-primary/90 text-black text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1 shadow"
+                                >
+                                    <span>수락하기 🔥</span>
+                                </button>
+                                <button
+                                    onClick={() => declineBuddyChallenge(challenge.id)}
+                                    className="py-2 px-4 bg-white/10 hover:bg-white/20 text-slate-300 text-xs font-bold rounded-xl transition-all"
+                                >
+                                    거절
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ⚔️ OUTGOING BUDDY CHALLENGE REQUESTS (Waiting for partner) */}
+            {buddyChallenges.filter(c => c.creator_id === user?.id && c.status === 'pending').length > 0 && (
+                <div className="mb-4 space-y-2 shrink-0">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm">⏳</span>
+                            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">내가 보낸 챌린지 요청 (수락 대기중)</h3>
+                        </div>
+                    </div>
+                    {buddyChallenges.filter(c => c.creator_id === user?.id && c.status === 'pending').map((challenge) => (
+                        <div key={challenge.id} className="p-3 bg-slate-900/70 rounded-2xl border border-white/5 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-base">⚔️</span>
+                                <div>
+                                    <p className="text-xs font-bold text-white">
+                                        <span className="text-accent">{challenge.partner?.nickname || '친구'}</span>님에게 신청함
+                                    </p>
+                                    <p className="text-[10px] text-slate-400">
+                                        {challenge.challenge_name || challenge.goal_category}
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => cancelPendingRequest(challenge.id)}
+                                className="py-1.5 px-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 text-[11px] font-bold rounded-xl transition-all"
+                            >
+                                요청 취소
+                            </button>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* ⚔️ ACTIVE BUDDY CHALLENGES */}
+            {buddyChallenges.filter(c => c.status === 'active').length > 0 && (
+                <div className="mb-4 space-y-2 shrink-0">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm">🔥</span>
+                            <h3 className="text-xs font-bold text-white uppercase tracking-wider">진행 중인 버디 챌린지</h3>
+                        </div>
+                    </div>
+                    {/* 📢 Incoming Mutual Cancellation Request Banner */}
+                    {incomingCancelRequest && (
+                        <div className="p-3.5 bg-gradient-to-r from-red-950/80 to-slate-900 border border-red-500/40 rounded-2xl shadow-xl space-y-2 animate-in fade-in">
+                            <div className="flex items-center gap-2">
+                                <span className="text-base">📢</span>
+                                <div>
+                                    <p className="text-xs font-bold text-white">
+                                        <span className="text-red-400">{incomingCancelRequest.requester_name}</span>님이 챌린지 중단을 요청했습니다.
+                                    </p>
+                                    <p className="text-[10px] text-slate-300">"{incomingCancelRequest.challenge_name}" 챌린지를 종료하시겠습니까?</p>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 pt-1">
+                                <button
+                                    onClick={() => agreeCancelChallenge(incomingCancelRequest.challenge_id)}
+                                    className="flex-1 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[11px] font-bold rounded-xl transition-all shadow"
+                                >
+                                    동의하여 챌린지 종료
+                                </button>
+                                <button
+                                    onClick={rejectCancelChallenge}
+                                    className="py-1.5 px-3 bg-white/10 hover:bg-white/20 text-slate-300 text-[11px] font-bold rounded-xl transition-all"
+                                >
+                                    계속 대결하기
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 🔔 Incoming Nudge Toast Banner */}
+                    {incomingNudgeToast && (
+                        <div className="p-3 bg-gradient-to-r from-yellow-500/20 to-amber-500/10 border border-yellow-500/40 rounded-2xl flex items-center justify-between shadow-lg animate-bounce">
+                            <div className="flex items-center gap-2">
+                                <span className="text-lg">🔔</span>
+                                <p className="text-xs font-bold text-yellow-300">{incomingNudgeToast}</p>
+                            </div>
+                            <button
+                                onClick={() => setIncomingNudgeToast(null)}
+                                className="text-xs text-slate-400 hover:text-white px-2 py-1"
+                            >
+                                ✕
+                            </button>
+                        </div>
+                    )}
+
+                    {buddyChallenges.filter(c => c.status === 'active').map((challenge) => {
+                        const isCreator = challenge.creator_id === user?.id;
+                        const partnerId = isCreator ? challenge.partner_id : challenge.creator_id;
+                        const partnerProfile = isCreator ? challenge.partner : challenge.creator;
+                        const isNudged = !!nudgedMap[challenge.id];
+                        const isCancelRequested = !!myCancelRequestedMap[challenge.id];
+
+                        return (
+                            <div key={challenge.id} className="p-3.5 bg-slate-900/90 rounded-2xl border border-primary/20 shadow-lg flex flex-col gap-2.5">
+                                <div className="flex justify-between items-center">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                            <span className="text-primary font-extrabold">나</span> 
+                                            <span className="text-[10px] text-slate-400">VS</span> 
+                                            <span className="text-accent font-extrabold">{partnerProfile?.nickname || '친구'}</span>
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 truncate max-w-[130px]">
+                                            ({challenge.challenge_name || challenge.goal_category})
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            onClick={() => nudgeBuddy(challenge.id, partnerId, partnerProfile?.nickname || '친구')}
+                                            disabled={isNudged}
+                                            className={`text-[10px] font-bold px-2.5 py-1 rounded-lg transition-all flex items-center gap-1 shadow-sm ${
+                                                isNudged 
+                                                    ? 'bg-green-500/20 text-green-400 border border-green-500/30' 
+                                                    : 'bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-400 border border-yellow-500/30 active:scale-95'
+                                            }`}
+                                            title="친구에게 미션 응원 찌르기"
+                                        >
+                                            <span>{isNudged ? '✅ 완료' : '🔔 넛지'}</span>
+                                        </button>
+                                        <button
+                                            onClick={() => requestMutualCancellation(challenge.id, partnerId, challenge.challenge_name)}
+                                            disabled={isCancelRequested}
+                                            className={`text-[10px] px-2 py-1 rounded-lg transition-colors ${
+                                                isCancelRequested
+                                                    ? 'text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 cursor-not-allowed'
+                                                    : 'text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10'
+                                            }`}
+                                            title={isCancelRequested ? '상대방의 중단 동의를 기다리는 중입니다' : '상대방에게 중단 요청 전송'}
+                                        >
+                                            {isCancelRequested ? '중단 대기중 ⏳' : '중단'}
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* VS Progress Bar - 실제 로그 기반 */}
+                                {(() => {
+                                    const logs = buddyLogs[challenge.id] || [];
+                                    const myCount = logs.filter(l => l.user_id === user?.id && l.is_completed).length;
+                                    const partnerCount = logs.filter(l => l.user_id === partnerId && l.is_completed).length;
+                                    const total = Math.max(myCount + partnerCount, 1);
+                                    const myPct = Math.round((myCount / total) * 100);
+                                    const partnerPct = 100 - myPct;
+                                    const myToday = getMyTodayLog(challenge.id);
+                                    const partnerToday = getPartnerTodayLog(challenge.id, partnerId);
+                                    return (
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-[10px] font-bold px-0.5">
+                                                <span className={myToday?.is_completed ? 'text-emerald-400' : 'text-primary'}>
+                                                    나: {myCount}일 완료 {myToday?.is_completed ? '✅' : '🔥'}
+                                                </span>
+                                                <span className={partnerToday?.is_completed ? 'text-emerald-400' : 'text-accent'}>
+                                                    {partnerProfile?.nickname || '친구'}: {partnerCount}일 완료 {partnerToday?.is_completed ? '✅' : '⚡'}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden flex p-0.5 border border-white/5">
+                                                <div className="bg-gradient-to-r from-primary to-emerald-400 h-full rounded-full transition-all duration-500" style={{ width: `${myPct}%` }} />
+                                                <div className="bg-gradient-to-r from-accent to-purple-400 h-full rounded-full transition-all duration-500 ml-auto" style={{ width: `${partnerPct}%` }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+
+                                {/* 오늘 인증 섹션 */}
+                                {(() => {
+                                    const myToday = getMyTodayLog(challenge.id);
+                                    const isVerifying = verifyingBuddyId === challenge.id;
+                                    const challengeTitle = challenge.challenge_name?.replace(/\s*\[1일 \d회\]/, '').trim() || challenge.goal_category;
+                                    return (
+                                        <div className="border-t border-white/5 pt-2 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-[11px] font-bold text-white">📅 오늘 인증
+                                                    <span className="text-[10px] font-normal text-slate-400 ml-1 truncate">({challengeTitle})</span>
+                                                </span>
+                                                {myToday?.is_completed ? (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[11px] font-bold text-emerald-400">✅ 오늘 완료!</span>
+                                                        <button onClick={() => setVerifyingBuddyId(isVerifying ? null : challenge.id)}
+                                                            className="text-[10px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 transition-colors">
+                                                            {isVerifying ? '닫기' : '수정'}
+                                                        </button>
+                                                    </div>
+                                                ) : (
+                                                    <button onClick={() => setVerifyingBuddyId(isVerifying ? null : challenge.id)}
+                                                        className="text-[11px] font-bold px-3 py-1 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/30 rounded-lg transition-all active:scale-95">
+                                                        {isVerifying ? '닫기' : '인증하기 📸'}
+                                                    </button>
+                                                )}
+                                            </div>
+                                            {isVerifying && (
+                                                <div className="space-y-2 bg-slate-800/60 p-3 rounded-xl border border-white/5">
+                                                    <label className="flex items-center gap-2 cursor-pointer">
+                                                        <input type="file" accept="image/*,video/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) submitBuddyProofImage(challenge.id, f); }} />
+                                                        <div className={`flex-1 py-2 rounded-lg text-center text-xs font-bold border ${uploadingBuddy ? 'bg-slate-700 text-slate-400 border-slate-600' : 'bg-primary/15 hover:bg-primary/25 text-primary border-primary/30'}`}>
+                                                            {uploadingBuddy ? '업로드 중...' : '📸 사진/동영상으로 인증'}
+                                                        </div>
+                                                    </label>
+                                                    <div className="flex gap-2">
+                                                        <input type="text" value={buddyProofText} onChange={e => setBuddyProofText(e.target.value)}
+                                                            placeholder="또는 텍스트로 인증 입력..."
+                                                            className="flex-1 bg-slate-700/60 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 outline-none focus:border-primary/50"
+                                                            onKeyDown={e => e.key === 'Enter' && submitBuddyProofText(challenge.id)} />
+                                                        <button onClick={() => submitBuddyProofText(challenge.id)}
+                                                            className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary text-xs font-bold rounded-lg border border-primary/30">전송</button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <button onClick={() => {
+                                                const next = expandedHistoryId === challenge.id ? null : challenge.id;
+                                                setExpandedHistoryId(next);
+                                                if (next) fetchBuddyLogs([challenge.id]);
+                                            }}
+                                                className="w-full text-[10px] text-slate-400 hover:text-white flex items-center justify-center gap-1 py-1 rounded-lg hover:bg-white/5 transition-all">
+                                                {expandedHistoryId === challenge.id ? '▲ 인증 히스토리 닫기' : '▼ 인증 히스토리 보기'}
+                                            </button>
+                                            {expandedHistoryId === challenge.id && (
+                                                <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+                                                    {(buddyLogs[challenge.id] || []).length === 0 ? (
+                                                        <p className="text-[10px] text-slate-500 text-center py-3">아직 인증 기록이 없습니다.</p>
+                                                    ) : (() => {
+                                                        const logs = buddyLogs[challenge.id] || [];
+                                                        const dateMap: Record<string, {me?: any; partner?: any}> = {};
+                                                        logs.forEach(l => {
+                                                            if (!dateMap[l.log_date]) dateMap[l.log_date] = {};
+                                                            if (l.user_id === user?.id) dateMap[l.log_date].me = l;
+                                                            else dateMap[l.log_date].partner = l;
+                                                        });
+                                                        return Object.entries(dateMap).sort(([a],[b]) => b.localeCompare(a)).map(([date, entry]) => (
+                                                            <div key={date} className="bg-slate-800/50 rounded-xl p-2.5 border border-white/5">
+                                                                <div className="text-[10px] font-bold text-slate-400 mb-1.5">{date}</div>
+                                                                <div className="flex gap-3">
+                                                                    <div className="flex-1">
+                                                                        <span className="text-[9px] text-primary font-bold block mb-1">나</span>
+                                                                        {entry.me?.is_completed ? (
+                                                                            entry.me.image_url ? (
+                                                                                <a href={entry.me.image_url} target="_blank" rel="noreferrer">
+                                                                                    <img src={entry.me.image_url} alt="인증" className="w-full h-20 object-cover rounded-lg hover:opacity-90 transition-opacity" />
+                                                                                </a>
+                                                                            ) : (
+                                                                                <div className="p-2 bg-emerald-900/30 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                                                                                    <span className="text-[10px] text-emerald-400 font-medium break-all">💬 {entry.me.proof_text || '완료'}</span>
+                                                                                </div>
+                                                                            )
+                                                                        ) : <div className="h-10 bg-slate-700/30 rounded-lg flex items-center justify-center"><span className="text-[9px] text-slate-500">미완료</span></div>}
+                                                                    </div>
+                                                                    <div className="flex-1">
+                                                                        <span className="text-[9px] text-accent font-bold block mb-1">{partnerProfile?.nickname || '친구'}</span>
+                                                                        {entry.partner?.is_completed ? (
+                                                                            entry.partner.image_url ? (
+                                                                                <a href={entry.partner.image_url} target="_blank" rel="noreferrer">
+                                                                                    <img src={entry.partner.image_url} alt="인증" className="w-full h-20 object-cover rounded-lg hover:opacity-90 transition-opacity" />
+                                                                                </a>
+                                                                            ) : (
+                                                                                <div className="p-2 bg-emerald-900/30 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                                                                                    <span className="text-[10px] text-emerald-400 font-medium break-all">💬 {entry.partner.proof_text || '완료'}</span>
+                                                                                </div>
+                                                                            )
+                                                                        ) : <div className="h-10 bg-slate-700/30 rounded-lg flex items-center justify-center"><span className="text-[9px] text-slate-500">미완료</span></div>}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        ));
+                                                    })()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* 🏆 COMPLETED / PAST BUDDY CHALLENGES (Visible when filter is 'completed') */}
+            {missionFilter === 'completed' && buddyChallenges.filter(c => c.status === 'completed' || c.status === 'cancelled').length > 0 && (
+                <div className="mb-4 space-y-2 shrink-0">
+                    <div className="flex items-center gap-1.5 px-1">
+                        <span className="text-sm">🏆</span>
+                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">완료된 버디 챌린지 히스토리</h3>
+                    </div>
+                    {buddyChallenges.filter(c => c.status === 'completed' || c.status === 'cancelled').map((challenge) => {
+                        const isCreator = challenge.creator_id === user?.id;
+                        const partnerProfile = isCreator ? challenge.partner : challenge.creator;
+                        const isCancelled = challenge.status === 'cancelled';
+                        return (
+                            <div key={challenge.id} className="p-3 bg-slate-900/60 rounded-2xl border border-white/5 flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm ${isCancelled ? 'bg-slate-800 text-slate-500' : 'bg-yellow-500/20 text-yellow-400'}`}>
+                                        {isCancelled ? '⏹️' : '🏆'}
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold text-white">
+                                            {challenge.challenge_name || challenge.goal_category} (vs {partnerProfile?.nickname || '친구'})
+                                        </p>
+                                        <p className="text-[10px] text-slate-400">
+                                            {challenge.start_date} ~ {challenge.end_date || '종료'} · {isCancelled ? '상호 중단' : '완주 성공!'}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isCancelled ? 'bg-slate-800 text-slate-400' : 'bg-primary/20 text-primary border border-primary/30'}`}>
+                                    {isCancelled ? '종료됨' : '완주 100%'}
+                                </span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
             {/* Friend List */}
             <div className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1 no-scrollbar">
                 {filteredFriends.length === 0 ? (
@@ -723,7 +1386,7 @@ export default function Friends() {
                 ) : (
                     filteredFriends.map((friend) => (
                         <div key={friend.uniqueKey} className="p-3 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-colors shadow-sm">
-                            <div className="flex justify-between items-start mb-2">
+                            <div className="flex justify-between items-center mb-2">
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/80 to-accent/80 p-0.5 shadow-lg shadow-primary/20 shrink-0 relative">
                                         <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center overflow-hidden">
@@ -759,6 +1422,46 @@ export default function Friends() {
                                         <p className="text-sm text-slate-400 mt-0.5">{friend.targetText}</p>
                                     </div>
                                 </div>
+
+                                {/* ⚔️ 대결 상태 버튼: 대결 중이면 '대결 중', 아니면 '대결 신청' */}
+                                {(() => {
+                                    const activeChallenge = buddyChallenges.find(c =>
+                                        c.status === 'active' &&
+                                        (c.creator_id === friend.id || c.partner_id === friend.id)
+                                    );
+                                    const pendingChallenge = buddyChallenges.find(c =>
+                                        c.status === 'pending' &&
+                                        (c.creator_id === friend.id || c.partner_id === friend.id)
+                                    );
+                                    if (activeChallenge) {
+                                        return (
+                                            <div className="px-3 py-1.5 bg-gradient-to-r from-emerald-700/60 to-green-600/60 text-emerald-300 font-extrabold text-xs rounded-xl border border-emerald-500/40 flex items-center gap-1.5 shrink-0">
+                                                <Swords size={13} className="text-emerald-300 stroke-[2.5]" />
+                                                <span>대결 중 ⚔️</span>
+                                            </div>
+                                        );
+                                    }
+                                    if (pendingChallenge) {
+                                        return (
+                                            <div className="px-3 py-1.5 bg-yellow-500/20 text-yellow-400 font-bold text-xs rounded-xl border border-yellow-500/30 flex items-center gap-1.5 shrink-0">
+                                                <span>수낙 대기 중 ⏳</span>
+                                            </div>
+                                        );
+                                    }
+                                    return (
+                                        <button
+                                            onClick={() => {
+                                                setSelectedBuddy(friend);
+                                                setIsBuddyModalOpen(true);
+                                            }}
+                                            className="px-3 py-1.5 bg-gradient-to-r from-purple-600 to-primary text-black font-extrabold text-xs rounded-xl shadow-lg shadow-purple-900/40 hover:shadow-primary/30 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 border border-white/20 shrink-0"
+                                            title="1:1 버디 챌린지 신청"
+                                        >
+                                            <Swords size={14} className="text-black stroke-[2.5]" />
+                                            <span>대결 신청 🔥</span>
+                                        </button>
+                                    );
+                                })()} 
                             </div>
 
                             {/* Stats & Rank */}
@@ -845,6 +1548,7 @@ export default function Friends() {
                                                 {likesMap[friend.userGoal.id]?.count || 0}
                                             </span>
                                         </button>
+
                                         <button
                                             onClick={() => handleComment(friend.userGoal.id)}
                                             className="flex items-center gap-1.5 text-xs font-medium transition-colors hover:text-blue-400 group"
@@ -985,6 +1689,12 @@ export default function Friends() {
                     />
                 )}
             </AnimatePresence>
+
+            <BuddyChallengeModal
+                isOpen={isBuddyModalOpen}
+                onClose={() => setIsBuddyModalOpen(false)}
+                partner={selectedBuddy}
+            />
 
             <div className="mt-4 text-center shrink-0">
                 <button

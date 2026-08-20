@@ -5,6 +5,7 @@ import { useLanguage } from '../../lib/i18n';
 import { ChevronDown, Calendar, ChevronRight, History as HistoryIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import HistoryDetail from './HistoryDetail';
+import { DEMO_SAMPLE_CARDS } from '../../lib/demoImageHelper';
 
 type GoalCategory = 'all' | 'body_wellness' | 'growth_career' | 'mind_connection' | 'funplay';
 
@@ -28,6 +29,10 @@ export default function History() {
     }, [user]);
 
     const fetchActiveGoals = async () => {
+        if (user?.id === 'demo123') {
+            setActiveGoals({ body_wellness: true, growth_career: true, mind_connection: true, funplay: true });
+            return;
+        }
         // Verify active goals by checking user_goals table
         const { data } = await supabase
             .from('user_goals')
@@ -47,6 +52,10 @@ export default function History() {
 
     const fetchMissionCounts = async () => {
         if (!user) return;
+        if (user.id === 'demo123') {
+            setMissionCounts({ body_wellness: 3, growth_career: 3, mind_connection: 3, funplay: 1 });
+            return;
+        }
         const today = new Date().toISOString().split('T')[0];
 
         // Fetch incomplete missions for today
@@ -69,6 +78,10 @@ export default function History() {
 
     const fetchCompletedCounts = async () => {
         if (!user) return;
+        if (user.id === 'demo123') {
+            setCompletedCounts({ 'body_wellness-1': 7, 'growth_career-1': 7, 'mind_connection-1': 7, 'funplay-1': 7 });
+            return;
+        }
         const { data } = await supabase
             .from('missions')
             .select('category, seq')
@@ -90,6 +103,57 @@ export default function History() {
     }, [user, selectedCategory, filterStatus]);
 
     const fetchGlobalHistory = async () => {
+        if (user?.id === 'demo123') {
+            const demoGoals = [
+                {
+                    id: 'demo-goal-body_wellness',
+                    user_id: 'demo123',
+                    category: 'body_wellness',
+                    target_text: language === 'ko' ? '건강 & 활력 루틴 (10km 러닝 및 체중 감량)' : 'Healthy Body & Wellness Routine',
+                    seq: 1,
+                    duration_months: 1,
+                    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    is_completed: filterStatus === 'completed'
+                },
+                {
+                    id: 'demo-goal-growth_career',
+                    user_id: 'demo123',
+                    category: 'growth_career',
+                    target_text: language === 'ko' ? '성장 & 커리어 루틴 (매일 독서 및 역량 강화)' : 'Career Growth & Skill Master Routine',
+                    seq: 1,
+                    duration_months: 1,
+                    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    is_completed: filterStatus === 'completed'
+                },
+                {
+                    id: 'demo-goal-mind_connection',
+                    user_id: 'demo123',
+                    category: 'mind_connection',
+                    target_text: language === 'ko' ? '마음 & 관계 루틴 (명상 및 감사일기)' : 'Mind & Soul Peace Routine',
+                    seq: 1,
+                    duration_months: 1,
+                    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    is_completed: filterStatus === 'completed'
+                },
+                {
+                    id: 'demo-goal-funplay',
+                    user_id: 'demo123',
+                    category: 'funplay',
+                    target_text: language === 'ko' ? '펀플레이 루틴 (창의적 30초 미션 게임)' : 'FunPlay Instant Challenge',
+                    seq: 1,
+                    duration_months: 1,
+                    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                    is_completed: filterStatus === 'completed'
+                }
+            ];
+
+            const filtered = selectedCategory === 'all'
+                ? demoGoals
+                : demoGoals.filter(g => g.category === selectedCategory);
+            setHistoryGoals(filtered);
+            return;
+        }
+
         let query = supabase
             .from('user_goals')
             .select('*')
@@ -204,9 +268,112 @@ export default function History() {
                 </div>
             </div>
 
-            {/* Timeline List */}
-            <div className="flex-1 overflow-y-auto no-scrollbar space-y-4 pr-1">
-                {historyGoals.length === 0 ? (
+            {/* Timeline List / Demo View */}
+            <div className="flex-1 overflow-y-auto no-scrollbar space-y-5 pr-1">
+                {user?.id === 'demo123' ? (
+                    <div className="space-y-6">
+                        {/* 1. 진행 중인 데모 미션 Section */}
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                                    진행 중인 데모 미션
+                                </h2>
+                                <span className="text-[10px] text-slate-400 font-medium">체험 모드 (4개 분야)</span>
+                            </div>
+
+                            <div className="space-y-2.5">
+                                {DEMO_SAMPLE_CARDS.map((card, idx) => {
+                                    const progressPercent = Math.round((card.dayCount / card.totalDays) * 100);
+                                    return (
+                                        <motion.div
+                                            key={card.id}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            transition={{ delay: idx * 0.08 }}
+                                            onClick={() => {
+                                                const targetGoal = historyGoals.find(g => g.category === card.category) || historyGoals[0];
+                                                setSelectedGoal(targetGoal);
+                                            }}
+                                            className="bg-white/5 border border-white/10 rounded-2xl p-3.5 hover:bg-white/10 hover:border-primary/40 transition-all cursor-pointer group shadow-lg active:scale-[0.98]"
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <span className="text-[10px] font-bold text-primary uppercase tracking-wider bg-primary/10 border border-primary/20 px-2 py-0.5 rounded-full">
+                                                        미션 {idx === 0 ? 3 : idx === 1 ? 1 : idx === 2 ? 2 : 4}: [{card.categoryName}]
+                                                    </span>
+                                                    <h3 className="text-sm font-bold text-white mt-1 group-hover:text-primary transition-colors">
+                                                        {card.title}
+                                                    </h3>
+                                                </div>
+                                                <span className="text-xl shrink-0 p-1 bg-white/5 rounded-xl border border-white/5">{card.icon}</span>
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold">
+                                                    <span>진행도</span>
+                                                    <span className="text-primary font-mono">{card.dayProgress}</span>
+                                                </div>
+                                                <div className="w-full h-2 bg-black/40 rounded-full overflow-hidden border border-white/5">
+                                                    <div
+                                                        className="h-full bg-gradient-to-r from-primary to-accent transition-all duration-500 rounded-full"
+                                                        style={{ width: `${progressPercent}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* 2. 나의 랜덤 미션 사진 갤러리 Section (3번째 이미지 먼저 노출) */}
+                        <div className="space-y-3 pt-2 border-t border-white/10">
+                            <div className="flex justify-between items-center">
+                                <h2 className="text-sm font-bold text-white flex items-center gap-1.5">
+                                    📸 나의 랜덤 미션 사진 갤러리
+                                </h2>
+                                <span className="text-[10px] text-slate-400">클릭 시 히스토리 상세</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                {DEMO_SAMPLE_CARDS.map((card, idx) => (
+                                    <motion.div
+                                        key={`gallery-${card.id}`}
+                                        initial={{ opacity: 0, scale: 0.95 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        transition={{ delay: idx * 0.1 }}
+                                        onClick={() => {
+                                            const targetGoal = historyGoals.find(g => g.category === card.category) || historyGoals[0];
+                                            setSelectedGoal(targetGoal);
+                                        }}
+                                        className="bg-slate-900 border border-white/10 rounded-2xl overflow-hidden cursor-pointer group hover:border-primary/50 transition-all shadow-xl"
+                                    >
+                                        <div
+                                            className="w-full h-32 bg-slate-800 relative bg-cover bg-no-repeat transition-transform duration-300 group-hover:scale-105"
+                                            style={{
+                                                backgroundImage: `url('/MyReDesign_히스토리 데모이미지 시안_세로.jpg')`,
+                                                backgroundPosition: card.cropStyle.backgroundPosition,
+                                                backgroundSize: card.cropStyle.backgroundSize
+                                            }}
+                                        >
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                                            {idx === 0 && (
+                                                <span className="absolute top-2 left-2 text-[9px] font-bold bg-accent text-black px-1.5 py-0.5 rounded shadow">
+                                                    대표 샘플
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="p-2.5 bg-black/40">
+                                            <p className="text-[11px] font-bold text-primary truncate">{card.photoLabel}</p>
+                                            <p className="text-[10px] text-slate-300 truncate mt-0.5">{card.photoSubText}</p>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                ) : historyGoals.length === 0 ? (
                     <div className="text-center py-20 opacity-50">
                         <HistoryIcon size={48} className="mx-auto mb-4 text-slate-600" />
                         <p className="text-slate-400">
@@ -239,8 +406,6 @@ export default function History() {
                         const totalExpectedMissions = totalDays * multiplier;
 
                         // Determine Denominator based on status
-                        // If it's completed or expired, show Total Expected for the whole duration.
-                        // If it's active, show Expected To Date.
                         const endDate = new Date(goal.created_at);
                         if (durationMonths < 1) {
                             endDate.setDate(endDate.getDate() + totalDays);

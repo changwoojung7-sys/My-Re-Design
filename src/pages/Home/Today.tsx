@@ -4,7 +4,7 @@ import { useStore } from '../../lib/store';
 import { generateMissions, generateFunPlayMissions } from '../../lib/openai';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb } from 'lucide-react';
+import { CheckCircle, Circle, Flame, Sparkles, Camera, PenTool, Mic, Video, X, ListTodo, ArrowRight, Lightbulb, Share2 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { useLanguage } from '../../lib/i18n';
 import Paywall from './Paywall';
@@ -12,6 +12,9 @@ import PaywallWarning from './PaywallWarning';
 import AdWarning from './AdWarning';
 import RewardAd from '../../components/ads/RewardAd';
 import MissionLoading from '../../components/common/MissionLoading';
+import GoldenTimePopup from '../../components/gamification/GoldenTimePopup';
+import ReflectionPopup from '../../components/gamification/ReflectionPopup';
+import ShareCard from '../../components/gamification/ShareCard';
 
 // --- Helper: Check Goal Expiry (Module Level) ---
 const isGoalExpired = (goal: any) => {
@@ -89,6 +92,12 @@ export default function Today() {
     const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
     const [checkingSubs, setCheckingSubs] = useState(true);
 
+    const [showGoldenTime, setShowGoldenTime] = useState(false);
+    const [showReflection, setShowReflection] = useState(false);
+    const [hasSubmittedReflection, setHasSubmittedReflection] = useState(false);
+    const [showShareCard, setShowShareCard] = useState(false);
+    const [pendingBuddyCount, setPendingBuddyCount] = useState(0);
+
     // Derived State
     const selectedGoal = userGoals.find(g => g.id === selectedGoalId);
 
@@ -96,12 +105,12 @@ export default function Today() {
     // Moved Monetization State & Check here to prevent RefError
 
 
-    // Initial Check
+    // Initial Check - Recalculate whenever selectedGoal changes
     useEffect(() => {
         const checkStatus = async () => {
             setCheckingSubs(true);
 
-            // 1. Calculate Trial Phase (Based on SELECTED GOAL)
+            // 1. Calculate Trial Phase (Based on CURRENT ACTIVE GOAL, otherwise user profile)
             let startDate = new Date();
             if (selectedGoal?.created_at) {
                 startDate = new Date(selectedGoal.created_at);
@@ -113,10 +122,10 @@ export default function Today() {
                 }
             }
 
-            // Calculate Days
+            // Calculate Days (1-indexed: Day 1, Day 2...)
             const now = new Date();
             const diffTime = Math.abs(now.getTime() - startDate.getTime());
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            const diffDays = Math.max(1, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
             setAccountAgeDays(diffDays);
 
             // 2. Fetch Settings
@@ -127,52 +136,24 @@ export default function Today() {
             if (modeData?.value) setPaywallMode(modeData.value as 'subscription' | 'ads');
 
             const { data: paywallDayData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
-            const globalPaywallDay = paywallDayData?.value ? parseInt(paywallDayData.value, 10) : 5;
+            const globalPaywallDay = paywallDayData?.value ? parseInt(paywallDayData.value, 10) : 7;
 
-            // Allow user a custom free trial limit, otherwise use global default
+            // Allow user a custom free trial limit, otherwise use global default (7 days)
             const userFreeDays = user?.custom_free_trial_days ?? globalPaywallDay;
 
-            // Determine Expiration
-            // diffDays represents "days passed since start".
-            // If diffDays > userFreeDays, then the trial is expired.
-            setIsTrialExpired(diffDays > userFreeDays);
+            // Determine Expiration: Free trial active during Day 1 ~ Day 7
+            const expired = diffDays > userFreeDays;
+            setIsTrialExpired(expired);
 
             // 3. Check Subscription
             if (user) {
-                const { data: subData } = await supabase
-                    .from('subscriptions')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('status', 'active');
-
-                let hasSub = false;
-                if (subData && subData.length > 0) {
-                    const now = new Date();
-                    now.setHours(0, 0, 0, 0);
-
-                    const active = subData.find(s => {
-                        const sStart = new Date(s.start_date);
-                        sStart.setHours(0, 0, 0, 0);
-                        const sEnd = new Date(s.end_date);
-                        sEnd.setHours(23, 59, 59, 999);
-
-                        if (sStart > now || sEnd < now) return false;
-
-                        // Check Type/Target
-                        if (s.type === 'all') return true;
-
-                        const targetMatch = s.target_id && selectedGoal?.category && s.target_id.toLowerCase() === selectedGoal.category.toLowerCase();
-                        return s.type === 'mission' && targetMatch;
-                    });
-
-                    if (active) hasSub = true;
-                }
-                setHasActiveSubscription(hasSub);
+                const isPro = user.plan_type === 'pro_monthly' || user.plan_type === 'pro_yearly' || user.subscription_tier === 'premium';
+                setHasActiveSubscription(isPro);
             }
             setCheckingSubs(false);
         };
         checkStatus();
-    }, [user, selectedGoal?.category]);
+    }, [user, selectedGoalId, selectedGoal?.created_at, selectedGoal?.category]);
 
     useEffect(() => {
         if (user) initData();
@@ -199,8 +180,34 @@ export default function Today() {
             }
 
             fetchMissions();
+            checkReflectionStatus();
         }
     }, [selectedDate, selectedGoalId, checkingSubs]);
+
+    const checkReflectionStatus = async () => {
+        if (!user) return;
+        const unifiedKey = `ai_reflections_${user.id}_${selectedDate}`;
+        const catKey = `ai_reflections_${user.id}_${selectedDate}_${selectedGoal?.category}`;
+        if (localStorage.getItem(unifiedKey) || (selectedGoal && localStorage.getItem(catKey))) {
+            setHasSubmittedReflection(true);
+            return;
+        }
+        if (user.id !== 'demo123') {
+            try {
+                const { data } = await supabase
+                    .from('ai_reflections')
+                    .select('id')
+                    .eq('user_id', user.id)
+                    .eq('mission_date', selectedDate)
+                    .maybeSingle();
+                setHasSubmittedReflection(!!data);
+            } catch (err) {
+                setHasSubmittedReflection(false);
+            }
+        } else {
+            setHasSubmittedReflection(false);
+        }
+    };
 
     // Fetch refresh count from DB for cross-device sync (Always based on TODAY, physical time)
     const fetchRefreshCountFromDB = async () => {
@@ -229,18 +236,47 @@ export default function Today() {
 
     const initData = async () => {
         setLoading(true);
+        try {
 
         // Allow specific reviewer account to see demo data for AdSense/AppStore review
         const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
 
         if (isDemoOrReviewer) {
-            // Mock Goals for Demo User
-            const mockGoals = [
-                { id: 'demo-body', user_id: 'demo123', category: 'body_wellness', seq: 1, target_text: 'Healthy Body', created_at: new Date().toISOString() },
-                { id: 'demo-growth', user_id: 'demo123', category: 'growth_career', seq: 1, target_text: 'Career Growth', created_at: new Date().toISOString() }
+            let demoGoals = [
+                { id: 'demo-body', user_id: 'demo123', category: 'body_wellness', seq: 1, target_text: language === 'ko' ? '건강 & 활력 루틴 (10km 러닝 및 체중 감량)' : 'Healthy Body & Wellness', created_at: new Date().toISOString() },
+                { id: 'demo-growth', user_id: 'demo123', category: 'growth_career', seq: 1, target_text: language === 'ko' ? '성장 & 커리어 루틴 (매일 독서 및 역량 강화)' : 'Career Growth & Skills', created_at: new Date().toISOString() },
+                { id: 'demo-mind', user_id: 'demo123', category: 'mind_connection', seq: 1, target_text: language === 'ko' ? '마음 & 관계 루틴 (명상 및 감사일기)' : 'Mind & Connection', created_at: new Date().toISOString() },
+                { id: 'demo-funplay', user_id: 'demo123', category: 'funplay', seq: 1, target_text: language === 'ko' ? '펀플레이 루틴 (창의적 30초 미션 게임)' : 'FunPlay 30s Challenge', created_at: new Date().toISOString() }
             ];
-            setUserGoals(mockGoals);
-            setSelectedGoalId(mockGoals[0].id);
+
+            const savedDemoGoalsStr = localStorage.getItem('demo_user_goals');
+            if (savedDemoGoalsStr) {
+                try {
+                    const parsed = JSON.parse(savedDemoGoalsStr);
+                    if (parsed && typeof parsed === 'object') {
+                        const parsedGoals = Object.keys(parsed)
+                            .filter(cat => parsed[cat]?.target_text || typeof parsed[cat] === 'string')
+                            .map(cat => ({
+                                id: `demo-${cat}`,
+                                user_id: 'demo123',
+                                category: cat,
+                                seq: parsed[cat]?.seq || 1,
+                                target_text: typeof parsed[cat] === 'string' ? parsed[cat] : (parsed[cat]?.target_text || cat),
+                                details: parsed[cat]?.details || {},
+                                created_at: parsed[cat]?.created_at || new Date().toISOString()
+                            }));
+                        if (parsedGoals.length > 0) {
+                            demoGoals = parsedGoals;
+                        }
+                    }
+                } catch (e) {}
+            }
+
+            setUserGoals(demoGoals);
+            if (demoGoals.length > 0) {
+                const currentIsValid = selectedGoalId && demoGoals.find(g => g.id === selectedGoalId);
+                setSelectedGoalId(currentIsValid ? selectedGoalId : demoGoals[0].id);
+            }
             setLoading(false);
             return;
         }
@@ -283,100 +319,60 @@ export default function Today() {
         // Convert map back to array
         const activeGoals = Array.from(latestGoalsMap.values());
 
-        // 2. Fetch Active Subscriptions to Prioritize
-        const { data: subs } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', user!.id)
-            .eq('status', 'active')
-            .gte('end_date', new Date().toISOString());
-
-        // Sort Goals: Subscribed (Active) First, then by Seq
+        // Sort Goals: Sort by seq
         const sortedGoals = [...activeGoals].sort((a, b) => {
-            const isASub = subs?.some(s => s.type === 'all' || (s.type === 'mission' && s.target_id === a.category));
-            const isBSub = subs?.some(s => s.type === 'all' || (s.type === 'mission' && s.target_id === b.category));
-
-            if (isASub && !isBSub) return -1;
-            if (!isASub && isBSub) return 1;
-            return b.seq - a.seq; // Fallback to original seq order
+            return b.seq - a.seq;
         });
 
-        setUserGoals(sortedGoals);
-        // Default select the first one (which should be a subscribed one if exists)
-        if (sortedGoals.length > 0) {
-            const currentIsValid = selectedGoalId && sortedGoals.find(g => g.id === selectedGoalId);
-            if (!currentIsValid) {
-                setSelectedGoalId(sortedGoals[0].id);
-            }
+        // 버디 챌린지는 Today에서 제거 → Friends 탭 전용
+        const allCombinedGoals = [...sortedGoals];
+
+        setUserGoals(allCombinedGoals);
+        // Don't auto-select here, keep current if valid or fallback
+        // If currently selected goal is deleted, reset:
+        if (!allCombinedGoals.some(g => g.id === selectedGoalId)) {
+            setSelectedGoalId(allCombinedGoals[0]?.id || null);
         }
+    } catch (err) {
+        console.error("Failed to init data:", err);
+    } finally {
         setLoading(false);
+    }
     };
 
     const fetchMissions = async (forceAdUnlocked?: boolean) => {
-        if (!selectedGoalId) return;
+        if (!selectedGoal || !user) return;
+        setLoading(true);
 
         try {
-            setLoading(true);
-            setDraftMissions([]);
-            setVerifyingId(null); // Clear any active verification
+            // Check Local Cache First (for demo or offline)
+            const cacheKey = `demo_missions_${selectedDate}_${selectedGoal?.category}`;
+            const cachedMissions = localStorage.getItem(cacheKey);
 
-            // Demo User Mock Missions
-            const isDemoOrReviewer = user?.id === 'demo123' || user?.email === 'reviewer@coreloop.com';
-
-            if (isDemoOrReviewer) {
-                const today = formatLocalYMD(new Date());
-                if (selectedDate === today && selectedGoal?.category === 'body_wellness') {
-                    const mockMissions = [
-                        {
-                            id: 'demo-m1', user_id: 'demo123', category: 'body_wellness',
-                            content: language === 'ko' ? '물 2L 마시기' : 'Drink 2L Water',
-                            is_completed: false, date: today, verification_type: 'image'
-                        }
-                    ];
-                    setMissions(mockMissions);
-                } else {
-                    setMissions([]);
-                    // Allow generating drafts for Demo
-                    if (selectedDate >= today) {
-                        await generateDraftPlan();
-                    }
-                }
+            if (user?.id === 'demo123' && cachedMissions) {
+                setMissions(JSON.parse(cachedMissions));
+                setLoading(false);
                 return;
             }
 
-            // Note: 'date' column in DB is likely type DATE or TEXT (YYYY-MM-DD). 
-            // Passing the local YYYY-MM-DD string is correct for matching.
             const { data: existing, error: fetchError } = await supabase
                 .from('missions')
                 .select('*')
-                .eq('user_id', user!.id)
-                .eq('date', selectedDate)
-                .order('created_at');
+                .eq('user_id', user.id)
+                .eq('date', selectedDate);
 
             if (fetchError) throw fetchError;
 
-            // Filter by category and SEQUENCE client-side to ensure match
             const goalCategory = selectedGoal?.category.toLowerCase();
             const goalSeq = selectedGoal?.seq || 1;
-            // const isVirtual = selectedGoalId === 'funplay-virtual'; // Removed
 
-            const relevantMissions = existing?.filter(m =>
-                m.category.toLowerCase() === goalCategory &&
-                (m.seq === goalSeq || (!m.seq && goalSeq === 1)) // Handle legacy data (null seq = 1)
-            ) || [];
-
-            // 🚨 Auto-Correct Virtual Goal Sequence REMOVED
+            const relevantMissions = existing?.filter(m => {
+                const catMatch = m.category.toLowerCase() === goalCategory;
+                return catMatch && (m.seq === goalSeq || (!m.seq && goalSeq === 1));
+            }) || [];
 
             if (relevantMissions.length > 0) {
-                // Logic for Mission Counts based on Trial Phase
-                // Funplay or Subscribed: 3 Missions
-                // Phase 1, 2: 3 Missions
-                // Phase 3: 1 Mission
-                // Phase 4: 0 Mission (Locked by Paywall view, but if bypassed, limit to 0 or 1?)
-
                 let limit = 3;
-                // Removed the limit of 1 mission for trialPhase === 3
-                // Now showing 3 missions until day 30 for free users.
 
                 // FILTER LOGIC:
                 // ALWAYS show missions that are already COMPLETED, regardless of limit.
@@ -403,7 +399,6 @@ export default function Today() {
                 const today = formatLocalYMD(new Date());
 
                 // 🚨 Paywall Guard: Do NOT generate drafts if paywall should be active.
-                // User must watch ad or subscribe FIRST, then missions are generated.
                 const shouldBlockForPaywall = !hasActiveSubscription
                     && selectedGoal?.category !== 'funplay'
                     && isTrialExpired
@@ -428,44 +423,26 @@ export default function Today() {
     };
 
     const generateDraftPlan = async (isRefresh: boolean = false) => {
-        // 1. Fetch recent missions logic removed from client side as it is now handled server-side via Fingerprints
-        // Keeping an empty list for param compatibility if still needed by other parts, but mostly it's internal now.
         const exclusionList: string[] = [];
 
         let newMissions: any[] = [];
 
-        // BRANCH: FunPlay Logic (now generates 3 missions like core categories)
-        if (selectedGoal?.category === 'funplay') {
-            const details = selectedGoal.details || {};
-            newMissions = await generateFunPlayMissions(
-                user,
-                language,
-                exclusionList,
-                {
-                    difficulty: details.difficulty || 'easy',
-                    time_limit: details.time_limit || 30,
-                    mood: details.mood || 'fun',
-                    place: 'unknown'
-                },
-                isRefresh
-            );
-            // Limit to 3 missions
+        // AI 미션 생성 (버디 챌린지는 Today에서 제거됨 - Friends 탭 전용)
+        newMissions = await generateMissions(user, language, exclusionList, selectedGoal, isRefresh);
+
+        const targetCategory = selectedGoal?.category;
+
+        const currentCategoryMissions = newMissions.filter(m =>
+            m?.category && targetCategory &&
+            m.category.toLowerCase().replace(/_/g, '') === targetCategory.toLowerCase().replace(/_/g, '')
+        );
+
+        if (currentCategoryMissions.length >= 3) {
+            newMissions = currentCategoryMissions.slice(0, 3);
+        } else if (newMissions.length >= 3) {
             newMissions = newMissions.slice(0, 3);
         } else {
-            // Standard Generation (3 Missions)
-            // Note: generateMissions now handles history lookup internally
-            newMissions = await generateMissions(user, language, exclusionList, selectedGoal, isRefresh);
-
-            // Filter for CURRENT selected category
-            const currentCategoryMissions = newMissions.filter(m =>
-                m?.category && selectedGoal?.category &&
-                m.category.toLowerCase() === selectedGoal.category.toLowerCase()
-            );
-
-            // Phase 3 Limit check removed: Always show 3 missions for standard goals in Trial Phase 1-3.
-            let limit = 3;
-
-            newMissions = currentCategoryMissions.slice(0, limit);
+            newMissions = currentCategoryMissions.length > 0 ? currentCategoryMissions : newMissions;
         }
 
         const mapped = newMissions.map((m: any, i: number) => ({
@@ -487,22 +464,36 @@ export default function Today() {
     const [pendingRefresh, setPendingRefresh] = useState(false);
 
     const handleRefresh = async () => {
+        // For Demo User: Check daily 3-times limit via localStorage
+        if (user?.id === 'demo123') {
+            const today = formatLocalYMD(new Date());
+            const refreshKey = `demo_refresh_count_${today}`;
+            const count = parseInt(localStorage.getItem(refreshKey) || '0', 10);
+            if (count >= 3) {
+                alert(language === 'ko' 
+                    ? '체험용 AI 미션 생성은 하루 3회로 제한됩니다. 계속 이용하시려면 회원가입을 해주세요!' 
+                    : 'Demo AI mission generation is limited to 3 times per day. Please sign up to continue!');
+                if (window.confirm(language === 'ko' ? '회원가입 페이지로 이동하시겠습니까?' : 'Would you like to go to the signup page?')) {
+                    navigate('/login');
+                }
+                return;
+            }
+            localStorage.setItem(refreshKey, String(count + 1));
+            setRefreshCount(count + 1);
+            executeRefresh();
+            return;
+        }
+
         if (refreshCount >= 3) return;
 
         // Ensure we don't trigger Ad if the user is just generating the first mission of the day
         const isInitialGeneration = missions.length === 0 && draftMissions.length === 0;
 
-        if (user?.subscription_tier !== 'premium' && !hasActiveSubscription && !isInitialGeneration) {
+        // ONLY trigger reward ad when the 7-day free trial has EXPIRED (Day 8+)
+        if (!hasActiveSubscription && isTrialExpired && !isInitialGeneration) {
             setPendingRefresh(true);
             setShowRewardAd(true);
             return;
-        }
-
-        if (isInitialGeneration) {
-            // Wait, if it's initial generation, they shouldn't be clicking 'Refresh' anyway, 
-            // the button should say 'Generate Plan' and it should bypass refresh limits.
-            // Actually, the empty state button calls execution directly? 
-            // Let's check the empty state button logic. 
         }
 
         executeRefresh();
@@ -514,21 +505,58 @@ export default function Today() {
         setMissions([]);
         await generateDraftPlan(true); // Pass true for refresh
 
-        // Refresh count is now managed by Edge Function in DB (mission_refresh_log)
-        // Re-fetch the count from DB after Edge Function has updated it
-        await fetchRefreshCountFromDB();
+        if (user && user.id !== 'demo123' && selectedGoal) {
+            try {
+                const todayStr = formatLocalYMD(new Date());
+                const { data: existingLog } = await supabase
+                    .from('mission_refresh_log')
+                    .select('refresh_count')
+                    .eq('user_id', user.id)
+                    .eq('mission_date', todayStr)
+                    .eq('category', selectedGoal.category)
+                    .maybeSingle();
+
+                const nextCount = (existingLog?.refresh_count || 0) + 1;
+                await supabase.from('mission_refresh_log').upsert({
+                    user_id: user.id,
+                    mission_date: todayStr,
+                    category: selectedGoal.category,
+                    refresh_count: nextCount
+                }, { onConflict: 'user_id,mission_date,category' });
+
+                setRefreshCount(nextCount);
+            } catch (err) {
+                console.error('Refresh log update error:', err);
+                setRefreshCount(prev => Math.min(3, prev + 1));
+            }
+        }
         setLoading(false);
     };
 
     const confirmPlan = async () => {
-        if (user?.id === 'demo123') return alert(t.demoLimit);
+        if (user?.id === 'demo123') {
+            setLoading(true);
+            const cacheKey = `demo_missions_${selectedDate}_${selectedGoal?.category}`;
+            const missionsToSave = draftMissions.map((m, idx) => ({
+                ...m,
+                id: `demo-${selectedGoal?.category}-${Date.now()}-${idx}`,
+                date: selectedDate
+            }));
+            localStorage.setItem(cacheKey, JSON.stringify(missionsToSave));
+            setMissions(missionsToSave);
+            setDraftMissions([]);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
-        const missionsToInsert = draftMissions.map(({ id, ...rest }) => rest);
+        // DB 컬럼과 일치하는 필드만 추출 (클라이언트 전용 필드 제거)
+        const missionsToInsert = draftMissions.map(({ id, _buddy_challenge_id, proof_type, details, ...rest }) => rest);
         const { data, error } = await supabase.from('missions').insert(missionsToInsert).select();
 
         if (error) {
             console.error("Mission Insert Error:", error);
-            alert(`Failed to save missions: ${error.message}`);
+            alert(`미션 저장 실패: ${error.message}`);
         }
 
         if (!error && data) {
@@ -538,9 +566,62 @@ export default function Today() {
         setLoading(false);
     };
 
+    const checkAndTriggerCompletionPopups = (updatedList: any[]) => {
+        const isFinished = checkChallengeCompletion(updatedList);
+        const allCompletedToday = updatedList.length > 0 && updatedList.every(m => m.is_completed);
+        const currentDayNum = getSelectedDayNum();
+
+        if (allCompletedToday) {
+            if (currentDayNum > 0 && currentDayNum % 7 === 0) {
+                setShowGoldenTime(true);
+            } else {
+                // Check if user already submitted reflection today to prevent repeat popup
+                const dateStr = formatLocalYMD(new Date());
+                const localKey = `ai_reflections_${user?.id}_${dateStr}_${selectedGoal?.category}`;
+                if (!localStorage.getItem(localKey)) {
+                    setShowReflection(true);
+                }
+            }
+        }
+
+        if (isFinished) {
+            setShowChallengeComplete(true);
+            triggerBigConfetti();
+        } else {
+            triggerConfetti();
+        }
+    };
+
+    const handleToggleCompleteDemo = (missionId: string) => {
+        const updated = missions.map(m => {
+            if (m.id === missionId) {
+                return { ...m, is_completed: !m.is_completed };
+            }
+            return m;
+        });
+        setMissions(updated);
+        const cacheKey = `demo_missions_${selectedDate}_${selectedGoal?.category}`;
+        localStorage.setItem(cacheKey, JSON.stringify(updated));
+        checkAndTriggerCompletionPopups(updated);
+    };
+
+    const promptDemoSignup = () => {
+        const msg = language === 'ko'
+            ? '미션 사진/텍스트 인증 및 데이터 영구 저장은 회원가입 후 이용하실 수 있습니다.\n\n회원가입 페이지로 이동하시겠습니까?'
+            : 'Mission verification photos/notes and permanent saving are available after signup.\n\nWould you like to go to the signup page?';
+        if (window.confirm(msg)) {
+            navigate('/login');
+        }
+    };
+
     // --- Verification Logic ---
 
     const openVerify = (mission: any) => {
+        if (user?.id === 'demo123') {
+            promptDemoSignup();
+            return;
+        }
+
         if (verifyingId === mission.id) {
             setVerifyingId(null); // Toggle off
         } else {
@@ -560,7 +641,10 @@ export default function Today() {
     };
 
     const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        if (user?.id === 'demo123') return alert(t.demoLimit);
+        if (user?.id === 'demo123') {
+            promptDemoSignup();
+            return;
+        }
         const file = event.target.files?.[0];
         if (!file || !verifyingId) return;
 
@@ -595,7 +679,6 @@ export default function Today() {
                 is_completed: true,
                 image_url: publicUrl, // Storing Media URL here
                 proof_type: type,
-                // proof_text: null // ❌ DO NOT CLEAR TEXT
             }).eq('id', verifyingId);
 
             const updated = missions.map(m => m.id === verifyingId ? {
@@ -603,23 +686,11 @@ export default function Today() {
                 is_completed: true,
                 image_url: publicUrl,
                 proof_type: type
-                // proof_text: null
             } : m);
             setMissions(updated);
-            // setVerifyingId(null); // Keep open to allow mixed verification if needed, or close? User asked to allow both. Let's keep close for UX consistency, or maybe not? 
-            // Actually, if I upload photo, I might want to add text right away. But usually "Upload" is an action. 
-            // Let's keep it close for now as per original behavior, user can re-open to add text if they want.
-            // Wait, "사진등록 후 텍스트를 입력하면" implies sequential actions.
             setVerifyingId(null);
 
-
-            const isFinished = checkChallengeCompletion(updated);
-            if (isFinished) {
-                setShowChallengeComplete(true);
-                triggerBigConfetti();
-            } else {
-                triggerConfetti();
-            }
+            checkAndTriggerCompletionPopups(updated);
         } catch (err) {
             // @ts-ignore
             alert(`Upload failed: ${err.message}`);
@@ -627,7 +698,10 @@ export default function Today() {
     };
 
     const handleTextSubmit = async () => {
-        if (user?.id === 'demo123') return alert(t.demoLimit);
+        if (user?.id === 'demo123') {
+            promptDemoSignup();
+            return;
+        }
         if (!textInput.trim() || !verifyingId) return;
 
         try {
@@ -635,7 +709,6 @@ export default function Today() {
                 is_completed: true,
                 proof_text: textInput,
                 proof_type: 'text',
-                // image_url: null // ❌ DO NOT CLEAR URL
             }).eq('id', verifyingId);
 
             const updated = missions.map(m => m.id === verifyingId ? {
@@ -643,18 +716,11 @@ export default function Today() {
                 is_completed: true,
                 proof_text: textInput,
                 proof_type: 'text',
-                // image_url: null
             } : m);
             setMissions(updated);
             setVerifyingId(null); // Close verification area on success
 
-            const isFinished = checkChallengeCompletion(updated);
-            if (isFinished) {
-                setShowChallengeComplete(true);
-                triggerBigConfetti();
-            } else {
-                triggerConfetti();
-            }
+            checkAndTriggerCompletionPopups(updated);
         } catch (err) {
             console.error(err);
             alert('Failed to save text.');
@@ -878,6 +944,7 @@ export default function Today() {
                     />
                 ) : (
                     <PaywallWarning
+                        accountAgeDays={accountAgeDays}
                         onConfirm={() => {
                             if (user?.id === 'demo123') return alert(t.demoPaymentLimit);
                             setPaywallStep('payment');
@@ -975,8 +1042,8 @@ export default function Today() {
                         <h1 className="text-2xl font-bold bg-gradient-to-r from-accent to-primary bg-clip-text text-transparent flex items-center gap-2">
                             <ListTodo size={24} className="text-accent" />
                             Mission
-                            {/* Trial Phase Badge (Visible only to Free Users up to 30 Days) */}
-                            {!hasActiveSubscription && currentDayNum <= 30 && (
+                            {/* Trial Phase Badge (Visible only to Free Users up to 7 Days) */}
+                            {!hasActiveSubscription && currentDayNum <= 7 && (
                                 <span className="text-[10px] bg-white/10 backdrop-blur-md text-white/70 px-2 py-0.5 border border-white/10 rounded-full font-medium ml-1">
                                     D:{accountAgeDays} {isTrialExpired ? '(Exp)' : '(Free)'}
                                 </span>
@@ -989,7 +1056,37 @@ export default function Today() {
                             </span>
                         )}
                     </div>
+                    {selectedGoal && missions.length > 0 && (
+                        <button 
+                            onClick={() => setShowShareCard(true)}
+                            className="bg-white/10 hover:bg-white/20 p-2 rounded-full transition-colors text-white"
+                            title="스토리로 공유하기"
+                        >
+                            <Share2 size={18} />
+                        </button>
+                    )}
                 </div>
+
+                {/* ⚔️ Incoming Buddy Challenge Alert Banner */}
+                {pendingBuddyCount > 0 && (
+                    <div className="mb-3 px-1">
+                        <button
+                            onClick={() => navigate('/friends')}
+                            className="w-full p-2.5 bg-gradient-to-r from-purple-600/30 via-primary/20 to-purple-600/30 border border-primary/40 rounded-2xl flex items-center justify-between text-left shadow-lg shadow-primary/10 transition-all hover:border-primary/80 group active:scale-[0.98]"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <span className="text-lg animate-bounce">⚔️</span>
+                                <div>
+                                    <p className="text-xs font-bold text-white group-hover:text-primary transition-colors">친구가 보낸 버디 챌린지 요청이 도착했습니다!</p>
+                                    <p className="text-[10px] text-slate-300">터치하여 요청을 수락하고 1:1 대결을 시작하세요 →</p>
+                                </div>
+                            </div>
+                            <span className="text-[10px] font-bold bg-primary text-black px-2.5 py-1 rounded-lg shrink-0 shadow">
+                                확인
+                            </span>
+                        </button>
+                    </div>
+                )}
 
                 <div className="flex justify-between items-end mb-2 px-1">
                     <div>
@@ -1015,6 +1112,13 @@ export default function Today() {
                             className="w-full bg-gradient-to-r from-slate-800 to-slate-900 text-white font-bold text-xs rounded-2xl px-5 py-2.5 appearance-none outline-none border border-white/10 focus:border-primary shadow-lg transition-all"
                         >
                             {userGoals.map(g => {
+                                if (g.is_buddy || g.category === 'buddy_challenge') {
+                                    return (
+                                        <option key={g.id} value={g.id} className="bg-slate-900 text-yellow-300 font-extrabold">
+                                            {`⚔️ [1:1 대결] ${g.target_text}`}
+                                        </option>
+                                    );
+                                }
                                 const enLabel = g.category.charAt(0).toUpperCase() + g.category.slice(1);
                                 const koLabel = t[g.category as keyof typeof t] || g.category;
                                 return (
@@ -1053,13 +1157,97 @@ export default function Today() {
                             <span className="text-lg font-bold text-white whitespace-nowrap">Day {getSelectedDayNum()}</span>
                         </div>
                     </div>
-                    <div className="bg-white/5 rounded-xl px-3 border border-white/5 flex flex-row items-center justify-center gap-2 h-12">
+                    <button
+                        onClick={() => setShowReflection(true)}
+                        className={`bg-white/5 rounded-xl px-3 border border-white/5 flex flex-row items-center justify-center gap-2 h-12 transition-all ${missions.length > 0 && missions.every(m => m.is_completed) ? 'bg-primary/20 border-primary/40 text-primary hover:bg-primary/30 cursor-pointer shadow-lg shadow-primary/10' : ''}`}
+                        title={missions.length > 0 && missions.every(m => m.is_completed) ? '오늘의 AI 회고 작성하기' : ''}
+                    >
                         <div className="text-accent shrink-0"><CheckCircle size={22} /></div>
                         <div className="text-left flex items-center gap-2 min-w-0">
                             <h2 className="text-sm font-bold text-slate-400 whitespace-nowrap">
                                 {t.missionOverview}
                             </h2>
-                            <span className="text-lg font-bold text-white whitespace-nowrap">{missions.filter(m => m.is_completed).length}/{missions.length}</span>
+                            <span className="text-lg font-bold text-white whitespace-nowrap">
+                                {missions.filter(m => m.is_completed).length}/{missions.length || draftMissions.length || (selectedGoal?.category === 'buddy_challenge' ? (selectedGoal.details?.daily_count || 1) : 3)}
+                            </span>
+                        </div>
+                    </button>
+                </div>
+            )}
+
+            {/* All Missions Completed - Reflection Quick Action Banner */}
+            {selectedGoal && missions.length > 0 && missions.every(m => m.is_completed) && (
+                <div className="mb-3 px-5">
+                    <button
+                        onClick={() => setShowReflection(true)}
+                        className={`w-full p-3.5 rounded-2xl flex items-center justify-between shadow-lg transition-all group active:scale-[0.98] ${
+                            hasSubmittedReflection 
+                                ? 'bg-slate-900/90 border border-emerald-500/40 shadow-emerald-500/10 hover:border-emerald-400' 
+                                : 'bg-gradient-to-r from-emerald-500/20 via-primary/20 to-purple-500/20 border border-primary/40 shadow-primary/10 hover:border-primary/80'
+                        }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <span className="text-xl">{hasSubmittedReflection ? '✨' : '🎉'}</span>
+                            <div className="text-left">
+                                <p className="text-xs font-bold text-white group-hover:text-primary transition-colors">
+                                    {hasSubmittedReflection ? '오늘의 회고가 안전하게 기록되었습니다' : '오늘의 3개 미션을 모두 완수했습니다!'}
+                                </p>
+                                <p className="text-[10px] text-slate-400">
+                                    {hasSubmittedReflection ? '터치하여 작성한 회고 내용을 확인 및 수정할 수 있습니다' : '터치하여 오늘의 AI 회고를 작성하고 코칭을 받아보세요 ✨'}
+                                </p>
+                            </div>
+                        </div>
+                        <span className={`text-xs font-bold px-3 py-1.5 rounded-xl shadow shrink-0 ${
+                            hasSubmittedReflection ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-primary text-black'
+                        }`}>
+                            {hasSubmittedReflection ? '회고 완료' : '회고 작성'}
+                        </span>
+                    </button>
+                </div>
+            )}
+            {/* Condition Slider (Always visible above mission proposal) */}
+            {selectedGoal && (
+                <div className="mb-4 shrink-0 px-5">
+                    <div className="bg-slate-900/50 p-4 rounded-3xl border border-white/10 shadow-xl relative overflow-hidden">
+                        <div className="flex justify-between items-center mb-3">
+                            <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                                <span>오늘의 컨디션 (기분)</span>
+                                {isPreview && <span className="text-[10px] text-primary font-normal">← 기분을 누르면 맞춤 미션이 제안됩니다</span>}
+                            </h3>
+                            <span className="text-[10px] text-slate-400 bg-black/40 px-2 py-0.5 rounded-full">AI 미션 난이도 연동</span>
+                        </div>
+                        <div className="flex justify-between items-center px-1">
+                            {[1, 2, 3, 4, 5].map((level) => {
+                                const emojis = ['😫', '☹️', '😐', '🙂', '🤩'];
+                                const isActive = user?.condition_today === level;
+                                return (
+                                    <button
+                                        key={level}
+                                        onClick={async () => {
+                                            if (!user) return;
+                                            try {
+                                                if (user.id !== 'demo123') {
+                                                    await supabase.from('profiles').update({ condition_today: level }).eq('id', user.id);
+                                                }
+                                                useStore.getState().setUser({ ...user, condition_today: level });
+
+                                                // If in preview or no confirmed missions, immediately regenerate draft tailored to this mood
+                                                if (isPreview || missions.length === 0) {
+                                                    setLoading(true);
+                                                    await generateDraftPlan();
+                                                    setLoading(false);
+                                                }
+                                            } catch (e) {
+                                                console.error(e);
+                                            }
+                                        }}
+                                        className={`flex flex-col items-center gap-1.5 transition-all ${isActive ? 'scale-125' : 'opacity-40 hover:opacity-100 hover:scale-110'}`}
+                                    >
+                                        <span className="text-2xl drop-shadow-md">{emojis[level - 1]}</span>
+                                        <div className={`w-1.5 h-1.5 rounded-full transition-colors ${isActive ? 'bg-primary shadow-[0_0_8px_rgba(168,85,247,0.8)]' : 'bg-transparent'}`} />
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -1141,7 +1329,14 @@ export default function Today() {
                                             <div className="flex items-start gap-4">
                                                 {/* Check Icon */}
                                                 <button
-                                                    onClick={() => !isPreview && openVerify(mission)}
+                                                    onClick={() => {
+                                                        if (isPreview) return;
+                                                        if (user?.id === 'demo123') {
+                                                            handleToggleCompleteDemo(mission.id);
+                                                        } else {
+                                                            openVerify(mission);
+                                                        }
+                                                    }}
                                                     disabled={isPreview}
                                                     title={mission.is_completed ? '미션 완료됨' : '미션 인증하기'}
                                                     aria-label={mission.is_completed ? '미션 완료됨' : '미션 인증하기'}
@@ -1405,6 +1600,32 @@ export default function Today() {
                     )}
                 </div>
             </div>
+
+            <GoldenTimePopup
+                isOpen={showGoldenTime}
+                onClose={() => setShowGoldenTime(false)}
+                onClaim={() => {
+                    setShowGoldenTime(false);
+                    // Pro 연간 플랜 결제 플로우로 이동하거나 팝업 표시
+                    // (Paywall에서 이미 연간 플랜을 보여주므로 여기서는 Paywall을 열거나 모달을 열 수 있음)
+                    window.location.href = '/mypage'; // 마이페이지 구독 관리로 이동
+                }}
+            />
+
+            <ReflectionPopup
+                isOpen={showReflection}
+                onClose={() => setShowReflection(false)}
+                goalCategory={selectedGoal?.category || 'general'}
+                date={selectedDate}
+                onSaved={() => setHasSubmittedReflection(true)}
+            />
+
+            <ShareCard
+                isOpen={showShareCard}
+                onClose={() => setShowShareCard(false)}
+                missions={missions}
+                date={selectedDate}
+            />
         </div>
     );
 }

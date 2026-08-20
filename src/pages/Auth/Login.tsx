@@ -692,10 +692,9 @@ export default function Login() {
                     {/* Guest */}
                     <div className="text-center mt-8 pt-6 border-t border-white/10">
                         <button type="button" onClick={() => {
-                            setUser({ id: 'demo123', email: 'demo@coreloop.com', nickname: 'DemoUser', routine_dna: null });
-                            navigate('/onboarding');
+                            navigate('/pre-trial');
                         }} className="text-xs text-slate-500 hover:text-primary underline">
-                            {t.guestLogin}
+                            로그인 없이 바로 시작하기
                         </button>
                     </div>
                     {/* Footer Links */}

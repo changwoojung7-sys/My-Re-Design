@@ -18,6 +18,14 @@ interface User {
     profile_image_url?: string;
     // Keeping legacy for compatibility if needed, but prefer top-level
     routine_dna?: any;
+    // Phase 3: Gamification
+    total_xp?: number;
+    current_level?: number;
+    level_title?: string;
+    condition_today?: number; // 1~5
+    // Phase 6: Plan
+    plan_type?: 'free' | 'pro_monthly' | 'pro_yearly';
+    referral_code?: string;
 }
 
 interface Mission {

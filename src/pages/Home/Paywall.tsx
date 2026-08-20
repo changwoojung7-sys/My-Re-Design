@@ -1,32 +1,24 @@
 import { motion } from 'framer-motion';
-import { Lock } from 'lucide-react';
+import { Lock, Sparkles, Check } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { useState, useEffect } from 'react';
-import { Capacitor } from '@capacitor/core';
+import { useState } from 'react';
 import SupportModal from '../../components/layout/SupportModal';
 
-// PortOne Type Definition (Minimal)
-import { processPaymentSuccess, checkMobilePaymentResult } from '../../lib/payment';
-import { savePendingOrder } from '../../lib/usePaymentReturn';
-
-declare global {
-    interface Window {
-        IMP: any;
-        PortOne: any;
-    }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 interface PaywallProps {
     onClose?: () => void;
 }
 
+const PRO_PRICING = [
+    { type: 'pro_monthly', months: 1, price: 9900, label: '1개월', subtitle: '매월 결제', save: '' },
+    { type: 'pro_yearly', months: 12, price: 59000, label: '12개월', subtitle: '연 59,000원 (월 4,900원 상당)', save: '50%', best: true },
+];
+
 export default function Paywall({ onClose }: PaywallProps) {
     const { t } = useLanguage();
-    const { user } = useStore();
-
+    const { user, setUser } = useStore();
+    const [loading, setLoading] = useState(false);
     const [supportModalState, setSupportModalState] = useState<{ isOpen: boolean, view: 'main' | 'terms' | 'privacy' | 'refund' }>({
         isOpen: false,
         view: 'main'
@@ -36,266 +28,131 @@ export default function Paywall({ onClose }: PaywallProps) {
         setSupportModalState({ isOpen: true, view });
     };
 
-    // Check for Mobile Payment Redirect Result on Mount
-    useEffect(() => {
-        const checkMobileResult = async () => {
-            const result = await checkMobilePaymentResult();
-            if (result) {
-                if (result.success) {
-                    alert(t.subscriptionSuccessful || 'Payment Successful!');
-                    window.location.href = '/';
-                } else {
-                    const errorMsg = result.error?.toLowerCase() || '';
-                    if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
-                        alert('결제를 취소하셨습니다.');
-                    } else {
-                        alert(`결제 실패: ${result.error}`);
-                    }
-                }
-            }
-        };
-        checkMobileResult();
+    const handleSubscribe = async (tier: typeof PRO_PRICING[0]) => {
+        if (!user) return;
+        
+        // Dummy Payment Logic for now (Simulate PortOne success)
+        const confirmMsg = `${tier.label} Pro 플랜을 구독하시겠습니까?\n\n결제 금액: ${tier.price.toLocaleString()}원`;
+        if (!window.confirm(confirmMsg)) return;
 
-        // appUrlOpen 리스너는 App.tsx 최상위로 이동됨 (타이밍 문제 해결)
-        return () => { };
-    }, []);
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({ plan_type: tier.type })
+                .eq('id', user.id);
 
-    const plans = [
-        { id: '1m', name: t.plan1Month, price: t.price1Month, amount: 3000, save: '24%' },
-        { id: '3m', name: t.plan3Months, price: t.price3Months, amount: 7500, save: '37%' },
-        { id: '6m', name: t.plan6Months, price: t.price6Months, amount: 12000, save: '50%' },
-        { id: '12m', name: t.plan12Months, price: t.price12Months, amount: 18000, save: '62%', best: true },
-    ];
+            if (error) throw error;
 
-    const handleSubscribe = async (plan: typeof plans[0]) => {
-        if (!window.IMP) return;
-        const { IMP } = window;
-
-        // Fetch Payment Mode
-        const { data: payModeData } = await supabase.from('admin_settings').select('value').eq('key', 'payment_mode').single();
-        const mode = payModeData?.value || 'test'; // Default to test
-
-        // Initialize PortOne (User Code for V1, or just proceed for V2 check)
-        // If mode is real, we use V2 logic which doesn't need IMP.init traditionally unless hybrid?
-        // But let's init anyway for V1 fallback or consistency
-        if (mode !== 'real') {
-            IMP.init('imp05646567'); // User's Identification Code (V1 Test)
-        }
-
-        // Save state for Mobile Redirect
-        const monthsToAdd = parseInt(plan.id.replace('m', ''));
-        const startDate = new Date();
-
-        const saveState = {
-            mode,
-            tier: { months: monthsToAdd, price: plan.amount, label: plan.name },
-            planType: 'all',
-            targetCategory: null,
-            startDate: startDate.toISOString(),
-            endDate: new Date(new Date(startDate).setMonth(startDate.getMonth() + monthsToAdd)).toISOString()
-        };
-        localStorage.setItem('pending_payment', JSON.stringify(saveState));
-
-        if (mode === 'real') {
-            // --- PortOne V2 (Real) ---
-            if (!window.PortOne) {
-                alert("PortOne V2 SDK Loading...");
-                return;
-            }
-
-            // PortOne V2 Store ID and Channel Key (Real) -> Copied from SubscriptionManager
-            const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
-            const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
-
-            const paymentId = `pay_${new Date().getTime()}`;
-            savePendingOrder(paymentId); // NEW: 딥링크 / resume 대비 트랜잭션 기록
-
-            try {
-                const response = await window.PortOne.requestPayment({
-                    storeId: PORTONE_V2_STORE_ID,
-                    channelKey: PORTONE_V2_CHANNEL_KEY,
-                    paymentId: paymentId,
-                    orderName: `MyReDesign Premium - ${plan.name}`,
-                    totalAmount: plan.amount,
-                    currency: "CURRENCY_KRW",
-                    payMethod: "CARD",
-                    customer: {
-                        fullName: user?.nickname || 'Guest',
-                        phoneNumber: user?.phone || '010-0000-0000',
-                        email: user?.email,
-                    },
-                    redirectUrl: Capacitor.isNativePlatform() ? import.meta.env.VITE_SUPABASE_URL + '/functions/v1/payment-redirect' : window.location.href, // Required for Mobile V2
-                    appScheme: 'myredesign',
-                });
-
-                if (response.code != null) {
-                    alert(`Payment Failed: ${response.message}`);
-                    return;
-                }
-
-                // Success
-                const result = await processPaymentSuccess(
-                    response.paymentId,
-                    mode,
-                    { months: parseInt(plan.id.replace('m', '')), price: plan.amount, label: plan.name },
-                    'all',
-                    null,
-                    new Date(),
-                    new Date(new Date().setMonth(new Date().getMonth() + parseInt(plan.id.replace('m', '')))),
-                    undefined
-                );
-
-                if (result.success) {
-                    localStorage.removeItem('pending_payment');
-                    alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
-                    window.location.href = '/';
-                } else {
-                    const errorMsg = result.error?.toLowerCase() || '';
-                    if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
-                        alert('결제 처리가 취소되었습니다.');
-                    } else {
-                        alert(`결제 처리 중 요류가 발생했습니다: ${result.error}`);
-                    }
-                }
-
-            } catch (e: any) {
-                console.error("Payment Request Error:", e);
-                const errorMsg = e.message?.toLowerCase() || '';
-                if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
-                    alert('결제를 취소하셨습니다.');
-                } else {
-                    alert(`결제 요청 실패: ${e.message}`);
-                }
-            }
-
-        } else {
-            // --- PortOne V1 (Test) ---
-            const merchantUid = `mid_${new Date().getTime()}`;
-            savePendingOrder(merchantUid); // NEW: 딥링크 / resume 대비 트랜잭션 기록
-
-            IMP.request_pay({
-                pg: 'html5_inicis', // PG Provider
-                pay_method: 'card', // Payment Method
-                merchant_uid: merchantUid, // Unique Order ID
-                name: `MyReDesign Premium - ${plan.name}`,
-                amount: plan.amount,
-                buyer_email: user?.email,
-                buyer_name: user?.nickname,
-                buyer_tel: user?.phone || '010-0000-0000', // Use user's phone if available
-                m_redirect_url: Capacitor.isNativePlatform() ? import.meta.env.VITE_SUPABASE_URL + '/functions/v1/payment-redirect' : window.location.href, // Redirect URL for mobile
-                app_scheme: 'myredesign',
-            }, async (rsp: any) => {
-                if (rsp.success) {
-                    // Success - Use centralized handler
-                    const result = await processPaymentSuccess(
-                        rsp.imp_uid,
-                        mode,
-                        // Convert Paywall plan to PaymentTier structure
-                        { months: parseInt(plan.id.replace('m', '')), price: plan.amount, label: plan.name },
-                        'all', // Paywall is always All Access
-                        null,
-                        new Date(), // Start Now
-                        new Date(new Date().setMonth(new Date().getMonth() + parseInt(plan.id.replace('m', '')))), // End Date
-                        rsp.merchant_uid
-                    );
-
-                    if (result.success) {
-                        alert(t.subscriptionSuccessful || 'Payment Successful! Premium activated.');
-                        window.location.href = '/';
-                    } else {
-                        const errorMsg = result.error?.toLowerCase() || '';
-                        if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
-                            alert('결제 처리가 취소되었습니다.');
-                        } else {
-                            alert(`결제 처리 중 요류가 발생했습니다: ${result.error}`);
-                        }
-                    }
-                } else {
-                    localStorage.removeItem('pending_payment');
-                    const errorMsg = rsp.error_msg?.toLowerCase() || '';
-                    if (errorMsg.includes('cancel') || errorMsg.includes('abandon') || errorMsg.includes('취소') || errorMsg.includes('failed to fetch')) {
-                        alert('결제를 취소하셨습니다.');
-                    } else {
-                        alert(`결제 실패: ${rsp.error_msg}`);
-                    }
-                }
-            });
+            setUser({ ...user, plan_type: tier.type as any });
+            alert('구독이 완료되었습니다! 이제 모든 Pro 기능을 사용할 수 있습니다.');
+            if (onClose) onClose();
+        } catch (e: any) {
+            console.error('Subscription error:', e);
+            alert('구독 처리 중 오류가 발생했습니다.');
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+        <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex flex-col justify-end bg-black/80 backdrop-blur-sm"
+        >
+            {/* Close Button Area (Click to close if not strict) */}
+            <div className="flex-1 w-full" onClick={onClose} />
+
             <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="w-full max-w-sm bg-slate-900 border border-white/10 rounded-3xl p-6 shadow-2xl relative overflow-hidden"
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="bg-slate-900 rounded-t-3xl w-full max-h-[90vh] overflow-y-auto pb-safe"
             >
-                {/* Background Decor */}
-                <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-primary/20 to-transparent pointer-events-none" />
-
-                <div className="relative text-center mb-6">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary to-accent rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-primary/20">
-                        <Lock className="text-white" size={32} />
+                <div className="p-6 relative">
+                    {/* Header */}
+                    <div className="flex flex-col items-center text-center mb-8 pt-4">
+                        <div className="w-16 h-16 bg-gradient-to-br from-primary to-violet-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-primary/30">
+                            <Lock size={32} className="text-white" />
+                        </div>
+                        <h2 className="text-2xl font-black text-white flex items-center justify-center gap-2">
+                            MyReDesign <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-pink-500">PRO</span>
+                        </h2>
+                        <p className="text-slate-400 text-sm mt-2">
+                            잠재력을 깨우는 모든 기능을 무제한으로.
+                        </p>
                     </div>
-                    <h2 className="text-2xl font-bold text-white mb-2">{t.paywallTitle}</h2>
-                    <p className="text-sm text-slate-400">{t.freeTrialEnded}</p>
-                    <p className="text-xs text-primary font-bold mt-1">{t.paywallSubtitle}</p>
-                </div>
 
-                <div className="space-y-3 mb-6">
-                    {plans.map((plan) => (
-                        <button
-                            key={plan.id}
-                            onClick={() => handleSubscribe(plan)}
-                            className={`w-full relative flex items-center justify-between p-4 rounded-xl border transition-all ${plan.best ? 'bg-white/10 border-primary shadow-lg shadow-primary/10' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
-                        >
-                            {plan.best && (
-                                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-accent text-black text-[10px] font-bold px-2 py-0.5 rounded-full shadow-lg">
-                                    BEST VALUE
+                    {/* Features */}
+                    <div className="bg-white/5 rounded-2xl p-5 mb-8 border border-white/5">
+                        <ul className="space-y-4">
+                            {['모든 카테고리 (Body, Mind, Growth) 미션 무제한 이용', 'AI 주간 바이브 리포트 및 심층 코칭 분석', 'Color Jam 캘린더 등 고급 통계 기능', '친구 초대 및 무제한 버디 챌린지 생성'].map((feat, idx) => (
+                                <li key={idx} className="flex items-start gap-3">
+                                    <div className="mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
+                                        <Check size={12} className="text-primary" />
+                                    </div>
+                                    <span className="text-sm text-slate-200 leading-tight">{feat}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+
+                    {/* Plans Grid */}
+                    <div className="grid grid-cols-2 gap-3 mb-8">
+                        {PRO_PRICING.map(tier => (
+                            <button
+                                key={tier.type}
+                                onClick={() => handleSubscribe(tier)}
+                                disabled={loading}
+                                className={`relative flex flex-col p-4 rounded-2xl border text-left transition-all ${
+                                    tier.best 
+                                    ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
+                                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                }`}
+                            >
+                                {tier.best && (
+                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-pink-500 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-lg flex items-center gap-1">
+                                        <Sparkles size={10} />
+                                        BEST VALUE
+                                    </div>
+                                )}
+                                <div className="text-lg font-bold text-white mb-1 mt-1">{tier.label}</div>
+                                <div className="text-xl font-black text-primary mb-1">
+                                    {tier.price.toLocaleString()}원
                                 </div>
-                            )}
-                            <div className="text-left">
-                                <p className="text-sm font-bold text-white">{plan.name}</p>
-                                {plan.save && <p className="text-[10px] text-accent font-bold">{t.savePercent} {plan.save}</p>}
-                            </div>
-                            <div className="text-right">
-                                <p className="text-sm font-bold text-white">{plan.price}</p>
-                            </div>
+                                <div className="text-[10px] text-slate-400 leading-tight">
+                                    {tier.subtitle}
+                                </div>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex flex-col gap-3">
+                        <button
+                            onClick={onClose}
+                            className="w-full py-3 text-sm font-bold text-slate-400 hover:text-white transition-colors"
+                        >
+                            나중에 하기
                         </button>
-                    ))}
-                </div>
-
-                <button
-                    onClick={onClose}
-                    className="w-full py-3 rounded-xl font-bold text-sm text-slate-500 hover:text-white hover:bg-white/5 transition mb-2"
-                >
-                    {t.maybeLater}
-                </button>
-
-                {/* New Detailed Footer */}
-                <div className="mt-0 text-center bg-black/20 p-4 rounded-2xl border border-white/5">
-                    <div className="flex justify-center gap-3 text-[10px] text-slate-500 underline mb-2">
-                        <button onClick={() => openSupportModal('main')} className="hover:text-white transition-colors">{t.inquiry}</button>
-                        <button onClick={() => openSupportModal('terms')} className="hover:text-white transition-colors">{t.terms}</button>
-                        <button onClick={() => openSupportModal('privacy')} className="hover:text-white transition-colors">{t.privacy}</button>
-                        <button onClick={() => openSupportModal('refund')} className="hover:text-white transition-colors">{t.refundPolicy}</button>
                     </div>
 
-                    <div className="text-[10px] text-slate-600 space-y-0.5">
-                        <p>상호 : 유진에이아이(YujinAI) | 대표자명 : 정창우</p>
-                        <p>사업자등록번호 : 519-77-00622</p>
-                        <p>My Re Design | 010-6614-4561</p>
+                    <div className="mt-6 flex justify-center gap-4 text-[10px] text-slate-500">
+                        <button onClick={() => openSupportModal('terms')} className="hover:text-white">{t.terms}</button>
+                        <button onClick={() => openSupportModal('privacy')} className="hover:text-white">{t.privacy}</button>
+                        <button onClick={() => openSupportModal('refund')} className="hover:text-white">{t.refundPolicy}</button>
                     </div>
                 </div>
-
-                {/* Support Modal Overlay */}
-                <SupportModal
-                    isOpen={supportModalState.isOpen}
-                    onClose={() => setSupportModalState({ ...supportModalState, isOpen: false })}
-                    initialView={supportModalState.view}
-                />
-
             </motion.div>
-        </div>
+
+            <SupportModal
+                isOpen={supportModalState.isOpen}
+                onClose={() => setSupportModalState({ ...supportModalState, isOpen: false })}
+                initialView={supportModalState.view}
+            />
+        </motion.div>
     );
 }

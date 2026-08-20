@@ -5,9 +5,10 @@ import { useLanguage } from '../../lib/i18n';
 interface PaywallWarningProps {
     onConfirm: () => void;
     onCancel: () => void;
+    accountAgeDays?: number;
 }
 
-export default function PaywallWarning({ onConfirm, onCancel }: PaywallWarningProps) {
+export default function PaywallWarning({ onConfirm, onCancel, accountAgeDays }: PaywallWarningProps) {
     const { t } = useLanguage();
 
     return (
@@ -28,6 +29,11 @@ export default function PaywallWarning({ onConfirm, onCancel }: PaywallWarningPr
                 <div className="text-sm text-slate-300 space-y-2 mb-6 text-left bg-white/5 p-4 rounded-xl">
                     <p>• {t.paywallWarningDesc1}</p>
                     <p>• {t.paywallWarningDesc2}</p>
+                    {accountAgeDays && accountAgeDays > 0 && (
+                        <p className="font-bold text-primary text-center mt-2 pt-2 border-t border-white/10">
+                            지금까지 꾸준히 이어온 {accountAgeDays}일의 성장을 여기서 멈출 건가요?
+                        </p>
+                    )}
                 </div>
 
                 <div className="flex gap-3">

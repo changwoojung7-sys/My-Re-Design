@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User, Clapperboard, Trash2, Pencil } from 'lucide-react';
+import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User, Clapperboard, Trash2, Pencil, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
 import MissionReel from '../../components/common/MissionReel';
 import RewardAd from '../../components/ads/RewardAd';
 import { useStore } from '../../lib/store';
+import ShareCard from '../../components/gamification/ShareCard';
+import { getDemoSlicedImage } from '../../lib/demoImageHelper';
 
 interface HistoryDetailProps {
     goal: any;
@@ -26,6 +28,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
     const [editMode, setEditMode] = useState(false);
     const [deleteTarget, setDeleteTarget] = useState<any | null>(null);
     const [deleting, setDeleting] = useState(false);
+    const [showShareCard, setShowShareCard] = useState(false);
 
     useEffect(() => {
         fetchMissionHistory();
@@ -34,6 +37,10 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
 
     const checkSubscriptionAccess = async () => {
         if (!user) return;
+        if (user.id === 'demo123') {
+            setHasAccess(true);
+            return;
+        }
 
         // 프리미엄 구독 여부만 확인 (비구독자는 항상 광고 시청)
         const { data: subs } = await supabase
@@ -65,10 +72,103 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
         }
     };
 
-    // ... fetchMissionHistory (unchanged) ...
-
     const fetchMissionHistory = async () => {
         setLoading(true);
+
+        if (user?.id === 'demo123' || goal?.id?.startsWith('demo-')) {
+            const catKey = goal.category || 'body_wellness';
+
+            // Pre-load the 4 sliced images from the demo sheet
+            const [slice3, slice1, slice2, slice4] = await Promise.all([
+                getDemoSlicedImage(3), // 3rd image: 캠핑 요리 (shown first!)
+                getDemoSlicedImage(1), // 1st image: 스트레칭
+                getDemoSlicedImage(2), // 2nd image: 독서 노트
+                getDemoSlicedImage(4)  // 4th image: 필름 사진
+            ]);
+
+            const demoCards = [
+                {
+                    img: slice3,
+                    content: '[라이프스타일 3일차] 휴대용 버너 미니멀 캠핑 요리 도전',
+                    proof: '간단하고 맛있는 야외 캠핑 요리 완성! 힐링 그 자체였습니다 🍳✨'
+                },
+                {
+                    img: slice1,
+                    content: '[건강 2일차] 완벽한 자세 아침 스트레칭',
+                    proof: '아침 기상 후 10분 전신 스트레칭으로 활력 충전 완료 🧘'
+                },
+                {
+                    img: slice2,
+                    content: '[자기계발 1일차] 핵심 개념 정리 독서 노트',
+                    proof: '책 읽고 중요한 인사이트 3줄로 노트에 요약 정리 완료 📖'
+                },
+                {
+                    img: slice4,
+                    content: '[크리에이티브 1일차] 자연의 패턴 필름 기록',
+                    proof: '아침 햇살에 비친 자연의 거미줄 패턴을 필름 카메라로 포착 📷'
+                },
+                {
+                    img: 'https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=800&auto=format&fit=crop&q=80',
+                    content: '루틴 5일차: 활력 넘치는 오후 조깅 & 수분 섭취',
+                    proof: '공원 러닝 3km 달성하고 상쾌하게 하루 마무리!'
+                },
+                {
+                    img: 'https://images.unsplash.com/photo-1517842645767-c639042777db?w=800&auto=format&fit=crop&q=80',
+                    content: '루틴 6일차: 목표 점검 및 마인드풀니스 명상',
+                    proof: '마음 챙김 10분 진행하며 이번 주 회고 작성 완료 ✨'
+                },
+                {
+                    img: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=800&auto=format&fit=crop&q=80',
+                    content: '루틴 7일차: 7일 챌린지 성공 및 최종 소감 기록',
+                    proof: '7일간 한 번도 빠짐없이 미션을 완수한 나 자신 칭찬해 🎉'
+                }
+            ];
+
+            const demoMissions = demoCards.map((card, i) => {
+                const missionDate = new Date();
+                missionDate.setDate(missionDate.getDate() - (6 - i));
+                const dateStr = missionDate.toISOString().split('T')[0];
+
+                return {
+                    id: `demo-detail-${catKey}-${i + 1}`,
+                    user_id: 'demo123',
+                    category: catKey,
+                    seq: goal.seq || 1,
+                    date: dateStr,
+                    is_completed: true,
+                    proof_type: 'image',
+                    image_url: card.img,
+                    content: card.content,
+                    proof_text: card.proof,
+                    trust_score: 95 + (i % 5),
+                    created_at: missionDate.toISOString()
+                };
+            });
+
+            setMissions(demoMissions);
+            setStats({
+                likes: 24,
+                comments: [
+                    {
+                        id: 'demo-comment-1',
+                        user_id: 'demo-user-mate',
+                        comment: '7일 동안 정말 꾸준하게 해내셨네요! 대단합니다 👍🔥',
+                        created_at: new Date().toISOString(),
+                        profiles: { nickname: '루프메이트 민지', profile_image_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80' }
+                    },
+                    {
+                        id: 'demo-comment-2',
+                        user_id: 'demo-user-mate2',
+                        comment: '사진들이 다 너무 멋져요! 저도 자극받아서 오늘 미션 하러 갑니다 ✨',
+                        created_at: new Date(Date.now() - 3600000).toISOString(),
+                        profiles: { nickname: '열정러너 준호', profile_image_url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80' }
+                    }
+                ]
+            });
+            setLoading(false);
+            return;
+        }
+
         const startDate = new Date(goal.created_at);
         startDate.setDate(startDate.getDate() - 1);
 
@@ -107,6 +207,12 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
     const handleDeleteMission = async (mission: any) => {
         setDeleting(true);
         try {
+            if (user?.id === 'demo123' || mission.id.startsWith('demo-')) {
+                setMissions(prev => prev.filter(m => m.id !== mission.id));
+                onMissionsChanged?.();
+                return;
+            }
+
             // Delete associated storage file if exists
             if (mission.image_url) {
                 try {
@@ -167,14 +273,23 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                                 {editMode ? '완료' : '수정'}
                             </button>
                             {!editMode && (
-                                <button
-                                    onClick={handlePlayClick}
-                                    className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold shadow-lg hover:shadow-purple-500/30 transition-all animate-pulse"
-                                >
-                                    <Clapperboard size={16} />
-                                    Play Movie
-                                    {!hasAccess && <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded ml-1">AD</span>}
-                                </button>
+                                <>
+                                    <button
+                                        onClick={() => setShowShareCard(true)}
+                                        className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full text-white shadow-lg hover:shadow-indigo-500/30 transition-all"
+                                        title="공유 숏폼 만들기"
+                                    >
+                                        <Share2 size={16} />
+                                    </button>
+                                    <button
+                                        onClick={handlePlayClick}
+                                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold shadow-lg hover:shadow-purple-500/30 transition-all animate-pulse"
+                                    >
+                                        <Clapperboard size={16} />
+                                        Play Movie
+                                        {!hasAccess && <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded ml-1">AD</span>}
+                                    </button>
+                                </>
                             )}
                         </>
                     )}
@@ -211,6 +326,14 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
                     />
                 )
             }
+
+            {/* Share Card Modal */}
+            <ShareCard
+                isOpen={showShareCard}
+                onClose={() => setShowShareCard(false)}
+                missions={missions}
+                date={new Date(goal.created_at).toLocaleDateString('ko-KR')}
+            />
 
             {/* Scrollable Content */}
             <div className="flex-1 overflow-y-auto p-6 pb-20 custom-scrollbar">
