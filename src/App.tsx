@@ -235,7 +235,6 @@ function App() {
             nickname,
             age: profile?.age,
             gender: profile?.gender,
-            custom_free_trial_days: profile?.custom_free_trial_days,
             full_name: profile?.full_name || authUser.user_metadata?.full_name,
           });
         }

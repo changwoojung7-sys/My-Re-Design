@@ -1,18 +1,29 @@
-
 import { supabase } from './supabase';
+import { useStore } from './store';
+
+declare global {
+    interface Window {
+        IMP?: any;
+        PortOne?: any;
+    }
+}
 
 export interface PaymentTier {
+    type: string;
     months: number;
     price: number;
     label: string;
+    subtitle?: string;
+    save?: string;
+    best?: boolean;
 }
 
 export interface PaymentRequest {
     user: any;
     tier: PaymentTier;
-    planType: 'mission' | 'all';
+    planType: string;
     targetCategory?: string;
-    isExtension: boolean;
+    isExtension?: boolean;
     currentEndDate?: Date;
 }
 
@@ -21,14 +32,14 @@ export const processPaymentSuccess = async (
     paymentIdOrImpUid: string,
     mode: string,
     tier: PaymentTier,
-    planType: 'mission' | 'all',
+    planType: string,
     targetCategory: string | null,
     startDate: Date,
     endDate: Date,
     merchantUid?: string
 ) => {
     try {
-        // 1. Verify Payment Server-Side
+        // 1. Verify Payment Server-Side via Supabase Edge Function
         const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
             body: {
                 imp_uid: mode === 'real' ? undefined : paymentIdOrImpUid,
@@ -41,10 +52,11 @@ export const processPaymentSuccess = async (
         if (verifyError) throw verifyError;
         if (verifyData?.error) throw new Error(verifyData.error);
 
-        // 2. Record Payment
-        // Check if there is a pending payment to update
-        let existingId: string | null = null;
+        const currentUser = (await supabase.auth.getUser()).data.user;
+        if (!currentUser) throw new Error('User not authenticated');
 
+        // 2. Record / Update Payment in DB
+        let existingId: string | null = null;
         const lookupValue = merchantUid || paymentIdOrImpUid;
         const { data: existing } = await supabase
             .from('payments')
@@ -57,9 +69,9 @@ export const processPaymentSuccess = async (
         if (existing) existingId = existing.id;
 
         const paymentData = {
-            user_id: (await supabase.auth.getUser()).data.user?.id,
+            user_id: currentUser.id,
             amount: tier.price,
-            plan_type: `${planType}_${tier.months}mo`,
+            plan_type: tier.type || `${planType}_${tier.months}mo`,
             duration_months: tier.months,
             target_id: targetCategory,
             status: 'paid',
@@ -83,35 +95,53 @@ export const processPaymentSuccess = async (
             payError = error;
         }
 
-        if (payError) throw payError;
+        if (payError) {
+            console.error('Error saving payment record:', payError);
+        }
 
-        // 3. Create Subscription
+        // 3. Create Subscription Record
         const { error: subError } = await supabase
             .from('subscriptions')
             .insert({
-                user_id: (await supabase.auth.getUser()).data.user?.id,
-                type: planType,
+                user_id: currentUser.id,
+                type: planType === 'pro_yearly' || planType === 'pro_monthly' ? 'pro' : planType,
                 target_id: targetCategory,
                 start_date: startDate.toISOString(),
                 end_date: endDate.toISOString(),
                 status: 'active'
             });
 
-        if (subError) throw subError;
+        if (subError) {
+            console.error('Error creating subscription record:', subError);
+        }
 
-        // 4. Update Profile (Best effort)
+        // 4. Update Profile
+        const newPlanType = tier.type || (tier.months === 12 ? 'pro_yearly' : 'pro_monthly');
         try {
             await supabase.from('profiles').update({
-                subscription_tier: 'premium'
-            }).eq('id', (await supabase.auth.getUser()).data.user?.id);
+                subscription_tier: 'premium',
+                plan_type: newPlanType
+            }).eq('id', currentUser.id);
+
+            // Update Zustand Store
+            const storeUser = useStore.getState().user;
+            if (storeUser) {
+                useStore.getState().setUser({
+                    ...storeUser,
+                    plan_type: newPlanType as any,
+                    subscription_tier: 'premium' as any
+                });
+            }
         } catch (e) {
             console.warn('Profile update failed', e);
         }
 
+        localStorage.removeItem('pending_payment');
+
         return {
             success: true,
             data: {
-                planName: `${planType === 'all' ? 'All Access' : targetCategory} (${tier.label})`,
+                planName: `MyReDesign Pro (${tier.label})`,
                 amount: tier.price,
                 startDate: startDate,
                 endDate: endDate
@@ -119,7 +149,6 @@ export const processPaymentSuccess = async (
         };
     } catch (error: any) {
         console.error('Payment processing error:', error);
-        // Alert is handled by the caller (App.tsx or component)
         return { success: false, error: error.message };
     }
 };
@@ -147,6 +176,160 @@ export const processPaymentFailure = async (paymentIdOrImpUid: string) => {
     }
 };
 
+// Main Entry Point for Requesting Subscription Payment
+export const requestSubscriptionPayment = async (
+    user: any,
+    tier: PaymentTier,
+    redirectPath: string = '/mypage'
+): Promise<{ success: boolean; error?: string; data?: any }> => {
+    if (!user) {
+        return { success: false, error: '로그인이 필요합니다.' };
+    }
+
+    try {
+        // 1. Check Global Payment Mode from admin_settings (default: 'real')
+        let mode = 'real';
+        try {
+            const { data: modeSetting } = await supabase
+                .from('admin_settings')
+                .select('value')
+                .eq('key', 'payment_mode')
+                .maybeSingle();
+            if (modeSetting?.value) {
+                mode = modeSetting.value;
+            }
+        } catch (e) {
+            console.warn('Failed to fetch payment mode setting, defaulting to real:', e);
+        }
+
+        // 2. Prepare Dates
+        const startDate = new Date();
+        const endDate = new Date(startDate);
+        endDate.setMonth(endDate.getMonth() + tier.months);
+
+        // 3. Prepare IDs
+        const merchantUid = `mid_${Date.now()}`;
+        const paymentId = mode === 'real' ? `pay_${Date.now()}` : merchantUid;
+
+        // 4. Save Pending Payment in DB
+        try {
+            await supabase.from('payments').insert({
+                user_id: user.id,
+                amount: tier.price,
+                plan_type: tier.type,
+                duration_months: tier.months,
+                target_id: null,
+                status: 'pending',
+                merchant_uid: merchantUid,
+                imp_uid: paymentId,
+                coverage_start_date: startDate.toISOString(),
+                coverage_end_date: endDate.toISOString()
+            });
+        } catch (e) {
+            console.warn('Failed to insert pending payment record:', e);
+        }
+
+        // 5. Save state for mobile redirect recovery
+        const saveState = {
+            mode,
+            tier,
+            planType: tier.type,
+            targetCategory: null,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString()
+        };
+        localStorage.setItem('pending_payment', JSON.stringify(saveState));
+
+        // 6. Execute Payment
+        if (mode === 'real') {
+            // --- PortOne V2 (Real KG Inicis) ---
+            const PORTONE_V2_STORE_ID = 'store-25bcb4a5-4d9e-440e-9aea-b20559181588';
+            const PORTONE_V2_CHANNEL_KEY = 'channel-key-eeaefe66-b5b0-4d67-a320-bb6a8e6ad7dd';
+
+            if (!window.PortOne) {
+                throw new Error('결제 모듈(PortOne V2)이 로드되지 않았습니다.');
+            }
+
+            const response = await window.PortOne.requestPayment({
+                storeId: PORTONE_V2_STORE_ID,
+                channelKey: PORTONE_V2_CHANNEL_KEY,
+                paymentId: paymentId,
+                orderName: `MyReDesign Pro - ${tier.label}`,
+                totalAmount: tier.price,
+                currency: "CURRENCY_KRW",
+                payMethod: "CARD",
+                customer: {
+                    email: user.email || undefined,
+                    phoneNumber: user.phone || undefined,
+                    fullName: user.nickname || "고객"
+                },
+                redirectUrl: `${window.location.origin}${redirectPath}`
+            });
+
+            if (response && response.code != null) {
+                await processPaymentFailure(paymentId);
+                localStorage.removeItem('pending_payment');
+                return { success: false, error: response.message || '결제가 취소되었거나 실패했습니다.' };
+            }
+
+            // PC Success Flow
+            return await processPaymentSuccess(
+                paymentId,
+                mode,
+                tier,
+                tier.type,
+                null,
+                startDate,
+                endDate,
+                merchantUid
+            );
+        } else {
+            // --- PortOne V1 (Test Mode) ---
+            return new Promise((resolve) => {
+                const { IMP } = window;
+                if (!IMP) {
+                    resolve({ success: false, error: '결제 모듈(PortOne V1)이 로드되지 않았습니다.' });
+                    return;
+                }
+
+                IMP.init('imp77227041');
+                IMP.request_pay({
+                    pg: 'html5_inicis',
+                    pay_method: 'card',
+                    merchant_uid: merchantUid,
+                    name: `MyReDesign Pro - ${tier.label}`,
+                    amount: tier.price,
+                    buyer_email: user.email,
+                    buyer_name: user.nickname || 'User',
+                    m_redirect_url: `${window.location.origin}${redirectPath}`
+                }, async (rsp: any) => {
+                    if (rsp.success) {
+                        const result = await processPaymentSuccess(
+                            rsp.imp_uid,
+                            'test',
+                            tier,
+                            tier.type,
+                            null,
+                            startDate,
+                            endDate,
+                            merchantUid
+                        );
+                        resolve(result);
+                    } else {
+                        localStorage.removeItem('pending_payment');
+                        await processPaymentFailure(merchantUid);
+                        resolve({ success: false, error: rsp.error_msg || '결제가 취소되었습니다.' });
+                    }
+                });
+            });
+        }
+    } catch (error: any) {
+        console.error('requestSubscriptionPayment error:', error);
+        localStorage.removeItem('pending_payment');
+        return { success: false, error: error.message || '결제 요청 중 오류가 발생했습니다.' };
+    }
+};
+
 // Check for Mobile Redirect Result
 export const checkMobilePaymentResult = async (customUrl?: string) => {
     const urlString = customUrl || window.location.href;
@@ -164,14 +347,9 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
     const message = urlParams.get('message');
 
     // Case 1: V1 Failure Check (Strict)
-    // If imp_success is explicitly 'false', OR if it's MISSING (and we are in a redirect flow with imp_uid), treat as fail.
-    // We should only proceed if imp_success === 'true'.
-    // Note: Some flows might use 'success' instead of 'imp_success'.
     const successFlag = imp_success || urlParams.get('success');
 
     if (successFlag !== 'true') {
-        // If we have an error message, use it. If not, generic cancellation/fail.
-        // But only if we actually HAVE some ID (meaning it's a payment redirect, not just a random page load)
         if (imp_uid || merchant_uid) {
             return { success: false, error: error_msg || 'Payment Cancelled or Failed' };
         }
@@ -179,7 +357,6 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
 
     // Case 2: V2 Failure (PortOne V2)
     if (code) {
-        // PortOne V2에서 code 파라미터가 넘어오면 결제 과정에 문제가 있거나 취소된 경우입니다.
         return { success: false, error: message || `Payment Failed (${code})` };
     }
 
@@ -187,7 +364,6 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
     const targetId = paymentId || imp_uid || merchant_uid;
 
     if (targetId) {
-        // Attempt to recover state from LocalStorage first
         let paymentData: any = null;
         const pendingPayment = localStorage.getItem('pending_payment');
 
@@ -195,7 +371,6 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
             paymentData = JSON.parse(pendingPayment);
             localStorage.removeItem('pending_payment');
         } else {
-            // Fallback: Recover from DB (Session persistence)
             console.log('Attempting to recover session from DB for:', targetId);
             const { data: pendingRecord } = await supabase
                 .from('payments')
@@ -205,20 +380,16 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
                 .maybeSingle();
 
             if (pendingRecord) {
-                // Reconstruct data
-                const [typeStr, durationStr] = pendingRecord.plan_type.split('_');
-                // typeStr: 'mission' or 'all'
-                // durationStr: '1mo', '3mo' -> parse int
-                const duration = parseInt(durationStr);
-
+                const duration = pendingRecord.duration_months || 1;
                 paymentData = {
-                    mode: targetId.startsWith('pay_') ? 'real' : 'test', // Auto-detect mode
+                    mode: targetId.startsWith('pay_') ? 'real' : 'test',
                     tier: {
+                        type: pendingRecord.plan_type || 'pro_monthly',
                         months: duration,
                         price: pendingRecord.amount,
-                        label: `${duration} Months` // Approx label
+                        label: `${duration} Months`
                     },
-                    planType: typeStr as 'mission' | 'all',
+                    planType: pendingRecord.plan_type || 'pro_monthly',
                     targetCategory: pendingRecord.target_id,
                     startDate: pendingRecord.coverage_start_date,
                     endDate: pendingRecord.coverage_end_date
@@ -245,7 +416,7 @@ export const checkMobilePaymentResult = async (customUrl?: string) => {
     return null;
 };
 
-// 앱이 Background에서 Foreground로 돌아올 때 (resume) 딥링크 없이 돌아온 경우 대비 서버 검증
+// Recover Pending Payment when App Resumes from Background
 export const checkPendingPaymentAndRecover = async () => {
     try {
         const pendingPaymentStr = localStorage.getItem('pending_payment');
@@ -257,7 +428,6 @@ export const checkPendingPaymentAndRecover = async () => {
             return null;
         }
 
-        // DB에서 최신 pending 결제내역 조회
         const { data: pendingRecord } = await supabase
             .from('payments')
             .select('*')
@@ -269,9 +439,8 @@ export const checkPendingPaymentAndRecover = async () => {
 
         if (pendingRecord) {
             const mode = pendingRecord.merchant_uid.startsWith('pay_') ? 'real' : 'test';
-            
+
             try {
-                // 포트원 검증(verify-payment) 호출로 실제 결제 여부 파악
                 const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
                     body: {
                         imp_uid: mode === 'real' ? undefined : pendingRecord.imp_uid,
@@ -282,13 +451,11 @@ export const checkPendingPaymentAndRecover = async () => {
                 });
 
                 if (verifyError || verifyData?.error) {
-                    // 미완료 또는 검증 실패 -> 취소된 것으로 간주
                     await processPaymentFailure(pendingRecord.merchant_uid);
                     localStorage.removeItem('pending_payment');
                     return { success: false, error: '결제가 취소되었거나 정상적으로 완료되지 않았습니다.' };
                 }
 
-                // 검증 성공 -> JS 레이어에서 못 잡은 딥링크 대신 성공 처리 진행
                 const paymentData = JSON.parse(pendingPaymentStr);
                 localStorage.removeItem('pending_payment');
 
@@ -307,7 +474,6 @@ export const checkPendingPaymentAndRecover = async () => {
                 return { success: false, error: '서버 상태를 확인하는 중 오류가 발생했습니다.' };
             }
         } else {
-            // DB에도 pending 상태가 없으면 지워버림 (이미 콜백 등에서 처리됨)
             localStorage.removeItem('pending_payment');
         }
     } catch (e) {
@@ -315,4 +481,3 @@ export const checkPendingPaymentAndRecover = async () => {
     }
     return null;
 };
-

@@ -1,55 +1,86 @@
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Sparkles, Check } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
-import { useState } from 'react';
 import SupportModal from '../../components/layout/SupportModal';
+import { requestSubscriptionPayment } from '../../lib/payment';
 
 interface PaywallProps {
     onClose?: () => void;
 }
 
 const PRO_PRICING = [
-    { type: 'pro_monthly', months: 1, price: 9900, label: '1개월', subtitle: '매월 결제', save: '' },
-    { type: 'pro_yearly', months: 12, price: 59000, label: '12개월', subtitle: '연 59,000원 (월 4,900원 상당)', save: '50%', best: true },
+    { type: 'pro_monthly', months: 1, price: 2900, label: '1개월 패스', subtitle: '기본형', save: '', badge: '기본형' },
+    { type: 'pro_quarterly', months: 3, price: 7900, label: '3개월 패스', subtitle: '10% 할인 (정상가 8,700원)', save: '10%', badge: '인기', best: true },
+    { type: 'pro_yearly', months: 12, price: 29900, label: '1년 패스', subtitle: '15% 할인 (정상가 34,800원)', save: '15%', badge: '최고 가치' },
 ];
 
 export default function Paywall({ onClose }: PaywallProps) {
     const { t } = useLanguage();
-    const { user, setUser } = useStore();
+    const { user } = useStore();
     const [loading, setLoading] = useState(false);
     const [supportModalState, setSupportModalState] = useState<{ isOpen: boolean, view: 'main' | 'terms' | 'privacy' | 'refund' }>({
         isOpen: false,
         view: 'main'
     });
 
+    useEffect(() => {
+        const verifyActiveSubscription = async () => {
+            if (!user) return;
+            try {
+                const now = new Date().toISOString();
+                const { data: activeSubs } = await supabase
+                    .from('subscriptions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('status', 'active')
+                    .gt('end_date', now);
+
+                const hasActiveSub = activeSubs && activeSubs.length > 0;
+                if (!hasActiveSub && (user.plan_type === 'pro_monthly' || user.plan_type === 'pro_yearly')) {
+                    await supabase
+                        .from('profiles')
+                        .update({ plan_type: 'free', subscription_tier: 'free' })
+                        .eq('id', user.id);
+
+                    useStore.getState().setUser({
+                        ...user,
+                        plan_type: 'free',
+                        subscription_tier: 'free' as any
+                    });
+                }
+            } catch (e) {
+                console.error('Error verifying active subscription:', e);
+            }
+        };
+
+        verifyActiveSubscription();
+    }, [user?.id]);
+
     const openSupportModal = (view: 'main' | 'terms' | 'privacy' | 'refund') => {
         setSupportModalState({ isOpen: true, view });
     };
 
     const handleSubscribe = async (tier: typeof PRO_PRICING[0]) => {
-        if (!user) return;
-        
-        // Dummy Payment Logic for now (Simulate PortOne success)
-        const confirmMsg = `${tier.label} Pro 플랜을 구독하시겠습니까?\n\n결제 금액: ${tier.price.toLocaleString()}원`;
-        if (!window.confirm(confirmMsg)) return;
+        if (!user) {
+            alert('로그인이 필요한 서비스입니다.');
+            return;
+        }
 
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({ plan_type: tier.type })
-                .eq('id', user.id);
-
-            if (error) throw error;
-
-            setUser({ ...user, plan_type: tier.type as any });
-            alert('구독이 완료되었습니다! 이제 모든 Pro 기능을 사용할 수 있습니다.');
-            if (onClose) onClose();
+            const result = await requestSubscriptionPayment(user, tier, window.location.pathname);
+            if (result.success) {
+                alert('구독이 완료되었습니다! 이제 모든 Pro 기능을 사용할 수 있습니다.');
+                if (onClose) onClose();
+            } else if (result.error) {
+                alert(result.error);
+            }
         } catch (e: any) {
             console.error('Subscription error:', e);
-            alert('구독 처리 중 오류가 발생했습니다.');
+            alert('결제 처리 중 오류가 발생했습니다: ' + (e.message || '다시 시도해주세요.'));
         } finally {
             setLoading(false);
         }
@@ -101,29 +132,31 @@ export default function Paywall({ onClose }: PaywallProps) {
                     </div>
 
                     {/* Plans Grid */}
-                    <div className="grid grid-cols-2 gap-3 mb-8">
+                    <div className="flex flex-col gap-3 mb-8">
                         {PRO_PRICING.map(tier => (
                             <button
                                 key={tier.type}
                                 onClick={() => handleSubscribe(tier)}
                                 disabled={loading}
-                                className={`relative flex flex-col p-4 rounded-2xl border text-left transition-all ${
+                                className={`relative p-4 rounded-2xl border text-left transition-all ${
                                     tier.best 
                                     ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
                                     : 'bg-white/5 border-white/10 hover:bg-white/10'
                                 }`}
                             >
-                                {tier.best && (
-                                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-primary to-pink-500 text-white text-[10px] font-bold px-3 py-1 rounded-full whitespace-nowrap shadow-lg flex items-center gap-1">
-                                        <Sparkles size={10} />
-                                        BEST VALUE
+                                {tier.badge && (
+                                    <div className={`absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 whitespace-nowrap ${tier.best ? 'bg-gradient-to-r from-primary to-pink-500' : 'bg-slate-700'}`}>
+                                        {tier.best && <Sparkles size={10} />}
+                                        {tier.badge}
                                     </div>
                                 )}
-                                <div className="text-lg font-bold text-white mb-1 mt-1">{tier.label}</div>
-                                <div className="text-xl font-black text-primary mb-1">
-                                    {tier.price.toLocaleString()}원
+                                <div className="flex justify-between items-center mt-1">
+                                    <div className="text-lg font-bold text-white">{tier.label}</div>
+                                    <div className="text-xl font-black text-primary">
+                                        {tier.price.toLocaleString()}원
+                                    </div>
                                 </div>
-                                <div className="text-[10px] text-slate-400 leading-tight">
+                                <div className="text-[10px] text-slate-400 leading-tight mt-1">
                                     {tier.subtitle}
                                 </div>
                             </button>

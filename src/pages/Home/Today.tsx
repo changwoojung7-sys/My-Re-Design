@@ -138,11 +138,8 @@ export default function Today() {
             const { data: paywallDayData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
             const globalPaywallDay = paywallDayData?.value ? parseInt(paywallDayData.value, 10) : 7;
 
-            // Allow user a custom free trial limit, otherwise use global default (7 days)
-            const userFreeDays = user?.custom_free_trial_days ?? globalPaywallDay;
-
             // Determine Expiration: Free trial active during Day 1 ~ Day 7
-            const expired = diffDays > userFreeDays;
+            const expired = diffDays > globalPaywallDay;
             setIsTrialExpired(expired);
 
             // 3. Check Subscription

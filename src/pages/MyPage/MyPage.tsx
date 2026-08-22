@@ -92,7 +92,7 @@ export default function MyPage() {
 
     // Subscription State
     // Paywall States
-    const [globalPaywallDay, setGlobalPaywallDay] = useState(5);
+    const [globalPaywallDay, setGlobalPaywallDay] = useState(7);
     const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
 
     // Account Deletion Verification State
@@ -176,10 +176,10 @@ export default function MyPage() {
         const diffMs = now.getTime() - start.getTime();
         const dayCount = Math.floor(diffMs / (1000 * 60 * 60 * 24)) + 1;
 
-        // Priority: User Custom > Global Default
+        // Priority: Global Default
         // If limit is 10, Day 10 is free. Day 11 is locked.
         // So Locked if Day > Limit.
-        const limit = user?.custom_free_trial_days ?? globalPaywallDay;
+        const limit = globalPaywallDay;
 
         return dayCount <= limit;
     };

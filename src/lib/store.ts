@@ -10,7 +10,6 @@ interface User {
     // Subscription
     subscription_tier?: 'free' | 'premium';
     subscription_end_date?: string;
-    custom_free_trial_days?: number;
     full_name?: string;
     phone?: string;
     notification_time?: string; // HH:mm format

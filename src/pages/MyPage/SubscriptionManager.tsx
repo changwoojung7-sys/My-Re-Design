@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Check, X, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Check, X, Sparkles, Receipt, Loader2 } from 'lucide-react';
 import { useLanguage } from '../../lib/i18n';
 import { useStore } from '../../lib/store';
 import { supabase } from '../../lib/supabase';
 import type { GoalCategory } from './MyPage';
 import SupportModal from '../../components/layout/SupportModal';
+import { requestSubscriptionPayment } from '../../lib/payment';
 
 interface SubscriptionManagerProps {
     onClose: () => void;
@@ -12,14 +13,16 @@ interface SubscriptionManagerProps {
 }
 
 const PRO_PRICING = [
-    { type: 'pro_monthly', months: 1, price: 9900, label: '1개월', subtitle: '매월 결제' },
-    { type: 'pro_yearly', months: 12, price: 59000, label: '12개월', subtitle: '연 59,000원 (월 4,900원 상당)' },
+    { type: 'pro_monthly', months: 1, price: 2900, label: '1개월 패스', subtitle: '기본형', save: '', badge: '기본형' },
+    { type: 'pro_quarterly', months: 3, price: 7900, label: '3개월 패스', subtitle: '10% 할인 (정상가 8,700원)', save: '10%', badge: '인기', best: true },
+    { type: 'pro_yearly', months: 12, price: 29900, label: '1년 패스', subtitle: '15% 할인 (정상가 34,800원)', save: '15%', badge: '최고 가치' },
 ];
 
 export default function SubscriptionManager({ onClose }: SubscriptionManagerProps) {
     const { t } = useLanguage();
-    const { user, setUser } = useStore();
+    const { user } = useStore();
     const [loading, setLoading] = useState(false);
+    const [history, setHistory] = useState<any[]>([]);
 
     // Support Modal State
     const [supportModalState, setSupportModalState] = useState<{
@@ -31,29 +34,85 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
         setSupportModalState({ isOpen: true, view });
     };
 
-    const handleSubscribe = async (tier: typeof PRO_PRICING[0]) => {
+    useEffect(() => {
+        if (user) {
+            fetchHistoryAndSync();
+        }
+    }, [user?.id]);
+
+    const fetchHistoryAndSync = async () => {
         if (!user) return;
-        
-        // Dummy Payment Logic for now (Simulate PortOne success)
-        const confirmMsg = `${tier.label} Pro 플랜을 구독하시겠습니까?\n\n결제 금액: ${tier.price.toLocaleString()}원`;
-        if (!window.confirm(confirmMsg)) return;
+        try {
+            // 1. Fetch Payments History
+            const { data: payData } = await supabase
+                .from('payments')
+                .select('*')
+                .eq('user_id', user.id)
+                .order('created_at', { ascending: false });
+            if (payData) setHistory(payData);
+
+            // 2. Fetch Active Subscriptions
+            const now = new Date().toISOString();
+            const { data: activeSubs } = await supabase
+                .from('subscriptions')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('status', 'active')
+                .gt('end_date', now);
+
+            const hasActiveSub = activeSubs && activeSubs.length > 0;
+
+            // 3. If user has pro plan_type but NO active subscription, reset to 'free'
+            if (!hasActiveSub && (user.plan_type === 'pro_monthly' || user.plan_type === 'pro_yearly')) {
+                await supabase
+                    .from('profiles')
+                    .update({ plan_type: 'free', subscription_tier: 'free' })
+                    .eq('id', user.id);
+
+                useStore.getState().setUser({
+                    ...user,
+                    plan_type: 'free',
+                    subscription_tier: 'free' as any
+                });
+            } else if (hasActiveSub && user.plan_type === 'free') {
+                // If user has active sub but plan_type is free, sync to active sub
+                const latestSub = activeSubs[0];
+                const newPlan = latestSub.type === 'pro_yearly' ? 'pro_yearly' : 'pro_monthly';
+                await supabase
+                    .from('profiles')
+                    .update({ plan_type: newPlan, subscription_tier: 'premium' })
+                    .eq('id', user.id);
+
+                useStore.getState().setUser({
+                    ...user,
+                    plan_type: newPlan as any,
+                    subscription_tier: 'premium' as any
+                });
+            }
+        } catch (e) {
+            console.error('Error syncing subscription/payment data:', e);
+        }
+    };
+
+    const handleSubscribe = async (tier: typeof PRO_PRICING[0]) => {
+        if (!user) {
+            alert('로그인이 필요한 서비스입니다.');
+            return;
+        }
 
         setLoading(true);
         try {
-            // Update profile
-            const { error } = await supabase
-                .from('profiles')
-                .update({ plan_type: tier.type })
-                .eq('id', user.id);
-
-            if (error) throw error;
-
-            setUser({ ...user, plan_type: tier.type as any });
-            alert('구독이 완료되었습니다! 이제 모든 Pro 기능을 사용할 수 있습니다.');
-            onClose();
+            const result = await requestSubscriptionPayment(user, tier, window.location.pathname);
+            if (result.success) {
+                alert('구독이 완료되었습니다! 이제 모든 Pro 기능을 사용할 수 있습니다.');
+                await fetchHistoryAndSync();
+                onClose();
+            } else if (result.error) {
+                alert(result.error);
+            }
         } catch (e: any) {
             console.error('Subscription error:', e);
-            alert('구독 처리 중 오류가 발생했습니다.');
+            alert('결제 처리 중 오류가 발생했습니다: ' + (e.message || '다시 시도해주세요.'));
         } finally {
             setLoading(false);
         }
@@ -101,32 +160,83 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                 {/* Plans */}
                 <div className="space-y-4">
                     <h3 className="text-sm font-bold text-white px-1">플랜 선택</h3>
-                    {PRO_PRICING.map(tier => (
-                        <div 
-                            key={tier.type}
-                            className="bg-slate-800/50 rounded-3xl p-1 border border-white/10 hover:border-primary/50 transition-colors overflow-hidden"
-                        >
-                            <div className="p-4">
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="text-lg font-bold text-white">{tier.label}</span>
-                                    <span className="text-xl font-black text-primary">{tier.price.toLocaleString()}원</span>
-                                </div>
-                                <p className="text-xs text-slate-400">{tier.subtitle}</p>
-                            </div>
-                            <button
-                                onClick={() => handleSubscribe(tier)}
-                                disabled={loading || user?.plan_type === tier.type}
-                                className={`w-full py-4 text-sm font-bold transition-colors ${
-                                    user?.plan_type === tier.type 
-                                        ? 'bg-white/10 text-slate-400 cursor-not-allowed'
-                                        : 'bg-primary text-black hover:bg-primary/90'
+                    {PRO_PRICING.map(tier => {
+                        const isCurrentPlan = user?.plan_type === tier.type;
+                        return (
+                            <div 
+                                key={tier.type}
+                                className={`rounded-3xl p-1 border transition-all overflow-hidden relative ${
+                                    tier.best 
+                                        ? 'bg-slate-800/80 border-primary/50 shadow-[0_0_20px_rgba(168,85,247,0.15)]' 
+                                        : 'bg-slate-800/50 border-white/10 hover:border-primary/30'
                                 }`}
                             >
-                                {user?.plan_type === tier.type ? '현재 이용 중인 플랜' : '구독하기'}
-                            </button>
-                        </div>
-                    ))}
+                                {tier.badge && (
+                                    <div className={`absolute top-3 right-4 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full shadow-md ${tier.best ? 'bg-gradient-to-r from-primary to-pink-500' : 'bg-slate-700'}`}>
+                                        {tier.badge}
+                                    </div>
+                                )}
+                                <div className="p-4">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-lg font-bold text-white">{tier.label}</span>
+                                        <span className="text-xl font-black text-primary">{tier.price.toLocaleString()}원</span>
+                                    </div>
+                                    <p className="text-xs text-slate-400">{tier.subtitle}</p>
+                                </div>
+                                <button
+                                    onClick={() => handleSubscribe(tier)}
+                                    disabled={loading || isCurrentPlan}
+                                    className={`w-full py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                                        isCurrentPlan 
+                                            ? 'bg-white/10 text-slate-400 cursor-not-allowed'
+                                            : 'bg-primary text-black hover:bg-primary/90 active:scale-[0.99]'
+                                    }`}
+                                >
+                                    {loading ? (
+                                        <>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>결제창 준비 중...</span>
+                                        </>
+                                    ) : isCurrentPlan ? (
+                                        '현재 이용 중인 플랜'
+                                    ) : (
+                                        '구독하기'
+                                    )}
+                                </button>
+                            </div>
+                        );
+                    })}
                 </div>
+
+                {/* Payment History Section */}
+                {history.length > 0 && (
+                    <div className="bg-white/5 rounded-3xl p-5 border border-white/5 space-y-3">
+                        <div className="flex items-center gap-2 text-white font-bold text-sm">
+                            <Receipt size={16} className="text-primary" />
+                            <span>결제 내역</span>
+                        </div>
+                        <div className="divide-y divide-white/5">
+                            {history.slice(0, 5).map((item) => (
+                                <div key={item.id} className="py-2.5 flex justify-between items-center text-xs">
+                                    <div>
+                                        <p className="text-slate-200 font-medium">
+                                            {item.plan_type === 'pro_yearly' ? 'Pro 12개월' : item.plan_type === 'pro_monthly' ? 'Pro 1개월' : item.plan_type}
+                                        </p>
+                                        <p className="text-[10px] text-slate-400">
+                                            {new Date(item.created_at).toLocaleDateString('ko-KR')}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-bold text-primary">₩{Number(item.amount).toLocaleString()}</p>
+                                        <p className={`text-[10px] ${item.status === 'paid' ? 'text-emerald-400' : 'text-slate-400'}`}>
+                                            {item.status === 'paid' ? '결제완료' : item.status}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* Footer Links */}
                 <div className="mt-8 pt-6 border-t border-white/5 flex flex-wrap justify-center gap-x-6 gap-y-3 px-4">
