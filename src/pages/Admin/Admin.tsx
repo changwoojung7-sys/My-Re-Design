@@ -231,7 +231,7 @@ export default function Admin() {
         const s = new Date(start);
         const e = new Date(end);
         const diffMonth = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
-        return diffMonth > 0 ? `${diffMonth} Months` : '1 Month';
+        return diffMonth > 0 ? `${diffMonth}개월` : '1개월';
     };
 
     const cancelPayment = async (id: string, imp_uid?: string, merchant_uid?: string, isForce: boolean = false) => {
