@@ -118,14 +118,9 @@ export default function MyPage() {
             if (!user) return;
 
             // 1. Subscriptions
-            const { data: subs } = await supabase
-                .from('subscriptions')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('status', 'active')
-                .gte('end_date', new Date().toISOString());
-
-            if (subs) setActiveSubscriptions(subs);
+            const { getActiveSubscriptions } = await import('../../lib/payment');
+            const activeSubs = await getActiveSubscriptions(user.id);
+            if (activeSubs.length > 0) setActiveSubscriptions(activeSubs);
 
             // 2. Global Paywall Setting
             const { data: adminData } = await supabase.from('admin_settings').select('value').eq('key', 'paywall_start_day').single();
@@ -163,7 +158,7 @@ export default function MyPage() {
         if (user?.plan_type === 'pro_monthly' || user?.plan_type === 'pro_yearly') return true;
 
         // Legacy subscription check (if still relying on DB table)
-        const hasAllAccess = activeSubscriptions.some(s => s.type === 'all' || s.type === 'pro');
+        const hasAllAccess = activeSubscriptions.some(s => s.type === 'all' || s.type.startsWith('pro'));
         const hasMissionAccess = activeSubscriptions.some(s => s.type === 'mission' && s.target_id === category);
         if (hasAllAccess || hasMissionAccess) return true;
 

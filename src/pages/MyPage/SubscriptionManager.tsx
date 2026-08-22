@@ -53,16 +53,11 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
             if (payData) setHistory(payData.filter((p: any) => p.status === 'paid'));
 
             // 2. Fetch Active Subscriptions
-            const now = new Date().toISOString();
-            const { data: activeSubs } = await supabase
-                .from('subscriptions')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('status', 'active')
-                .gt('end_date', now);
+            const { getActiveSubscriptions } = await import('../../lib/payment');
+            const activeSubs = await getActiveSubscriptions(user.id);
 
-            if (activeSubs) setActiveSubscriptions(activeSubs);
-            const hasActiveSub = activeSubs && activeSubs.length > 0;
+            if (activeSubs.length > 0) setActiveSubscriptions(activeSubs);
+            const hasActiveSub = activeSubs.length > 0;
 
             // 3. If user has pro plan_type but NO active subscription, reset to 'free'
             if (!hasActiveSub && (user.plan_type === 'pro_monthly' || user.plan_type === 'pro_yearly')) {

@@ -31,16 +31,11 @@ export default function Paywall({ onClose }: PaywallProps) {
         const verifyActiveSubscription = async () => {
             if (!user) return;
             try {
-                const now = new Date().toISOString();
-                const { data: activeSubs } = await supabase
-                    .from('subscriptions')
-                    .select('*')
-                    .eq('user_id', user.id)
-                    .eq('status', 'active')
-                    .gt('end_date', now);
+                const { getActiveSubscriptions } = await import('../../lib/payment');
+                const activeSubs = await getActiveSubscriptions(user.id);
 
-                if (activeSubs) setActiveSubscriptions(activeSubs);
-                const hasActiveSub = activeSubs && activeSubs.length > 0;
+                if (activeSubs.length > 0) setActiveSubscriptions(activeSubs);
+                const hasActiveSub = activeSubs.length > 0;
                 if (!hasActiveSub && (user.plan_type === 'pro_monthly' || user.plan_type === 'pro_yearly')) {
                     await supabase
                         .from('profiles')

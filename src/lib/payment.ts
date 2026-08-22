@@ -18,6 +18,46 @@ export interface PaymentTier {
     best?: boolean;
 }
 
+export const getActiveSubscriptions = async (userId: string) => {
+    const now = new Date().toISOString();
+    const [subsRes, paysRes] = await Promise.all([
+        supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'active')
+            .gt('end_date', now),
+        supabase
+            .from('payments')
+            .select('*')
+            .eq('user_id', userId)
+            .eq('status', 'paid')
+            .gt('coverage_end_date', now)
+    ]);
+
+    const activeSubs: any[] = [];
+    if (subsRes.data) activeSubs.push(...subsRes.data);
+    
+    if (paysRes.data) {
+        // Convert payments to subscription-like format and deduplicate
+        const paySubs = paysRes.data
+            .filter(p => !activeSubs.some(sub => sub.start_date === p.coverage_start_date && sub.end_date === p.coverage_end_date))
+            .map(p => ({
+                id: p.id,
+                user_id: p.user_id,
+                type: p.plan_type,
+                start_date: p.coverage_start_date,
+                end_date: p.coverage_end_date,
+                status: 'active'
+            }));
+        activeSubs.push(...paySubs);
+    }
+
+    // Sort by end_date descending (longest active subscription first)
+    activeSubs.sort((a, b) => new Date(b.end_date).getTime() - new Date(a.end_date).getTime());
+    return activeSubs;
+};
+
 export interface PaymentRequest {
     user: any;
     tier: PaymentTier;

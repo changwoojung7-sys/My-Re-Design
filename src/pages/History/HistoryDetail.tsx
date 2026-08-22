@@ -43,15 +43,11 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
         }
 
         // 프리미엄 구독 여부만 확인 (비구독자는 항상 광고 시청)
-        const { data: subs } = await supabase
-            .from('subscriptions')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('status', 'active')
-            .gt('end_date', new Date().toISOString());
+        const { getActiveSubscriptions } = await import('../../lib/payment');
+        const subs = await getActiveSubscriptions(user.id);
 
         if (subs && subs.length > 0) {
-            const hasAllAccess = subs.some((s: any) => s.type === 'all' || s.type === 'pro');
+            const hasAllAccess = subs.some((s: any) => s.type === 'all' || s.type.startsWith('pro'));
             const hasCategoryAccess = subs.some((s: any) => s.type === 'mission' && s.target_id === goal.category);
 
             if (hasAllAccess || hasCategoryAccess) {
