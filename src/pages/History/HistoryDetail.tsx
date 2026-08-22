@@ -250,57 +250,58 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
     return (
         <div className="fixed inset-0 z-[60] bg-black/90 backdrop-blur-xl flex flex-col animate-in fade-in duration-200">
             {/* Header */}
-            <div className="p-6 flex justify-between items-center bg-black/50 border-b border-white/10 shrink-0">
-                <div>
+            <div className="p-5 bg-black/50 border-b border-white/10 shrink-0 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-primary uppercase tracking-wide">
                         Challenge #{goal.seq || 1}
                     </span>
-                    <h2 className="text-2xl font-bold text-white mt-1">
-                        {goal.target_text || t[goal.category as keyof typeof t]}
-                    </h2>
-                </div>
-                <div className="flex gap-2">
-                    {missions.length > 0 && (
-                        <>
-                            <button
-                                onClick={() => setEditMode(!editMode)}
-                                className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-bold transition-all ${editMode
-                                    ? 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                    : 'bg-white/10 text-slate-300 hover:bg-white/20'
-                                    }`}
-                            >
-                                <Pencil size={14} />
-                                {editMode ? '완료' : '수정'}
-                            </button>
-                            {!editMode && (
-                                <>
-                                    <button
-                                        onClick={() => setShowShareCard(true)}
-                                        className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full text-white shadow-lg hover:shadow-indigo-500/30 transition-all"
-                                        title="공유 숏폼 만들기"
-                                    >
-                                        <Share2 size={16} />
-                                    </button>
-                                    <button
-                                        onClick={handlePlayClick}
-                                        className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-sm font-bold shadow-lg hover:shadow-purple-500/30 transition-all animate-pulse"
-                                    >
-                                        <Clapperboard size={16} />
-                                        Play Movie
-                                        {!hasAccess && <span className="text-[10px] bg-black/20 px-1.5 py-0.5 rounded ml-1">AD</span>}
-                                    </button>
-                                </>
-                            )}
-                        </>
-                    )}
                     <button
                         title="닫기"
                         onClick={onClose}
-                        className="p-2 bg-white/10 hover:bg-white/20 rounded-full transition-colors"
+                        className="p-2 bg-white/10 hover:bg-white/20 active:scale-95 rounded-full transition-all text-white"
                     >
-                        <X size={24} className="text-white" />
+                        <X size={20} />
                     </button>
                 </div>
+
+                <h2 className="text-xl font-bold text-white break-words leading-snug">
+                    {goal.target_text || t[goal.category as keyof typeof t]}
+                </h2>
+
+                {missions.length > 0 && (
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                        <button
+                            onClick={() => setEditMode(!editMode)}
+                            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all active:scale-95 ${editMode
+                                ? 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                : 'bg-white/10 text-slate-300 hover:bg-white/20'
+                                }`}
+                        >
+                            <Pencil size={13} />
+                            {editMode ? '완료' : '수정'}
+                        </button>
+                        {!editMode && (
+                            <>
+                                <button
+                                    onClick={() => setShowShareCard(true)}
+                                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full text-white text-xs font-bold shadow-md hover:shadow-indigo-500/30 active:scale-95 transition-all"
+                                    title="공유 숏폼 만들기"
+                                >
+                                    <Share2 size={13} />
+                                    <span>공유</span>
+                                </button>
+                                <button
+                                    onClick={handlePlayClick}
+                                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full text-white text-xs font-bold shadow-md hover:shadow-purple-500/30 active:scale-95 transition-all animate-pulse"
+                                >
+                                    <Clapperboard size={14} />
+                                    <span>Play Movie</span>
+                                    {!hasAccess && <span className="text-[10px] bg-black/30 px-1.5 py-0.5 rounded ml-0.5 font-normal">AD</span>}
+                                </button>
+                            </>
+                        )}
+                    </div>
+                )}
             </div>
 
 

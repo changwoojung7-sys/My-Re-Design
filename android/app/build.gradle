@@ -7,8 +7,8 @@ android {
         applicationId "com.calamus.myredesign"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 37
-        versionName "2.1.7"
+        versionCode 38
+        versionName "2.1.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
