@@ -136,8 +136,8 @@ export default function Paywall({ onClose }: PaywallProps) {
                     {/* Plans Grid */}
                     <div className="flex flex-col gap-3 mb-8">
                         {PRO_PRICING.map(tier => {
-                            const currentSub = activeSubscriptions.find(s => s.type === tier.type);
-                            const isCurrentPlan = !!currentSub;
+                            const isCurrentPlan = user?.plan_type === tier.type;
+                            const currentSub = isCurrentPlan && activeSubscriptions.length > 0 ? activeSubscriptions[0] : null;
                             let isExpiringSoon = false;
                             let endDateStr = '';
                             if (currentSub) {

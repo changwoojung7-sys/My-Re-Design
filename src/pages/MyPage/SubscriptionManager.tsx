@@ -163,8 +163,8 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                 <div className="space-y-4">
                     <h3 className="text-sm font-bold text-white px-1">플랜 선택</h3>
                     {PRO_PRICING.map(tier => {
-                        const currentSub = activeSubscriptions.find(s => s.type === tier.type);
-                        const isCurrentPlan = !!currentSub;
+                        const isCurrentPlan = user?.plan_type === tier.type;
+                        const currentSub = isCurrentPlan && activeSubscriptions.length > 0 ? activeSubscriptions[0] : null;
                         let isExpiringSoon = false;
                         let endDateStr = '';
                         if (currentSub) {

@@ -206,6 +206,7 @@ export const requestSubscriptionPayment = async (
         const startDate = new Date();
         const endDate = new Date(startDate);
         endDate.setMonth(endDate.getMonth() + tier.months);
+        endDate.setDate(endDate.getDate() - 1); // 종료일은 한 달 뒤의 전날까지
 
         // 3. Prepare IDs
         const merchantUid = `mid_${Date.now()}`;
