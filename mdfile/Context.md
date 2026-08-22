@@ -42,7 +42,7 @@
 
 | 경로 | 컴포넌트 | 설명 |
 |------|----------|------|
-| `/login` | Login | 로그인 (카카오/이메일) |
+| `/login` | Login | 로그인 (이메일) |
 | `/onboarding` | Onboarding | 신규 가입 초기 설정 |
 | `/reset-password` | ResetPassword | 비밀번호 재설정 |
 | `/` | MyPage | 기본 홈 (마이페이지) |
@@ -61,7 +61,7 @@
 
 ### 사용자 흐름
 
-1. **Splash/Login**: 카카오 로그인 또는 이메일 로그인. 카카오 리다이렉트 핸들러(`KakaoRedirectHandler`) 내장.
+1. **Splash/Login**: 이메일 로그인. 결제 및 소셜 로그인을 방해하는 카카오톡 인앱 브라우저를 외부 브라우저(크롬/사파리)로 강제 전환해주는 리다이렉트 핸들러(`KakaoRedirectHandler`) 내장.
 2. **Onboarding**: (신규 유저) 나이, 성별, 주요 목표(Body/Mind/Growth) 설정.
 3. **Main (Today)**: 매일 생성되는 미션 확인 및 인증.
 4. **하단 탭 네비게이션**: My Loop → Today → Growth → History → Friends
@@ -256,7 +256,7 @@
 
 ### G. 로그인 (Login.tsx) `/login`
 
-- **카카오 로그인**: OAuth 기반, 카카오 리다이렉트 핸들러 내장
+- **카카오 인앱 브라우저 이탈 방지**: 결제 호환성을 위해 `KakaoRedirectHandler`가 카카오톡 인앱 브라우저를 감지하고 크롬/사파리로 강제 리다이렉트 시킴
 - **이메일 로그인**: Supabase Auth
 - **비밀번호 찾기**: OTP 기반 비밀번호 재설정 (ResetPassword.tsx)
 - **데모 계정**: `demo123`으로 체험 가능
