@@ -162,15 +162,40 @@ export default function Admin() {
         const { data: freshUser } = await supabase.from('profiles').select('*').eq('id', user.id).single();
         const { data: freshSubs } = await supabase.from('subscriptions').select('*').eq('user_id', user.id).order('created_at', { ascending: false });
 
+        // Fetch payments first to merge them
+        const { data: payments } = await supabase
+            .from('payments')
+            .select('*')
+            .eq('user_id', user.id)
+            .neq('status', 'pending')
+            .order('created_at', { ascending: false });
+
+        const combinedSubs: any[] = [];
+        if (freshSubs) combinedSubs.push(...freshSubs);
+        if (payments) {
+            const paySubs = payments
+                .filter((p: any) => !combinedSubs.some(sub => sub.start_date === p.coverage_start_date && sub.end_date === p.coverage_end_date))
+                .map((p: any) => ({
+                    id: p.id,
+                    user_id: p.user_id,
+                    type: p.plan_type,
+                    start_date: p.coverage_start_date,
+                    end_date: p.coverage_end_date,
+                    status: p.status === 'paid' ? 'active' : 'cancelled'
+                }));
+            combinedSubs.push(...paySubs);
+        }
+        // Sort by start date descending
+        combinedSubs.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+
         // Calculate enriched fields
         const enrichedUser = {
             ...freshUser,
-            // Fallback to existing user data if fresh fetch fails (though unlikely)
             nickname: freshUser?.nickname || user.nickname,
             email: freshUser?.email || user.email,
-            subscriptions: freshSubs || [],
-            is_premium: freshSubs?.some((s: any) => s.type === 'all' && s.status === 'active'),
-            active_plan: freshSubs?.find((s: any) => s.status === 'active' && s.type !== 'all')?.target_id
+            subscriptions: combinedSubs,
+            is_premium: combinedSubs.some((s: any) => (s.type === 'all' || s.type?.startsWith('pro')) && s.status === 'active' && new Date(s.end_date) > new Date()),
+            active_plan: combinedSubs.find((s: any) => s.status === 'active' && new Date(s.end_date) > new Date() && s.type !== 'all' && !s.type?.startsWith('pro'))?.target_id
         };
 
         setSelectedUser(enrichedUser);
@@ -181,14 +206,6 @@ export default function Admin() {
             .from('user_goals')
             .select('*')
             .eq('user_id', user.id)
-            .order('created_at', { ascending: false });
-
-        // Fetch payments
-        const { data: payments } = await supabase
-            .from('payments')
-            .select('*')
-            .eq('user_id', user.id)
-            .neq('status', 'pending')
             .order('created_at', { ascending: false });
 
         setUserMissions(goals || []);
@@ -734,8 +751,8 @@ export default function Admin() {
                                                 <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center group">
                                                     <div>
                                                         <div className="flex items-center gap-2">
-                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${sub.type === 'all' ? 'bg-purple-500/20 text-purple-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
-                                                                {sub.type === 'all' ? '전체 플랜' : sub.target_id}
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase ${(sub.type === 'all' || sub.type?.startsWith('pro')) ? 'bg-purple-500/20 text-purple-300' : 'bg-emerald-500/20 text-emerald-300'}`}>
+                                                                {(sub.type === 'all' || sub.type?.startsWith('pro')) ? '전체 플랜' : sub.target_id}
                                                             </span>
                                                             {sub.status === 'cancelled' && <span className="text-[9px] text-red-400 font-bold">(취소됨)</span>}
                                                         </div>
