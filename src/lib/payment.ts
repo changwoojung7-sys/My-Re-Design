@@ -260,7 +260,7 @@ export const requestSubscriptionPayment = async (
                 payMethod: "CARD",
                 customer: {
                     email: user.email || undefined,
-                    phoneNumber: user.phone || undefined,
+                    phoneNumber: user.phone || "01000000000",
                     fullName: user.nickname || "고객"
                 },
                 redirectUrl: `${window.location.origin}${redirectPath}`
