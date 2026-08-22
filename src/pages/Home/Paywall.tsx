@@ -122,7 +122,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                     {/* Features */}
                     <div className="bg-white/5 rounded-2xl p-5 mb-8 border border-white/5">
                         <ul className="space-y-4">
-                            {['모든 카테고리 (Body, Mind, Growth) 미션 무제한 이용', 'AI 주간 바이브 리포트 및 심층 코칭 분석', 'Color Jam 캘린더 등 고급 통계 기능', '친구 초대 및 무제한 버디 챌린지 생성'].map((feat, idx) => (
+                            {['모든 카테고리 (Body, Mind, Growth) 미션 무제한 이용', '과거 미션 기록 (Play Movie) 시청 시 팝업 광고 완전 제거', '프로필 프리미엄 전용 황금색 VIP 뱃지 표시', '향후 추가될 신규 프리미엄 기능 우선 체험권'].map((feat, idx) => (
                                 <li key={idx} className="flex items-start gap-3">
                                     <div className="mt-0.5 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                                         <Check size={12} className="text-primary" />

@@ -148,7 +148,7 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                 <div className="bg-white/5 rounded-3xl p-5 border border-white/5">
                     <h3 className="text-sm font-bold text-white mb-4">Pro 혜택 안내</h3>
                     <ul className="space-y-3">
-                        {['모든 카테고리 (Body, Mind, Growth) 미션 무제한 이용', 'AI 주간 바이브 리포트 및 심층 코칭 분석', 'Color Jam 캘린더 등 고급 통계 기능', '친구 초대 및 무제한 버디 챌린지 생성'].map((benefit, i) => (
+                        {['모든 카테고리 (Body, Mind, Growth) 미션 무제한 이용', '과거 미션 기록 (Play Movie) 시청 시 팝업 광고 완전 제거', '프로필 프리미엄 전용 황금색 VIP 뱃지 표시', '향후 추가될 신규 프리미엄 기능 우선 체험권'].map((benefit, i) => (
                             <li key={i} className="flex items-start gap-3">
                                 <div className="mt-0.5 text-primary shrink-0">
                                     <Check size={16} />
