@@ -263,6 +263,10 @@ export const requestSubscriptionPayment = async (
                     phoneNumber: user.phone || "01000000000",
                     fullName: user.nickname || "고객"
                 },
+                windowType: {
+                    pc: 'IFRAME',
+                    mobile: 'REDIRECTION'
+                },
                 redirectUrl: `${window.location.origin}${redirectPath}`
             });
 
