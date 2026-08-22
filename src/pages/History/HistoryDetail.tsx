@@ -51,7 +51,7 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
             .gt('end_date', new Date().toISOString());
 
         if (subs && subs.length > 0) {
-            const hasAllAccess = subs.some((s: any) => s.type === 'all');
+            const hasAllAccess = subs.some((s: any) => s.type === 'all' || s.type === 'pro');
             const hasCategoryAccess = subs.some((s: any) => s.type === 'mission' && s.target_id === goal.category);
 
             if (hasAllAccess || hasCategoryAccess) {

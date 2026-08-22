@@ -163,7 +163,7 @@ export default function MyPage() {
         if (user?.plan_type === 'pro_monthly' || user?.plan_type === 'pro_yearly') return true;
 
         // Legacy subscription check (if still relying on DB table)
-        const hasAllAccess = activeSubscriptions.some(s => s.type === 'all');
+        const hasAllAccess = activeSubscriptions.some(s => s.type === 'all' || s.type === 'pro');
         const hasMissionAccess = activeSubscriptions.some(s => s.type === 'mission' && s.target_id === category);
         if (hasAllAccess || hasMissionAccess) return true;
 
