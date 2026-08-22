@@ -21,6 +21,7 @@ export default function Paywall({ onClose }: PaywallProps) {
     const { t } = useLanguage();
     const { user } = useStore();
     const [loading, setLoading] = useState(false);
+    const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
     const [supportModalState, setSupportModalState] = useState<{ isOpen: boolean, view: 'main' | 'terms' | 'privacy' | 'refund' }>({
         isOpen: false,
         view: 'main'
@@ -38,6 +39,7 @@ export default function Paywall({ onClose }: PaywallProps) {
                     .eq('status', 'active')
                     .gt('end_date', now);
 
+                if (activeSubs) setActiveSubscriptions(activeSubs);
                 const hasActiveSub = activeSubs && activeSubs.length > 0;
                 if (!hasActiveSub && (user.plan_type === 'pro_monthly' || user.plan_type === 'pro_yearly')) {
                     await supabase
@@ -133,34 +135,52 @@ export default function Paywall({ onClose }: PaywallProps) {
 
                     {/* Plans Grid */}
                     <div className="flex flex-col gap-3 mb-8">
-                        {PRO_PRICING.map(tier => (
-                            <button
-                                key={tier.type}
-                                onClick={() => handleSubscribe(tier)}
-                                disabled={loading}
-                                className={`relative p-4 rounded-2xl border text-left transition-all ${
-                                    tier.best 
-                                    ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
-                                    : 'bg-white/5 border-white/10 hover:bg-white/10'
-                                }`}
-                            >
-                                {tier.badge && (
-                                    <div className={`absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 whitespace-nowrap ${tier.best ? 'bg-gradient-to-r from-primary to-pink-500' : 'bg-slate-700'}`}>
-                                        {tier.best && <Sparkles size={10} />}
-                                        {tier.badge}
+                        {PRO_PRICING.map(tier => {
+                            const currentSub = activeSubscriptions.find(s => s.type === tier.type);
+                            const isCurrentPlan = !!currentSub;
+                            let isExpiringSoon = false;
+                            let endDateStr = '';
+                            if (currentSub) {
+                                const endDate = new Date(currentSub.end_date);
+                                endDateStr = endDate.toLocaleDateString('ko-KR');
+                                isExpiringSoon = endDate.getTime() - Date.now() < 24 * 60 * 60 * 1000;
+                            }
+    
+                            const disableButton = loading || (isCurrentPlan && !isExpiringSoon);
+
+                            return (
+                                <button
+                                    key={tier.type}
+                                    onClick={() => handleSubscribe(tier)}
+                                    disabled={disableButton}
+                                    className={`relative p-4 rounded-2xl border text-left transition-all ${
+                                        tier.best 
+                                        ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(168,85,247,0.3)]' 
+                                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                                    } ${disableButton ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                >
+                                    {tier.badge && (
+                                        <div className={`absolute -top-3 left-1/2 -translate-x-1/2 text-white text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1 whitespace-nowrap ${tier.best ? 'bg-gradient-to-r from-primary to-pink-500' : 'bg-slate-700'}`}>
+                                            {tier.best && <Sparkles size={10} />}
+                                            {tier.badge}
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center mt-1">
+                                        <div className="text-lg font-bold text-white">{tier.label}</div>
+                                        <div className="text-xl font-black text-primary">
+                                            {isCurrentPlan && !isExpiringSoon 
+                                                ? <span className="text-sm font-bold text-primary">구독중 (~{endDateStr})</span>
+                                                : `${tier.price.toLocaleString()}원`
+                                            }
+                                        </div>
                                     </div>
-                                )}
-                                <div className="flex justify-between items-center mt-1">
-                                    <div className="text-lg font-bold text-white">{tier.label}</div>
-                                    <div className="text-xl font-black text-primary">
-                                        {tier.price.toLocaleString()}원
+                                    <div className="text-[10px] text-slate-400 leading-tight mt-1 flex justify-between">
+                                        <span>{tier.subtitle}</span>
+                                        {isCurrentPlan && isExpiringSoon && <span className="text-accent font-bold">만료 예정 (재구독 가능)</span>}
                                     </div>
-                                </div>
-                                <div className="text-[10px] text-slate-400 leading-tight mt-1">
-                                    {tier.subtitle}
-                                </div>
-                            </button>
-                        ))}
+                                </button>
+                            );
+                        })}
                     </div>
 
                     {/* Actions */}

@@ -23,6 +23,7 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
     const { user } = useStore();
     const [loading, setLoading] = useState(false);
     const [history, setHistory] = useState<any[]>([]);
+    const [activeSubscriptions, setActiveSubscriptions] = useState<any[]>([]);
 
     // Support Modal State
     const [supportModalState, setSupportModalState] = useState<{
@@ -49,7 +50,7 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                 .select('*')
                 .eq('user_id', user.id)
                 .order('created_at', { ascending: false });
-            if (payData) setHistory(payData);
+            if (payData) setHistory(payData.filter((p: any) => p.status === 'paid'));
 
             // 2. Fetch Active Subscriptions
             const now = new Date().toISOString();
@@ -60,6 +61,7 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                 .eq('status', 'active')
                 .gt('end_date', now);
 
+            if (activeSubs) setActiveSubscriptions(activeSubs);
             const hasActiveSub = activeSubs && activeSubs.length > 0;
 
             // 3. If user has pro plan_type but NO active subscription, reset to 'free'
@@ -161,7 +163,18 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                 <div className="space-y-4">
                     <h3 className="text-sm font-bold text-white px-1">플랜 선택</h3>
                     {PRO_PRICING.map(tier => {
-                        const isCurrentPlan = user?.plan_type === tier.type;
+                        const currentSub = activeSubscriptions.find(s => s.type === tier.type);
+                        const isCurrentPlan = !!currentSub;
+                        let isExpiringSoon = false;
+                        let endDateStr = '';
+                        if (currentSub) {
+                            const endDate = new Date(currentSub.end_date);
+                            endDateStr = endDate.toLocaleDateString('ko-KR');
+                            isExpiringSoon = endDate.getTime() - Date.now() < 24 * 60 * 60 * 1000;
+                        }
+
+                        const disableButton = loading || (isCurrentPlan && !isExpiringSoon);
+
                         return (
                             <div 
                                 key={tier.type}
@@ -185,9 +198,9 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                                 </div>
                                 <button
                                     onClick={() => handleSubscribe(tier)}
-                                    disabled={loading || isCurrentPlan}
+                                    disabled={disableButton}
                                     className={`w-full py-4 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                                        isCurrentPlan 
+                                        disableButton 
                                             ? 'bg-white/10 text-slate-400 cursor-not-allowed'
                                             : 'bg-primary text-black hover:bg-primary/90 active:scale-[0.99]'
                                     }`}
@@ -198,7 +211,7 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                                             <span>결제창 준비 중...</span>
                                         </>
                                     ) : isCurrentPlan ? (
-                                        '현재 이용 중인 플랜'
+                                        isExpiringSoon ? '만료 예정 (재구독 가능)' : `구독중 (~${endDateStr})`
                                     ) : (
                                         '구독하기'
                                     )}
@@ -224,6 +237,7 @@ export default function SubscriptionManager({ onClose }: SubscriptionManagerProp
                                         </p>
                                         <p className="text-[10px] text-slate-400">
                                             {new Date(item.created_at).toLocaleDateString('ko-KR')}
+                                            {item.coverage_end_date && ` ~ ${new Date(item.coverage_end_date).toLocaleDateString('ko-KR')}`}
                                         </p>
                                     </div>
                                     <div className="text-right">

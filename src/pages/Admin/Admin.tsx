@@ -789,6 +789,7 @@ export default function Admin() {
                                             userPayments.map((pay: any, idx: number) => {
                                                 const isCancelled = pay.status === 'cancelled' || !!pay.cancelled_at;
                                                 const isPaid = pay.status === 'paid';
+                                                const isExpired = pay.coverage_end_date && new Date(pay.coverage_end_date).getTime() < Date.now();
 
                                                 return (
                                                     <div key={idx} className="bg-white/5 p-2 rounded-lg border border-white/5 flex justify-between items-center">
@@ -811,6 +812,7 @@ export default function Admin() {
                                                             </p>
                                                             <p className="text-[10px] text-slate-500 font-mono mt-0.5">
                                                                 {new Date(pay.created_at).toLocaleDateString()}
+                                                                {pay.coverage_end_date && ` ~ ${new Date(pay.coverage_end_date).toLocaleDateString()}`}
                                                             </p>
                                                         </div>
                                                         <div className="text-right">
@@ -827,13 +829,19 @@ export default function Admin() {
                                                                     <div className="flex gap-1">
                                                                         <button
                                                                             onClick={() => cancelPayment(pay.id, pay.imp_uid, pay.merchant_uid, false)}
-                                                                            className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20 hover:bg-red-500/20"
+                                                                            disabled={isExpired}
+                                                                            className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                                                                                isExpired ? 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed' : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                                                                            }`}
                                                                         >
                                                                             취소
                                                                         </button>
                                                                         <button
                                                                             onClick={() => cancelPayment(pay.id, pay.imp_uid, pay.merchant_uid, true)}
-                                                                            className="text-[9px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded border border-slate-600 hover:bg-slate-600"
+                                                                            disabled={isExpired}
+                                                                            className={`text-[9px] px-1.5 py-0.5 rounded border transition-colors ${
+                                                                                isExpired ? 'bg-white/5 text-slate-500 border-white/10 cursor-not-allowed' : 'bg-slate-700 text-slate-300 border-slate-600 hover:bg-slate-600'
+                                                                            }`}
                                                                             title="강제 취소 (DB만 업데이트)"
                                                                         >
                                                                             강제
