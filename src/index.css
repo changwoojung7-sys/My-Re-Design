@@ -51,6 +51,10 @@ body {
   font-family: 'Pretendard Variable', 'Pretendard', 'Inter', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  word-break: keep-all;
+  overflow-wrap: break-word;
   background-color: var(--bg-base);
 
   /* Capacitor / iOS / Android Notches SafeArea */

@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "MyReDesign",
+    "slug": "myredesign",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B1120"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.calamus.myredesign",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B1120",
+        "foregroundImage": "./assets/android-icon-foreground.png"
+      },
+      "package": "com.calamus.myredesign",
+      "versionCode": 1
+    },
+    "owner": "calamus7",
+    "extra": {
+      "eas": {
+        "projectId": "4557a7fb-d8d2-4506-a1d1-50777bc1a7f6"
+      }
+    }
+  }
+}

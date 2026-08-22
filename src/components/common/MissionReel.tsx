@@ -171,26 +171,26 @@ export default function MissionReel({ missions, category, onClose }: MissionReel
                             </div>
                         ) : (
                             /* 3. TEXT CARD SLIDE */
-                            <div className={`w-full h-full flex items-center justify-center p-8 bg-gradient-to-br ${bgGradient}`}>
+                            <div className={`w-full h-full flex items-center justify-center p-5 sm:p-8 bg-gradient-to-br ${bgGradient}`}>
                                 <motion.div
                                     initial={{ y: 20, opacity: 0 }}
                                     animate={{ y: 0, opacity: 1 }}
                                     transition={{ delay: 0.3 }}
-                                    className="max-w-2xl text-center"
+                                    className="max-w-xl text-center w-full px-2"
                                 >
-                                    <h3 className="text-xl md:text-2xl font-bold text-white/80 mb-6 uppercase tracking-widest border-b border-white/20 pb-4 inline-block">
+                                    <h3 className="text-sm sm:text-lg md:text-xl font-bold text-white/90 mb-4 sm:mb-6 uppercase tracking-wider border-b border-white/20 pb-2.5 inline-block max-w-full break-keep">
                                         {missionTitle}
                                     </h3>
 
-                                    <div className="relative">
-                                        <Quote size={48} className="absolute -top-6 -left-6 text-white/20" />
-                                        <p className="text-3xl md:text-5xl font-bold text-white leading-tight font-serif italic shadow-black drop-shadow-sm px-6">
+                                    <div className="relative my-2">
+                                        <Quote size={32} className="absolute -top-4 -left-2 sm:-top-6 sm:-left-6 text-white/20" />
+                                        <p className="text-xl sm:text-3xl md:text-4xl font-bold text-white leading-snug sm:leading-tight font-serif italic shadow-black drop-shadow-sm px-3 sm:px-6 break-keep">
                                             "{userComment}"
                                         </p>
-                                        <Quote size={48} className="absolute -bottom-6 -right-6 text-white/20 rotate-180" />
+                                        <Quote size={32} className="absolute -bottom-4 -right-2 sm:-bottom-6 sm:-right-6 text-white/20 rotate-180" />
                                     </div>
 
-                                    <p className="mt-12 text-white/60 text-sm font-mono">
+                                    <p className="mt-8 sm:mt-12 text-white/60 text-xs sm:text-sm font-mono">
                                         {new Date(currentSlide.date).toLocaleDateString()}
                                     </p>
                                 </motion.div>
@@ -201,20 +201,21 @@ export default function MissionReel({ missions, category, onClose }: MissionReel
 
                 {/* Caption Overlay - Show for Image AND Video */}
                 {(hasImage || hasVideo) && (
-                    <div className="absolute bottom-10 left-0 right-0 p-6 bg-gradient-to-t from-black/80 to-transparent text-center">
+                    <div className="absolute bottom-6 sm:bottom-10 left-0 right-0 p-4 sm:p-6 bg-gradient-to-t from-black/90 via-black/50 to-transparent text-center">
                         <motion.div
                             key={currentSlide.id + "-caption"}
                             initial={{ y: 20, opacity: 0 }}
                             animate={{ y: 0, opacity: 1 }}
                             transition={{ delay: 0.5 }}
+                            className="max-w-md mx-auto px-2"
                         >
-                            <h3 className="text-lg font-bold text-white/90 mb-1 uppercase tracking-wider">
+                            <h3 className="text-xs sm:text-sm font-bold text-white/90 mb-1 uppercase tracking-wider break-keep line-clamp-2">
                                 {missionTitle}
                             </h3>
-                            <p className="text-2xl font-serif italic text-white mb-2">
+                            <p className="text-base sm:text-xl font-serif italic text-white mb-1.5 break-keep line-clamp-2">
                                 {userComment !== "Mission Completed" ? userComment : ""}
                             </p>
-                            <p className="text-white/50 text-xs">
+                            <p className="text-white/50 text-[10px] sm:text-xs">
                                 {new Date(currentSlide.date).toLocaleDateString()}
                             </p>
                         </motion.div>

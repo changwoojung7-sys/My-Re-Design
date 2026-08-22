@@ -8,13 +8,13 @@
 
 - **Framework**: React 19 + TypeScript
 - **Build Tool**: Vite
-- **Mobile Runtime**: Capacitor (Android)
+- **Mobile Runtime**: Capacitor (Android) + Expo EAS / React Native WebView (`MyReDesign-Expo`, iOS)
 - **Styling**: Tailwind CSS + Shadcn/UI (Lucide React icons)
 - **State Management**: Zustand (Persistent Storage)
 - **Backend / DB**: Supabase (Auth, Database, Storage, Edge Functions)
 - **Animation**: Framer Motion, Canvas Confetti
 - **Payment**: PortOne V1 (iamport) + V2 SDK
-- **Deployment**: Vercel (Web), Google Play Store (Android)
+- **Deployment**: Vercel (Web), Google Play Store (Android), Apple App Store & TestFlight (iOS)
 
 ### 주요 라이브러리
 

@@ -1034,42 +1034,42 @@ export default function MyPage() {
 
             <div className="flex-1 overflow-y-auto no-scrollbar relative min-h-0">
                 {/* Profile Header (Read Only / Quick View) */}
-                <div className="relative bg-white/5 border border-white/10 rounded-3xl p-6 mb-6 mt-1">
+                <div className="relative bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-4 sm:p-6 mb-4 mt-1">
                     <button
                         onClick={() => {
                             if (user.id === 'demo123') return alert(t.demoPaymentLimit);
                             setIsSubManagerOpen(true);
                         }}
-                        className="absolute top-6 right-6 p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-2"
+                        className="absolute top-4 sm:top-6 right-4 sm:right-6 p-2 bg-white/10 text-white rounded-xl hover:bg-white/20 transition-colors flex items-center gap-1.5"
                     >
-                        <CreditCard size={20} className="text-accent" />
+                        <CreditCard size={18} className="text-accent" />
                         <span className="text-xs font-bold hidden sm:inline">{t.manageSubscription}</span>
                     </button>
                     {/* ... Profile Info ... */}
-                    <div className="flex items-center gap-4 mb-6">
-                        <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative">
+                    <div className="flex items-center gap-3.5 mb-4">
+                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-primary to-accent p-1 relative shrink-0">
                             <div className="w-full h-full rounded-full bg-slate-900 flex items-center justify-center overflow-hidden">
                                 {user.profile_image_url ? (
                                     <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
                                 ) : (
-                                    <span className="text-2xl font-bold text-white shadow-lg">{user.nickname?.charAt(0).toUpperCase()}</span>
+                                    <span className="text-xl sm:text-2xl font-bold text-white shadow-lg">{user.nickname?.charAt(0).toUpperCase()}</span>
                                 )}
                             </div>
                         </div>
-                        <div>
-                            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <div className="min-w-0 pr-10">
+                            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2 truncate">
                                 {user.nickname}
                             </h2>
                             {/* Account Display */}
-                            <div className="flex flex-col text-sm text-slate-400 mt-1">
-                                <span>{user.email}</span>
-                                <span className="text-xs text-slate-500 mt-0.5">{user.age} years · {user.gender}</span>
+                            <div className="flex flex-col text-xs sm:text-sm text-slate-400 mt-0.5">
+                                <span className="truncate">{user.email}</span>
+                                <span className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{user.age} years · {user.gender}</span>
                             </div>
                         </div>
                     </div>
 
                     {/* Category Selector */}
-                    <div className="relative mb-6 z-10">
+                    <div className="relative mb-4 z-10">
                         {/* Label + Status Toggle Row */}
                         <div className="flex items-center justify-between mb-2">
                             <label className="text-xs font-bold text-slate-400 uppercase">{t.focusArea}</label>
@@ -1273,10 +1273,10 @@ export default function MyPage() {
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
+                            <div className="space-y-2.5">
                                 {/* Main Goal Input */}
                                 <div>
-                                    <label className="text-xs text-slate-400 block mb-1">{t.mainGoal}</label>
+                                    <label className="text-[11px] font-bold text-slate-400 block mb-1">{t.mainGoal}</label>
                                     <textarea
                                         disabled={!isEditing}
                                         value={currentGoal.target_text}
@@ -1290,20 +1290,20 @@ export default function MyPage() {
                                                         ? "무엇을 이루고 싶으신가요?\n예: 5kg 감량, 규칙적인 생활 습관 만들기 등"
                                                         : t.whatToAchieve
                                         }
-                                        className="w-full bg-white/5 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50 transition-all resize-none h-12"
+                                        className="w-full bg-white/5 rounded-lg px-2.5 py-2 text-xs sm:text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-75 transition-all resize-none min-h-[48px] break-keep leading-relaxed"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-3">
                                     <div>
                                         <div>
-                                            <label className="text-xs text-slate-400 block mb-1">{t.duration}</label>
+                                            <label className="text-[11px] font-bold text-slate-400 block mb-1">{t.duration}</label>
                                             <select
                                                 title={t.duration}
                                                 disabled={!isEditing}
                                                 value={currentGoal.duration_months}
                                                 onChange={e => updateGoal('duration_months', Number(e.target.value))}
-                                                className="w-full bg-white/5 rounded-lg px-2 py-2 text-xs focus:ring-1 focus:ring-primary outline-none disabled:opacity-50"
+                                                className="w-full bg-white/5 rounded-lg px-2.5 py-2 text-xs sm:text-sm focus:ring-1 focus:ring-primary outline-none disabled:opacity-75"
                                             >
                                                 <option value={0.25} className="bg-slate-800 text-white">{t.oneWeek}</option>
                                                 <option value={0.5} className="bg-slate-800 text-white">{t.twoWeeks}</option>
@@ -1316,7 +1316,7 @@ export default function MyPage() {
                                 </div>
 
                                 {/* Details Section */}
-                                <div className="pt-4 border-t border-white/5 space-y-4">
+                                <div className="pt-3 border-t border-white/5 space-y-3">
                                     {/* ... Reusing previous logic, simplified for brevity but fully functional ... */}
                                     {selectedCategory === 'body_wellness' && (
                                         <div className="space-y-3">

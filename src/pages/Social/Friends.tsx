@@ -913,21 +913,21 @@ export default function Friends() {
                 </div>
             </div>
 
-            {/* Groups & Filters */}
-            <div className="mb-4 space-y-3 shrink-0">
-                {/* Groups - Wrapped for Mobile */}
-                <div className="flex flex-wrap items-center gap-2">
+            {/* Groups & Filters - Compact One Line */}
+            <div className="mb-2.5 flex items-center justify-between gap-2 shrink-0">
+                {/* Groups - Horizontally scrollable without wrapping */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 flex-1 min-w-0">
                     <button
                         onClick={() => setSelectedGroupId('all')}
-                        className={`px-3 py-1 rounded-full text-xs font-bold transition-colors ${selectedGroupId === 'all' ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors whitespace-nowrap shrink-0 ${selectedGroupId === 'all' ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
                     >
                         All
                     </button>
                     {groups.map(g => (
-                        <div key={g.id} className="relative group">
+                        <div key={g.id} className="relative group shrink-0">
                             <button
                                 onClick={() => setSelectedGroupId(g.id)}
-                                className={`px-3 py-1 rounded-full text-xs font-bold transition-colors flex items-center gap-2 ${selectedGroupId === g.id ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
+                                className={`px-2.5 py-1 rounded-full text-xs font-bold transition-colors flex items-center gap-1.5 whitespace-nowrap ${selectedGroupId === g.id ? 'bg-white text-black' : 'bg-white/5 text-slate-400 hover:bg-white/10'}`}
                             >
                                 {g.name}
                             </button>
@@ -939,7 +939,7 @@ export default function Friends() {
                                         setEditingGroup(g);
                                         setShowEditGroupModal(true);
                                     }}
-                                    className="absolute -top-2 -right-1 w-4 h-4 bg-slate-700 text-white rounded-full flex items-center justify-center shadow-md border border-white/10 hover:bg-slate-600 z-10"
+                                    className="absolute -top-1.5 -right-1 w-4 h-4 bg-slate-700 text-white rounded-full flex items-center justify-center shadow-md border border-white/10 hover:bg-slate-600 z-10"
                                     title="그룹 설정"
                                     aria-label="그룹 설정"
                                 >
@@ -950,52 +950,48 @@ export default function Friends() {
                     ))}
                     <button
                         onClick={() => setShowGroupModal(true)}
-                        className="px-2 py-1 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center gap-1 hover:bg-primary/30"
+                        className="px-2 py-1 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center gap-1 hover:bg-primary/30 whitespace-nowrap shrink-0"
                     >
                         <Plus size={10} /> New
                     </button>
                 </div>
 
-                {/* Mission Status Tabs - Smaller & Korean */}
-                <div className="flex items-center gap-2">
-                    <div className="flex p-0.5 bg-slate-900 rounded-lg border border-white/5">
-                        <button
-                            onClick={() => setMissionFilter('active')}
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${missionFilter === 'active' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-                        >
-                            진행중
-                        </button>
-                        <button
-                            onClick={() => setMissionFilter('completed')}
-                            className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${missionFilter === 'completed' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
-                        >
-                            완료
-                        </button>
-                    </div>
+                {/* Mission Status Tabs - Placed at the right end */}
+                <div className="flex p-0.5 bg-slate-900 rounded-lg border border-white/5 shrink-0">
+                    <button
+                        onClick={() => setMissionFilter('active')}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all whitespace-nowrap ${missionFilter === 'active' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        진행중
+                    </button>
+                    <button
+                        onClick={() => setMissionFilter('completed')}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all whitespace-nowrap ${missionFilter === 'completed' ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        완료
+                    </button>
                 </div>
             </div>
 
-            {/* Search Section - Compact One Line */}
-            <div className="bg-slate-900/50 p-2 rounded-xl border border-white/5 mb-4 shrink-0 flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center shrink-0">
-                    <UserPlus size={14} className="text-slate-400" />
-                </div>
+            {/* Search Section - Slim & Compact */}
+            <div className="bg-slate-900/60 px-3 py-1.5 rounded-xl border border-white/5 mb-3 shrink-0 flex items-center gap-2 shadow-sm">
+                <UserPlus size={14} className="text-slate-400 shrink-0" />
                 <div className="relative flex-1">
                     <input
                         type="text"
                         placeholder={t.searchPlaceholder}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-transparent border-none p-0 text-sm focus:ring-0 text-white placeholder:text-slate-600"
+                        className="w-full bg-transparent border-none p-0 text-xs focus:ring-0 text-white placeholder:text-slate-500 outline-none"
                     />
                 </div>
                 <button
                     onClick={handleSearch}
                     disabled={searching}
                     title="검색"
-                    className="w-8 h-8 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-colors shrink-0"
+                    className="w-7 h-7 bg-white/10 hover:bg-white/20 text-white rounded-lg flex items-center justify-center transition-colors shrink-0"
                 >
-                    <Search size={14} />
+                    <Search size={12} />
                 </button>
             </div>
 

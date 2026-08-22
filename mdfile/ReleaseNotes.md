@@ -1,3 +1,36 @@
+# 📢 [업데이트] v2.2.2 (iOS App Store 정식 출시 지원 및 모바일 UI 고도화)
+
+안녕하세요, **My Re Design**입니다!
+iOS App Store 정식 배포 지원(Expo EAS 기반 클라우드 빌드 시스템 구축), iPhone 16 화면 및 모바일 디스플레이 최적화, Friends 화면 레이아웃 컴팩트화 및 앱스토어/플레이스토어 자산 전면 정비가 적용된 **v2.2.2** 업데이트를 배포했습니다.
+
+### ✨ 주요 업데이트 내용
+
+#### 1. 🍏 iOS App Store 정식 배포 시스템 구축 (`MyReDesign-Expo`)
+* **Expo EAS Cloud Build 도입**: Mac 장비 없이도 클라우드 서버에서 iOS 배포용 번들(IPA)을 빌드하고 App Store Connect에 자동 제출(`--auto-submit`)하는 최신 배포 파이프라인 구축.
+* **Apple 공식 가이드라인 완벽 준수**: 비면제 암호화 면제(`ITSAppUsesNonExemptEncryption: false`), 계정 탈퇴 지원, Apple 심사관 전용 가이드 문서(`App_Review_Guide_iOS.rtf` / `.html`) 완비.
+* **TestFlight 테스팅 지원**: Apple TestFlight를 통해 실제 출시 환경과 100% 동일한 바이너리를 내부 테스터 실기기에서 즉시 설치 및 검증 가능.
+
+#### 2. 📱 iPhone 16 및 모바일 화면 텍스트/여백 최적화
+* **텍스트 줄바꿈 및 잘림 현상 방지**: `index.css` 및 전역 스타일에 `word-break: keep-all; overflow-wrap: break-word; text-size-adjust: 100%`를 적용하여 긴 텍스트와 제목이 부자연스럽게 잘려 아래로 길어지는 현상 해결.
+* **뷰포트 및 세이프 에어리어 개선**: `viewport-fit=cover` 적용 및 WebView 상단 SafeAreaView 분리로 가로 폭 100% 활용.
+* **PlayMovie / MyPage 화면 컴팩트화**: 릴스 및 프로필 설정 폼의 여백과 폰트 크기를 모바일에 맞게 최적화.
+
+#### 3. 👥 Friends 화면 상단 레이아웃 개편 (세로 공간 획기적 절약)
+* **그룹 탭 & 미션 필터 1줄 통합**: 기존 2줄을 차지하던 친구 그룹 탭(`All, 가족, 친구들...` - 가로 스크롤 지원)과 `[진행중 | 완료]` 필터 버튼을 한 라인에 나란히 배치.
+* **슬림 검색창 적용**: 검색 입력창 상하 패딩과 아이콘/버튼 크기를 슬림화하여 화면 상단 공간 낭비를 줄이고 친구 목록과 챌린지 영역의 가독성 향상.
+
+#### 4. 🎨 스토어 공식 규격 에셋 자동 생성 시스템 완비
+* **Apple App Store Connect**: 6.9인치(1320x2868), 6.5인치(1242x2688), 6.1인치(1179x2556 및 1125x2436), 13인치 iPad(2048x2732) 24비트 무알파 스크린샷 및 10장 제한 최적화 TOP 10 폴더 구성.
+* **Google Play Store**: 512x512 앱 아이콘, 1024x500 그래픽 이미지 배너, 1080x2400 폰 스크린샷 8장 전용 패키징 완료.
+
+### 🚀 버전 정보
+
+* **Version Name**: `2.2.2`
+* **Version Code**: `40`
+* **iOS Build**: `1.0.0 (2)`
+
+---
+
 # 📢 [업데이트] v2.2.1 (Version Code 39) 배포 안내
 
 안녕하세요, **My Re Design**입니다!
