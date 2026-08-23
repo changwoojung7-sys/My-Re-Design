@@ -42,7 +42,7 @@ export default function App() {
           scalesPageToFit={false}
           textZoom={100}
           onLoadEnd={() => setIsLoading(false)}
-          userAgent="MyReDesign-iOS-App"
+          applicationNameForUserAgent="MyReDesign-iOS-App"
         />
         {isLoading && (
           <View style={styles.loadingContainer}>

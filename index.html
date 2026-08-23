@@ -16,8 +16,24 @@
 
   <meta name="google-adsense-account" content="ca-pub-2810872681064029">
 
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2810872681064029"
-    crossorigin="anonymous"></script>
+  <!-- Expo iOS 웹뷰 User-Agent 보정 스크립트 (이니시스/포트원 파싱 에러 방지) -->
+  <script>
+    (function() {
+      try {
+        var ua = navigator.userAgent || '';
+        if (ua.indexOf('MyReDesign-iOS-App') !== -1 && ua.indexOf('iPhone') === -1) {
+          var fullIosUA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1 ' + ua;
+          Object.defineProperty(navigator, 'userAgent', {
+            get: function() { return fullIosUA; },
+            configurable: true
+          });
+        }
+      } catch (e) {
+        console.warn('UserAgent Polyfill Error:', e);
+      }
+    })();
+  </script>
+
   <!-- jQuery (Required for some PG features in V1/Legacy) -->
   <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
   <!-- PortOne SDK V1 (Legacy 1.2.0 for stability with html5_inicis) -->

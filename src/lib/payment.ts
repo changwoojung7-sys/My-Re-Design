@@ -2,12 +2,6 @@ import { supabase } from './supabase';
 import { useStore } from './store';
 import { Capacitor } from '@capacitor/core';
 
-const isMobilePhone = () => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    const isTablet = /(ipad|tablet|(android(?!.*mobile))|(windows(?!.*phone)(.*touch))|kindle|playbook|silk|(puffin(?!.*(IP|AP|WP))))/.test(userAgent);
-    return (/iphone|ipod|android|blackberry|iemobile|myredesign-ios-app/.test(userAgent) || /mobile/.test(userAgent)) && !isTablet;
-};
-
 declare global {
     interface Window {
         IMP?: any;
@@ -298,8 +292,6 @@ export const requestSubscriptionPayment = async (
                 throw new Error('결제 모듈(PortOne V2)이 로드되지 않았습니다.');
             }
 
-            const isPhone = isMobilePhone();
-
             const response = await window.PortOne.requestPayment({
                 storeId: PORTONE_V2_STORE_ID,
                 channelKey: PORTONE_V2_CHANNEL_KEY,
@@ -310,17 +302,15 @@ export const requestSubscriptionPayment = async (
                 payMethod: "CARD",
                 customer: {
                     email: user.email || undefined,
-                    phoneNumber: user.phone || "01000000000",
+                    phoneNumber: user.phone ? String(user.phone).replace(/[^0-9]/g, '') : "01000000000",
                     fullName: user.nickname || "고객"
                 },
                 windowType: {
-                    pc: isPhone ? 'REDIRECTION' : 'IFRAME',
+                    pc: 'IFRAME',
                     mobile: 'REDIRECTION'
                 },
-                appScheme: 'myredesign://',
-                redirectUrl: Capacitor.isNativePlatform() 
-                    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-redirect`
-                    : `${window.location.origin}${redirectPath}`
+                appScheme: 'myredesign',
+                redirectUrl: `${window.location.origin}${redirectPath}`
             });
 
             if (response && response.code != null) {
