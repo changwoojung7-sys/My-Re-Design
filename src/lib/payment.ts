@@ -299,9 +299,6 @@ export const requestSubscriptionPayment = async (
             }
 
             const isPhone = isMobilePhone();
-            const bypassParamsV2 = isPhone ? {
-                inicis_v2: { P_DEVICE_TYPE: 'MOBILE' }
-            } : undefined;
 
             const response = await window.PortOne.requestPayment({
                 storeId: PORTONE_V2_STORE_ID,
@@ -320,8 +317,7 @@ export const requestSubscriptionPayment = async (
                     pc: isPhone ? 'REDIRECTION' : 'IFRAME',
                     mobile: 'REDIRECTION'
                 },
-                appScheme: 'myredesign',
-                bypass: bypassParamsV2,
+                appScheme: 'myredesign://',
                 redirectUrl: Capacitor.isNativePlatform() 
                     ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-redirect`
                     : `${window.location.origin}${redirectPath}`
@@ -354,11 +350,6 @@ export const requestSubscriptionPayment = async (
                 }
 
                 IMP.init('imp77227041');
-                
-                const isPhone = isMobilePhone();
-                const bypassParamsV1 = isPhone ? {
-                    inicis: { P_DEVICE_TYPE: 'MOBILE' }
-                } : undefined;
 
                 IMP.request_pay({
                     pg: 'html5_inicis',
@@ -368,7 +359,6 @@ export const requestSubscriptionPayment = async (
                     amount: tier.price,
                     buyer_email: user.email,
                     buyer_name: user.nickname || 'User',
-                    bypass: bypassParamsV1,
                     m_redirect_url: Capacitor.isNativePlatform()
                         ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-redirect`
                         : `${window.location.origin}${redirectPath}`,
