@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core';
 const isMobilePhone = () => {
     const userAgent = navigator.userAgent.toLowerCase();
     const isTablet = /(ipad|tablet|(android(?!.*mobile))|(windows(?!.*phone)(.*touch))|kindle|playbook|silk|(puffin(?!.*(IP|AP|WP))))/.test(userAgent);
-    return /iphone|ipod|android|blackberry|iemobile/.test(userAgent) && !isTablet;
+    return (/iphone|ipod|android|blackberry|iemobile|myredesign-ios-app/.test(userAgent) || /mobile/.test(userAgent)) && !isTablet;
 };
 
 declare global {
@@ -317,7 +317,7 @@ export const requestSubscriptionPayment = async (
                     fullName: user.nickname || "고객"
                 },
                 windowType: {
-                    pc: 'IFRAME',
+                    pc: isPhone ? 'REDIRECTION' : 'IFRAME',
                     mobile: 'REDIRECTION'
                 },
                 appScheme: 'myredesign',
