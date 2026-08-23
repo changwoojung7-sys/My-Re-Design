@@ -1,5 +1,12 @@
 import { supabase } from './supabase';
 import { useStore } from './store';
+import { Capacitor } from '@capacitor/core';
+
+const isMobilePhone = () => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    const isTablet = /(ipad|tablet|(android(?!.*mobile))|(windows(?!.*phone)(.*touch))|kindle|playbook|silk|(puffin(?!.*(IP|AP|WP))))/.test(userAgent);
+    return /iphone|ipod|android|blackberry|iemobile/.test(userAgent) && !isTablet;
+};
 
 declare global {
     interface Window {
@@ -291,6 +298,11 @@ export const requestSubscriptionPayment = async (
                 throw new Error('결제 모듈(PortOne V2)이 로드되지 않았습니다.');
             }
 
+            const isPhone = isMobilePhone();
+            const bypassParamsV2 = isPhone ? {
+                inicis_v2: { P_DEVICE_TYPE: 'MOBILE' }
+            } : undefined;
+
             const response = await window.PortOne.requestPayment({
                 storeId: PORTONE_V2_STORE_ID,
                 channelKey: PORTONE_V2_CHANNEL_KEY,
@@ -308,7 +320,11 @@ export const requestSubscriptionPayment = async (
                     pc: 'IFRAME',
                     mobile: 'REDIRECTION'
                 },
-                redirectUrl: `${window.location.origin}${redirectPath}`
+                appScheme: 'myredesign',
+                bypass: bypassParamsV2,
+                redirectUrl: Capacitor.isNativePlatform() 
+                    ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-redirect`
+                    : `${window.location.origin}${redirectPath}`
             });
 
             if (response && response.code != null) {
@@ -338,6 +354,12 @@ export const requestSubscriptionPayment = async (
                 }
 
                 IMP.init('imp77227041');
+                
+                const isPhone = isMobilePhone();
+                const bypassParamsV1 = isPhone ? {
+                    inicis: { P_DEVICE_TYPE: 'MOBILE' }
+                } : undefined;
+
                 IMP.request_pay({
                     pg: 'html5_inicis',
                     pay_method: 'card',
@@ -346,7 +368,11 @@ export const requestSubscriptionPayment = async (
                     amount: tier.price,
                     buyer_email: user.email,
                     buyer_name: user.nickname || 'User',
-                    m_redirect_url: `${window.location.origin}${redirectPath}`
+                    bypass: bypassParamsV1,
+                    m_redirect_url: Capacitor.isNativePlatform()
+                        ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payment-redirect`
+                        : `${window.location.origin}${redirectPath}`,
+                    app_scheme: 'myredesign'
                 }, async (rsp: any) => {
                     if (rsp.success) {
                         const result = await processPaymentSuccess(
