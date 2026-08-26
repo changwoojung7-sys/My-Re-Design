@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, Image as ImageIcon, CheckCircle, Heart, MessageCircle, User, Clapperboard, Trash2, Pencil, Share2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useLanguage } from '../../lib/i18n';
@@ -507,23 +507,58 @@ export default function HistoryDetail({ goal, onClose, onMissionsChanged }: Hist
             )}
 
             {/* Lightbox / Image Modal */}
-            {
-                selectedImage && (
-                    <div
-                        className="fixed inset-0 z-[60] bg-black flex items-center justify-center p-4"
+            <AnimatePresence>
+                {selectedImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/85 backdrop-blur-md z-[80] flex items-center justify-center p-4"
                         onClick={() => setSelectedImage(null)}
                     >
-                        <img
-                            src={selectedImage}
-                            alt="Full Screen"
-                            className="max-w-full max-h-full rounded-lg shadow-2xl"
-                        />
-                        <button title="닫기" onClick={() => setSelectedImage(null)} className="absolute top-6 right-6 text-white bg-black/50 rounded-full p-2">
-                            <X size={32} />
-                        </button>
-                    </div>
-                )
-            }
-        </div >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-slate-900 border border-white/15 rounded-2xl p-4 w-full max-w-sm sm:max-w-md shadow-2xl flex flex-col gap-3 max-h-[85vh] overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between pb-2 border-b border-white/10 shrink-0">
+                                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                                    📸 인증 사진
+                                </h3>
+                                <button
+                                    onClick={() => setSelectedImage(null)}
+                                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-slate-300 hover:text-white transition-all shrink-0"
+                                    title="닫기"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Image Box */}
+                            <div className="bg-slate-950/70 border border-white/10 rounded-xl p-2 flex items-center justify-center overflow-hidden min-h-0 flex-1">
+                                <img
+                                    src={selectedImage}
+                                    alt="Full Screen Proof"
+                                    className="max-h-[50vh] sm:max-h-[55vh] w-auto max-w-full object-contain rounded-lg shadow-md"
+                                />
+                            </div>
+
+                            {/* Footer */}
+                            <div className="pt-1 shrink-0">
+                                <button
+                                    onClick={() => setSelectedImage(null)}
+                                    className="w-full py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white text-xs font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-1.5"
+                                >
+                                    <span>닫기</span>
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
     );
 }

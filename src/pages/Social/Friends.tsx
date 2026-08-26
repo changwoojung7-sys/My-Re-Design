@@ -51,6 +51,13 @@ export default function Friends() {
     const [buddyProofText, setBuddyProofText] = useState('');
     const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null); // 히스토리 펼친 챌린지 ID
     const [uploadingBuddy, setUploadingBuddy] = useState(false);
+    const [previewImage, setPreviewImage] = useState<{
+        url: string;
+        title?: string;
+        date?: string;
+        userName?: string;
+        proofText?: string;
+    } | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -1311,11 +1318,25 @@ export default function Friends() {
                                                                         <span className="text-[9px] text-primary font-bold block mb-1">나</span>
                                                                         {entry.me?.is_completed ? (
                                                                             entry.me.image_url ? (
-                                                                                <a href={entry.me.image_url} target="_blank" rel="noreferrer">
-                                                                                    <img src={entry.me.image_url} alt="인증" className="w-full h-20 object-cover rounded-lg hover:opacity-90 transition-opacity" />
-                                                                                </a>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setPreviewImage({
+                                                                                        url: entry.me.image_url,
+                                                                                        title: challenge.challenge_name || challenge.goal_category,
+                                                                                        date: date,
+                                                                                        userName: '나',
+                                                                                        proofText: entry.me.proof_text
+                                                                                    })}
+                                                                                    className="w-full h-20 rounded-lg overflow-hidden border border-white/10 hover:border-primary/50 transition-all group relative block text-left bg-slate-900/50"
+                                                                                    title="인증 사진 크게 보기"
+                                                                                >
+                                                                                    <img src={entry.me.image_url} alt="인증" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                        <span className="text-[9px] text-white bg-black/70 px-1.5 py-0.5 rounded font-medium shadow">🔍 크게보기</span>
+                                                                                    </div>
+                                                                                </button>
                                                                             ) : (
-                                                                                <div className="p-2 bg-emerald-900/30 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                                                                                <div className="p-2 bg-emerald-900/30 rounded-lg flex items-center justify-center border border-emerald-500/20 min-h-[50px]">
                                                                                     <span className="text-[10px] text-emerald-400 font-medium break-all">💬 {entry.me.proof_text || '완료'}</span>
                                                                                 </div>
                                                                             )
@@ -1325,11 +1346,25 @@ export default function Friends() {
                                                                         <span className="text-[9px] text-accent font-bold block mb-1">{partnerProfile?.nickname || '친구'}</span>
                                                                         {entry.partner?.is_completed ? (
                                                                             entry.partner.image_url ? (
-                                                                                <a href={entry.partner.image_url} target="_blank" rel="noreferrer">
-                                                                                    <img src={entry.partner.image_url} alt="인증" className="w-full h-20 object-cover rounded-lg hover:opacity-90 transition-opacity" />
-                                                                                </a>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => setPreviewImage({
+                                                                                        url: entry.partner.image_url,
+                                                                                        title: challenge.challenge_name || challenge.goal_category,
+                                                                                        date: date,
+                                                                                        userName: partnerProfile?.nickname || '친구',
+                                                                                        proofText: entry.partner.proof_text
+                                                                                    })}
+                                                                                    className="w-full h-20 rounded-lg overflow-hidden border border-white/10 hover:border-accent/50 transition-all group relative block text-left bg-slate-900/50"
+                                                                                    title="인증 사진 크게 보기"
+                                                                                >
+                                                                                    <img src={entry.partner.image_url} alt="인증" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                                                                    <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                                                        <span className="text-[9px] text-white bg-black/70 px-1.5 py-0.5 rounded font-medium shadow">🔍 크게보기</span>
+                                                                                    </div>
+                                                                                </button>
                                                                             ) : (
-                                                                                <div className="p-2 bg-emerald-900/30 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                                                                                <div className="p-2 bg-emerald-900/30 rounded-lg flex items-center justify-center border border-emerald-500/20 min-h-[50px]">
                                                                                     <span className="text-[10px] text-emerald-400 font-medium break-all">💬 {entry.partner.proof_text || '완료'}</span>
                                                                                 </div>
                                                                             )
@@ -1880,6 +1915,82 @@ export default function Friends() {
                                     Skip Group (Just Add)
                                 </button>
                             )}
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* 🖼️ Buddy Challenge Proof Image Modal */}
+            <AnimatePresence>
+                {previewImage && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4"
+                        onClick={() => setPreviewImage(null)}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.92, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.92, opacity: 0 }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                            className="bg-slate-900/95 border border-white/15 rounded-2xl p-4 w-full max-w-sm sm:max-w-md shadow-2xl flex flex-col gap-3 max-h-[85vh] overflow-hidden"
+                            onClick={e => e.stopPropagation()}
+                        >
+                            {/* Modal Header */}
+                            <div className="flex items-center justify-between pb-2 border-b border-white/10 shrink-0">
+                                <div className="flex flex-col min-w-0 pr-2">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-xs font-bold text-white truncate">
+                                            📸 {previewImage.userName}님의 인증
+                                        </span>
+                                        {previewImage.date && (
+                                            <span className="text-[10px] text-slate-400 bg-white/5 px-2 py-0.5 rounded-md shrink-0">
+                                                {previewImage.date}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {previewImage.title && (
+                                        <span className="text-[11px] text-slate-400 truncate mt-0.5">
+                                            {previewImage.title}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => setPreviewImage(null)}
+                                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-slate-300 hover:text-white transition-all shrink-0"
+                                    title="닫기"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Modal Image Frame */}
+                            <div className="bg-slate-950/70 border border-white/10 rounded-xl p-2 flex items-center justify-center overflow-hidden min-h-0 flex-1">
+                                <img
+                                    src={previewImage.url}
+                                    alt="인증 사진"
+                                    className="max-h-[50vh] sm:max-h-[55vh] w-auto max-w-full object-contain rounded-lg shadow-md"
+                                />
+                            </div>
+
+                            {/* Optional Proof Text */}
+                            {previewImage.proofText && (
+                                <div className="px-3 py-2 bg-white/5 rounded-xl border border-white/5 text-xs text-slate-300 break-words max-h-20 overflow-y-auto shrink-0">
+                                    💬 {previewImage.proofText}
+                                </div>
+                            )}
+
+                            {/* Modal Footer (Close Button) */}
+                            <div className="pt-1 shrink-0">
+                                <button
+                                    onClick={() => setPreviewImage(null)}
+                                    className="w-full py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/30 text-white text-xs font-bold rounded-xl transition-all border border-white/10 flex items-center justify-center gap-1.5"
+                                >
+                                    <span>닫기</span>
+                                </button>
+                            </div>
                         </motion.div>
                     </motion.div>
                 )}

@@ -7,7 +7,7 @@
 - **패키지명**: `com.calamus.myredesign`
 - **GitHub 프로필**: `changwoojung7-sys`
 - **GitHub 저장소**: [https://github.com/changwoojung7-sys/My-Re-Design.git](https://github.com/changwoojung7-sys/My-Re-Design.git)
-- **주요 기술 스택**: 
+- **주요 기술 스택**:
   - **Core Web**: React 19 (Vite), TypeScript, TailwindCSS, Supabase, Zustand
   - **Android**: Capacitor (`android/`)
   - **iOS**: Expo + React Native WebView 래퍼 (`MyReDesign-Expo/` -> `https://myredesign.ai.kr/` 실시간 로드)
@@ -17,6 +17,7 @@
 ## 2. 모바일 플랫폼별 아키텍처 및 배포 규칙 (⚠️ 필수 숙지)
 
 ### 🍏 iOS 배포 및 동작 방식 (Expo WebView 래퍼)
+
 - iOS 앱은 `MyReDesign-Expo/` 폴더에 위치한 **Expo React Native WebView 래퍼 앱**입니다.
 - 앱 실행 시 `https://myredesign.ai.kr/` 실시간 배포 URL을 웹뷰로 로드합니다.
 - **실시간 반영 (No Rebuild)**: 웹 코드(React/Vite)를 수정하고 `git push origin main`을 실행하면 웹 서버가 배포되어, **아이폰에 이미 설치된 앱에도 즉시(실시간) 반영**됩니다. (EAS 재빌드 불필요)
@@ -26,6 +27,7 @@
   - 명령어: `npx eas build -p ios --profile production --auto-submit`
 
 ### 🤖 Android 배포 및 동작 방식 (Capacitor)
+
 - 안드로이드는 루트 경로의 Capacitor(`android/`)를 사용합니다.
 - 웹 빌드 후 `npx cap sync android`를 통해 네이티브 동기화를 진행합니다.
 
@@ -49,6 +51,8 @@
 5. **품질 & 완성도**:
    - 모바일 반응형 디자인과 웹/네이티브 환경 모두 고려
    - 직관적이고 깔끔한 UI/UX 구현
+
+6. 작업 내용을 나에게 보여 줄때는 12살도 이해할 수 있도록 시각적으로 보여줄 것
 
 ---
 
