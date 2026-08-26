@@ -144,7 +144,22 @@ serve(async (req: Request) => {
         // --- Daily Missions (Batch) ---
         // ==============================
         if (type === 'daily_missions') {
-            const { userProfile } = payload;
+            const { userProfile, goalDetails } = payload;
+
+            // Condition -> Difficulty label
+            const difficulty = userProfile?.difficulty || 'normal';
+            const difficultyLabel = userProfile?.difficulty_label || '보통 미션 (10~15분)';
+
+            // BMI calculation for body_wellness
+            const bwHeight = goalDetails?.height || userProfile?.height;
+            const bwWeight = goalDetails?.weight || userProfile?.weight;
+            const bmiText = (bwHeight && bwWeight)
+                ? (() => {
+                    const bmi = bwWeight / ((bwHeight / 100) ** 2);
+                    const cat = bmi < 18.5 ? '저체중' : bmi < 23 ? '정상' : bmi < 25 ? '과체중' : '비만';
+                    return `BMI ${bmi.toFixed(1)} (${cat})`;
+                })()
+                : 'not specified';
 
             // Determine requested categories
             const requested = payload.goalList && Object.keys(payload.goalList).length > 0
@@ -155,13 +170,10 @@ serve(async (req: Request) => {
             const bwGoal = requested.includes('body_wellness') ? (payload.goalList?.body_wellness || goalMap['body_wellness'] || '건강관리') : null;
             const gcGoal = requested.includes('growth_career') ? (payload.goalList?.growth_career || goalMap['growth_career'] || '자기계발') : null;
             const mcGoal = requested.includes('mind_connection') ? (payload.goalList?.mind_connection || goalMap['mind_connection'] || '심리적안정') : null;
-            const fpGoal = requested.includes('funplay') ? (payload.goalList?.funplay || goalMap['funplay'] || '즐거움 및 기분전환') : null;
+            const fpGoal = requested.includes('funplay') ? (payload.goalList?.funplay || goalMap['funplay'] || '즉거움 및 기분전환') : null;
 
             // 🔍 DEBUG: Log goal resolution
-            console.log('[DEBUG] Goal Resolution:', {
-                'requested': requested,
-                'resolved': { bwGoal, gcGoal, mcGoal, fpGoal }
-            });
+            console.log('[DEBUG] Goal Resolution:', { requested, resolved: { bwGoal, gcGoal, mcGoal, fpGoal }, difficulty, goalDetails });
 
             // Helper to pick N random items
             const pickRandomN = (arr: any[], n: number) => {
@@ -184,34 +196,7 @@ serve(async (req: Request) => {
                 }
             }
 
-            // Construct User Goals Section
-            let goalsSection = '═══ USER GOALS (TOPIC — create missions ONLY for these) ═══\n';
-            if (bwGoal) goalsSection += `- body_wellness_goal: "${bwGoal}"\n`;
-            if (gcGoal) goalsSection += `- growth_career_goal: "${gcGoal}"\n`;
-            if (mcGoal) goalsSection += `- mind_connection_goal: "${mcGoal}"\n`;
-            if (fpGoal) goalsSection += `- funplay_goal: "${fpGoal}"\n`;
-
-            // Construct Pattern Library Section
-            let patternsSection = '═══ PATTERN LIBRARY (METHOD HINT) ═══\n';
-            if (bwGoal) {
-                patternsSection += `- body_wellness:\n`;
-                patternsSection += `  1) ${bwPatterns[0].brief} (type: ${bwPatterns[0].core_type})\n`;
-                patternsSection += `  2) ${bwPatterns[1].brief} (type: ${bwPatterns[1].core_type})\n`;
-                patternsSection += `  3) ${bwPatterns[2].brief} (type: ${bwPatterns[2].core_type})\n`;
-            }
-            if (gcGoal) {
-                patternsSection += `- growth_career (source: ${gcPatternSource}):\n`;
-                patternsSection += `  1) ${gcPatterns[0].brief} (type: ${gcPatterns[0].core_type})\n`;
-                patternsSection += `  2) ${gcPatterns[1].brief} (type: ${gcPatterns[1].core_type})\n`;
-                patternsSection += `  3) ${gcPatterns[2].brief} (type: ${gcPatterns[2].core_type})\n`;
-            }
-            if (mcGoal) {
-                patternsSection += `- mind_connection:\n`;
-                patternsSection += `  1) ${mcPatterns[0].brief} (type: ${mcPatterns[0].core_type})\n`;
-                patternsSection += `  2) ${mcPatterns[1].brief} (type: ${mcPatterns[1].core_type})\n`;
-                patternsSection += `  3) ${mcPatterns[2].brief} (type: ${mcPatterns[2].core_type})\n`;
-            }
-
+            // ========== SYSTEM PROMPT ==========
             const systemPrompt = `You are MyReDesign Mission Composer.
 
 CRITICAL RULE:
@@ -239,18 +224,107 @@ Each mission object MUST have:
 
 Output strictly valid JSON only.`;
 
+            // ========== CATEGORY-SPECIFIC CONTEXT BLOCKS ==========
+
+            let categoryContextBlock = '';
+
+            // 💪 BODY_WELLNESS specific context
+            if (bwGoal) {
+                const hobby = goalDetails?.hobby || '지정 안 됨';
+                const routine = goalDetails?.routine || '지정 안 됨';
+                categoryContextBlock += `
+═ BODY_WELLNESS SPECIFIC CONTEXT ═
+- Target: "${bwGoal}"
+- Height: ${bwHeight ? bwHeight + 'cm' : 'not specified'}, Weight: ${bwWeight ? bwWeight + 'kg' : 'not specified'}
+- ${bmiText}
+- Hobby/Routine: ${hobby} / ${routine}
+- Age: ${userProfile?.age || 'not specified'} (consider joint safety and recovery for age)
+- Intensity Rule: ${difficultyLabel}
+=> Missions MUST be physical actions directly targeting "${bwGoal}".
+   Adjust intensity to match user's condition (${difficulty}).
+   For age 50+: prefer low-impact, protect knees and joints.
+`;
+            }
+
+            // 🚀 GROWTH_CAREER specific context
+            if (gcGoal) {
+                const topic = goalDetails?.topic || '지정 안 됨';
+                const currentLevel = goalDetails?.current_level || '초보';
+                const targetLevel = goalDetails?.target_level || '목표 미설정';
+                categoryContextBlock += `
+═ GROWTH_CAREER SPECIFIC CONTEXT ═
+- Target: "${gcGoal}"
+- Topic/Project: ${topic}
+- Current Level: ${currentLevel} => Target Level: ${targetLevel}
+- Intensity Rule: ${difficultyLabel}
+=> Missions = concrete skill-building steps (read / write / practice balance).
+   Match difficulty to user's energy level (${difficulty}).
+   ${gcPatternSource === 'growth_career_language' ? 'Use target language in exercises.' : ''}
+`;
+            }
+
+            // 🧘 MIND_CONNECTION specific context
+            if (mcGoal) {
+                const currentMood = goalDetails?.current_mood || '지정 안 됨';
+                const affirmation = goalDetails?.affirmation || '지정 안 됨';
+                const people = goalDetails?.people || '혼자';
+                const activityType = goalDetails?.activity_type || '지정 안 됨';
+                categoryContextBlock += `
+═ MIND_CONNECTION SPECIFIC CONTEXT ═
+- Target: "${mcGoal}"
+- Current Emotional State: ${currentMood}
+- Personal Affirmation: ${affirmation !== '지정 안 됨' ? '"' + affirmation + '"' : 'not specified'}
+- People to involve: ${people}
+- Preferred Activity Type: ${activityType}
+- Intensity Rule: ${difficultyLabel}
+=> IMPORTANT: For mind_connection, mindfulness, gratitude journaling, breathing, and gentle meditation ARE ALLOWED.
+   Missions should reference the user's affirmation and emotional state.
+   Activities can involve the people listed above.
+`;
+            }
+
+            // ========== GOALS SECTION ==========
+            let goalsSection = '═══ USER GOALS (TOPIC — create missions ONLY for these) ═══\n';
+            if (bwGoal) goalsSection += `- body_wellness_goal: "${bwGoal}"\n`;
+            if (gcGoal) goalsSection += `- growth_career_goal: "${gcGoal}"\n`;
+            if (mcGoal) goalsSection += `- mind_connection_goal: "${mcGoal}"\n`;
+            if (fpGoal) goalsSection += `- funplay_goal: "${fpGoal}"\n`;
+
+            // ========== PATTERN LIBRARY ==========
+            let patternsSection = '═══ PATTERN LIBRARY (METHOD HINT) ═══\n';
+            if (bwGoal && bwPatterns.length >= 3) {
+                patternsSection += `- body_wellness:\n`;
+                patternsSection += `  1) ${bwPatterns[0].brief} (type: ${bwPatterns[0].core_type})\n`;
+                patternsSection += `  2) ${bwPatterns[1].brief} (type: ${bwPatterns[1].core_type})\n`;
+                patternsSection += `  3) ${bwPatterns[2].brief} (type: ${bwPatterns[2].core_type})\n`;
+            }
+            if (gcGoal && gcPatterns.length >= 3) {
+                patternsSection += `- growth_career (source: ${gcPatternSource}):\n`;
+                patternsSection += `  1) ${gcPatterns[0].brief} (type: ${gcPatterns[0].core_type})\n`;
+                patternsSection += `  2) ${gcPatterns[1].brief} (type: ${gcPatterns[1].core_type})\n`;
+                patternsSection += `  3) ${gcPatterns[2].brief} (type: ${gcPatterns[2].core_type})\n`;
+            }
+            if (mcGoal && mcPatterns.length >= 3) {
+                patternsSection += `- mind_connection:\n`;
+                patternsSection += `  1) ${mcPatterns[0].brief} (type: ${mcPatterns[0].core_type})\n`;
+                patternsSection += `  2) ${mcPatterns[1].brief} (type: ${mcPatterns[1].core_type})\n`;
+                patternsSection += `  3) ${mcPatterns[2].brief} (type: ${mcPatterns[2].core_type})\n`;
+            }
+
+            // ========== USER PROMPT ==========
             const userPrompt = `
 User Profile:
 - age: ${userProfile?.age || 25}
 - gender: ${userProfile?.gender || 'any'}
-- height: ${userProfile?.height ? `${userProfile.height}cm` : 'not specified'}
-- weight: ${userProfile?.weight ? `${userProfile.weight}kg` : 'not specified'}
+- height: ${bwHeight ? `${bwHeight}cm` : 'not specified'}
+- weight: ${bwWeight ? `${bwWeight}kg` : 'not specified'}, ${bmiText}
 - job: ${userProfile?.job || 'not specified'}
-- condition_today: ${userProfile?.condition_today || 'normal'}
+- condition_today: ${userProfile?.condition_today || 3}/5
+- mission_difficulty: ${difficulty} (${difficultyLabel})
 - language: ${payload.language || 'ko'}
 
 ${goalsSection}
-
+${categoryContextBlock}
 Context Knobs:
 - time_budget_sec: 120
 - constraint_seed: "${Math.random().toString(36).substring(7)}"
@@ -271,18 +345,19 @@ Hard Rules:
 2) Each mission in a category MUST use a DIFFERENT pattern from the list provided above.
 3) Doable within 120 seconds.
 4) Strict anti-repeat: No reuse of primary action verbs from history.
-5) Forbidden: No "drink water/sleep", No "read book/lecture", No "preaching/meditation".
+5) Language: Korean (Natural, encouraging tone).
 ${gcPatternSource === 'growth_career_language' ? '6) growth_career missions MUST be language learning exercises in the user\'s target language.' : ''}
 
-Category Style Rules:
-${bwGoal ? `- body_wellness: MUST relate to "${bwGoal}".` : ''}
-${gcGoal ? `- growth_career: MUST relate to "${gcGoal}".` : ''}
-${mcGoal ? `- mind_connection: MUST relate to "${mcGoal}".` : ''}
+Category-specific FORBIDDEN list (apply PER category, not globally):
+- body_wellness: Do NOT suggest generic "drink water / sleep early" unless directly tied to the goal.
+- growth_career: Do NOT suggest "watch a lecture / read a book" generically without specifying content.
+- mind_connection: Mindfulness, breathing, gratitude, and gentle meditation ARE ALLOWED and encouraged.
+- All categories: Do NOT repeat missions from history.
 
-User Rules:
-1) Language: Korean (Natural, encouraging tone).
-2) Structure: Action-oriented, specific.
-3) Constraints: No "meditate" or generic advice.
+Category Style Rules:
+${bwGoal ? `- body_wellness: MUST relate to "${bwGoal}". Adjust intensity per difficulty=${difficulty}.` : ''}
+${gcGoal ? `- growth_career: MUST relate to "${gcGoal}". Skill-level appropriate actions.` : ''}
+${mcGoal ? `- mind_connection: MUST relate to "${mcGoal}". Can use affirmation and involve listed people.` : ''}
 `;
 
             const outputSchema = `

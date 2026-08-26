@@ -208,10 +208,24 @@ export async function generateMissions(
     const category = targetGoal?.category || 'body_wellness';
     const targetText = targetGoal?.target_text || '';
 
+    // Convert numeric condition (1~5) to AI-readable difficulty level
+    const conditionScore = userProfile?.condition_today ?? 3;
+    const difficulty =
+        conditionScore <= 2 ? 'light' :
+        conditionScore >= 4 ? 'push' :
+        'normal';
+    const difficultyLabel =
+        conditionScore <= 2 ? '쉬운 미션 (5분 이내, 부담 없는 행동 위주)' :
+        conditionScore >= 4 ? '도전적 미션 (기록 경신, 최대 노력)' :
+        '보통 미션 (10~15분, 꾸준한 실행)';
+
     // We only need the categories/goals structure. Detailed history is now fetched server-side via Fingerprints.
     const goalList = targetGoal ? {
         [targetGoal.category]: targetGoal.target_text
     } : {};
+
+    // Pass the details object from the goal (contains height/weight/hobby/topic/affirmation etc.)
+    const goalDetails = targetGoal?.details || {};
 
     try {
         console.log('[DEBUG openai.ts] Calling generate-mission Edge Function...');
@@ -226,10 +240,13 @@ export async function generateMissions(
                         height: userProfile?.height,
                         weight: userProfile?.weight,
                         job: userProfile?.job,
-                        condition_today: userProfile?.condition_today
+                        condition_today: conditionScore,
+                        difficulty,
+                        difficulty_label: difficultyLabel
                     },
                     language,
                     goalList,
+                    goalDetails,   // ← 카테고리별 세부 정보 (height, weight, hobby, topic, affirmation 등)
                     refresh,
                     refreshCategory: targetGoal?.category || null
                 }
