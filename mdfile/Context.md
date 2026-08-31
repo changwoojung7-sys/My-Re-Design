@@ -9,12 +9,13 @@
 - **Framework**: React 19 + TypeScript
 - **Build Tool**: Vite
 - **Mobile Runtime**: Capacitor (Android) + Expo EAS / React Native WebView (`MyReDesign-Expo`, iOS)
-- **Styling**: Tailwind CSS + Shadcn/UI (Lucide React icons)
+- **Styling**: Tailwind CSS + Shadcn/UI (Lucide React icons) + Warm Comfort Slate & Sage Design System (v2.2.3)
 - **State Management**: Zustand (Persistent Storage)
 - **Backend / DB**: Supabase (Auth, Database, Storage, Edge Functions)
 - **Animation**: Framer Motion, Canvas Confetti
 - **Payment**: PortOne V1 (iamport) + V2 SDK
 - **Deployment**: Vercel (Web), Google Play Store (Android), Apple App Store & TestFlight (iOS)
+- **Target Persona**: 인생 2막(50대+) 맞춤형 라이프스타일 코칭 & 웰에이징
 
 ### 주요 라이브러리
 
@@ -22,6 +23,11 @@
 - `canvas-confetti`: 미션 완료 시 축하 효과
 - `@capacitor/*`: 네이티브 기능 (카메라, 파일 시스템) 연동
 - `framer-motion`: UI 애니메이션 (페이드, 슬라이드, 스케일)
+
+### 디자인 시스템 v2.2.3 (Warm Comfort Slate)
+- **배경**: 온화한 웜 차콜 (`--bg-base: #121316`, `--bg-surface: #1A1C22`, `--bg-elevated: #23262F`)
+- **브랜드**: 자연스러운 세이지 틸/민트 (`--brand-mint: #14B8A6`, `--brand-lime: #84CC16`)
+- **카테고리 톤**: 눈이 편안한 파스텔 (Body `#FB7185`, Mind `#A78BFA`, Growth `#38BDF8`, FunPlay `#FB923C`)
 
 ### 폴더 구조
 
