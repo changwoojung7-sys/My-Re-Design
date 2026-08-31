@@ -228,6 +228,47 @@ Output strictly valid JSON only.`;
 
             let categoryContextBlock = '';
 
+            // Life stage & gender context analysis
+            const userAge = userProfile?.age || 35;
+            const is50s = userAge >= 50 && userAge < 60;
+            const is60sPlus = userAge >= 60;
+            const isSecondAct = userAge >= 50;
+            const userGender = userProfile?.gender || 'any';
+
+            // Life Stage & Gender Context Directive
+            let personaDirective = `
+═ LIFE STAGE & GENDER PERSONA DIRECTIVE ═
+- Age: ${userAge} (${is60sPlus ? '60대 이상 웰에이징 케어' : is50s ? '50대 인생 2막 활력기' : userAge >= 40 ? '40대 전환기 밸런스' : '2030 청년 갓생'})
+- Gender: ${userGender === 'female' ? '여성' : userGender === 'male' ? '남성' : '성별 무관'}
+- Key Principles:
+`;
+
+            if (is60sPlus) {
+                personaDirective += `  * [60대 이상 시니어 케어 & 관절 보호 필수]
+  * 신체 운동: 맨몸 스쿼트 대신 의자 잡고 앉았다 일어나기(체어 스쿼트 8~10회), 벽 짚고 팔굽혀펴기 8~10회, 가벼운 관절 회전 위주로 횟수 조절.
+  * 아침 기상 시: 침상에서 기지개, 발목 까딱이기, 미온수 마시기 등 혈압/관절에 무리 없는 부드러운 시작 권장.
+  * 급격한 점프, 무거운 중량, 관절에 충격을 주는 유산소는 엄격히 금지.
+  * 톤앤매너: 따뜻하고 존중하며 정중한 어조(해요체/하십시오체).
+`;
+            } else if (is50s) {
+                personaDirective += `  * [50대 인생 2막 활력 & 근감소 예방 골든타임]
+  * 신체 운동: 스쿼트(15~20회), 플랭크, 계단 오르기 등 적정 강도의 근력 운동 충분히 가능하며 권장함!
+  * 아침 기상 시: 기상 직후 몸을 부드럽게 깨우는 습관(침상 기지개, 발목 펌핑, 미온수 1잔, 양치 까치발 15회)을 우선 구성.
+  * 무리한 점핑이나 준비운동 없는 과격한 동작만 피하고, 활기찬 일상 근력 강화 지향.
+  * 톤앤매너: 성취감을 북돋우는 품격 있고 격려하는 어조.
+`;
+            } else {
+                personaDirective += `  * [2040 활력 & 퍼포먼스]
+  * 에너지 넘치는 실행, 딥워크 생산성, 확실한 습관 형성에 초점.
+`;
+            }
+
+            if (userGender === 'female') {
+                personaDirective += `  * 여성 케어: ${isSecondAct ? '골밀도 유지(까치발/저충격 걷기), 갱년기 자율신경 안정을 위한 환기 호흡, 나만의 따뜻한 차 한 잔 여유 반영.' : '신체 밸런스, 코어 및 유연성 스트레칭.'}\n`;
+            } else if (userGender === 'male') {
+                personaDirective += `  * 남성 케어: ${isSecondAct ? '굳은 흉추 및 고관절 가동성 회복, 하체 혈액 펌핑(종아리/허벅지), 주체적인 아침 루틴(침구 정리, 바른 걸음걸이) 반영.' : '근력 강화 및 체계적인 실행.'}\n`;
+            }
+
             // 💪 BODY_WELLNESS specific context
             if (bwGoal) {
                 const hobby = goalDetails?.hobby || '지정 안 됨';
@@ -238,11 +279,11 @@ Output strictly valid JSON only.`;
 - Height: ${bwHeight ? bwHeight + 'cm' : 'not specified'}, Weight: ${bwWeight ? bwWeight + 'kg' : 'not specified'}
 - ${bmiText}
 - Hobby/Routine: ${hobby} / ${routine}
-- Age: ${userProfile?.age || 'not specified'} (consider joint safety and recovery for age)
+- Age: ${userAge}
 - Intensity Rule: ${difficultyLabel}
+${personaDirective}
 => Missions MUST be physical actions directly targeting "${bwGoal}".
-   Adjust intensity to match user's condition (${difficulty}).
-   For age 50+: prefer low-impact, protect knees and joints.
+   ${is60sPlus ? '60대 이상: 안전 최우선. 체어 스쿼트 8~10회, 벽 짚기, 관절 가동 범위 내 스트레칭.' : is50s ? '50대: 아침 기상 깨우기(기지개/미온수/까치발) + 적정 근력(스쿼트 15~20회 정상 수행).' : '연령과 체력에 맞는 활력 운동.'}
 `;
             }
 
@@ -256,6 +297,7 @@ Output strictly valid JSON only.`;
 - Target: "${gcGoal}"
 - Topic/Project: ${topic}
 - Current Level: ${currentLevel} => Target Level: ${targetLevel}
+- Age Focus: ${isSecondAct ? '인생 2막 전문성 재발견, 디지털 도구/스마트폰 활용, 두뇌 인지 활력(사설/독서/퀴즈)' : '직무 역량, 생산성 스킬'}
 - Intensity Rule: ${difficultyLabel}
 => Missions = concrete skill-building steps (read / write / practice balance).
    Match difficulty to user's energy level (${difficulty}).
@@ -276,6 +318,7 @@ Output strictly valid JSON only.`;
 - Personal Affirmation: ${affirmation !== '지정 안 됨' ? '"' + affirmation + '"' : 'not specified'}
 - People to involve: ${people}
 - Preferred Activity Type: ${activityType}
+- Age Focus: ${isSecondAct ? '가족/배우자/이웃과의 따뜻한 품격 대화, 아침 햇살과 식물 교감, 감사 일기, 온전한 차 한 잔' : '스트레스 관리, 마음챙김'}
 - Intensity Rule: ${difficultyLabel}
 => IMPORTANT: For mind_connection, mindfulness, gratitude journaling, breathing, and gentle meditation ARE ALLOWED.
    Missions should reference the user's affirmation and emotional state.
@@ -436,9 +479,12 @@ Selected Setup (use DIFFERENT archetype for each of the 3 missions):
 - Archetype 3: "${selectedArchetypes[2].name}" — ${selectedArchetypes[2].description}
   Mechanic: "${selectedMechanics[2]}", Twist: "${selectedTwists[2]}"
 
+Age Considerations:
+${(userProfile?.age || 25) >= 50 ? '- User is 50+ (Second Act). Avoid risky physical movements, heavy balance loss, or excessive strain. Focus on delightful brain-stimulating dexterity (fingers, smiles, mirror mode, rhythm, non-dominant hand everyday fun).' : '- Standard fun and creative challenge.'}
+
 Task: Generate exactly 3 FunPlay missions, one per archetype+mechanic+twist combo above.
 Each mission MUST be COMPLETELY different from History and from each other.
-Language: ${payload.language || 'ko'}.
+Language: ${payload.language || 'ko'}. (If using non-dominant hand, naturally say '평소 잘 안 쓰는 손' or '반대쪽 손' in Korean).
 
 Output JSON:
 {

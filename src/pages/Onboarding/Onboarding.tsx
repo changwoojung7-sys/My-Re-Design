@@ -19,7 +19,7 @@ export default function Onboarding() {
     const [loading, setLoading] = useState(false);
 
     const [formData, setFormData] = useState({
-        age: 25,
+        age: 52,
         gender: 'female',
         phoneNumber: '',
         goals: {
@@ -220,20 +220,48 @@ export default function Onboarding() {
                 <div>
                     <label className="text-sm text-primary font-bold">{t.body_wellness || "Body & Wellness"}</label>
                     <input
-                        type="text" placeholder={t.healthPlaceholder || "e.g. Lose 5kg, Run 10km"}
+                        type="text" placeholder={formData.age >= 50 ? "예: 아침 활력 기상 루틴 & 스쿼트 15회" : (t.healthPlaceholder || "e.g. Lose 5kg, Run 10km")}
                         value={formData.goals.body_wellness}
                         onChange={(e) => updateGoal('body_wellness', e.target.value)}
                         className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-primary focus:outline-none`}
                     />
+                    {formData.age >= 50 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            {['아침 기상 4단계 활력 루틴', '하체 근감소 예방 스쿼트 15회', '매일 아침 15분 햇살 산책'].map((chip) => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    onClick={() => updateGoal('body_wellness', chip)}
+                                    className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-primary/20 text-zinc-300 hover:text-primary border border-white/10 transition-colors"
+                                >
+                                    + {chip}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
                 <div>
                     <label className="text-sm text-accent font-bold">{t.growth_career || "Growth & Career"}</label>
                     <input
-                        type="text" placeholder={t.growthPlaceholder || "e.g. Learn Python"}
+                        type="text" placeholder={formData.age >= 50 ? "예: 인생 2막 전문성 정리 & 두뇌 인지 활력" : (t.growthPlaceholder || "e.g. Learn Python")}
                         value={formData.goals.growth_career}
                         onChange={(e) => updateGoal('growth_career', e.target.value)}
                         className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-accent focus:outline-none`}
                     />
+                    {formData.age >= 50 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            {['인생 2막 지혜 기록 & 독서', '스마트폰 유용한 앱 1가지 배우기', '하루 사설 읽고 3줄 요약'].map((chip) => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    onClick={() => updateGoal('growth_career', chip)}
+                                    className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-accent/20 text-zinc-300 hover:text-accent border border-white/10 transition-colors"
+                                >
+                                    + {chip}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
             <button onClick={nextStep} className="w-full bg-white text-black font-bold py-3 rounded-xl mt-4">{t.next}</button>
@@ -248,11 +276,25 @@ export default function Onboarding() {
                 <div>
                     <label className="text-sm text-pink-500 font-bold">{t.mind_connection || "Mind & Connection"}</label>
                     <input
-                        type="text" placeholder={t.mindsetPlaceholder || "e.g. Read 1 book/week"}
+                        type="text" placeholder={formData.age >= 50 ? "예: 가족에게 따뜻한 말 & 차 한 잔의 여유" : (t.mindsetPlaceholder || "e.g. Read 1 book/week")}
                         value={formData.goals.mind_connection}
                         onChange={(e) => updateGoal('mind_connection', e.target.value)}
                         className={`w-full mt-2 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white focus:border-blue-400 focus:outline-none`}
                     />
+                    {formData.age >= 50 && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                            {['아침 햇살 보며 따뜻한 차 한 잔', '가족/배우자에게 따뜻한 한마디', '오늘 감사한 일 3가지 메모'].map((chip) => (
+                                <button
+                                    key={chip}
+                                    type="button"
+                                    onClick={() => updateGoal('mind_connection', chip)}
+                                    className="text-xs px-2.5 py-1 rounded-lg bg-white/5 hover:bg-pink-500/20 text-zinc-300 hover:text-pink-300 border border-white/10 transition-colors"
+                                >
+                                    + {chip}
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </div>
             <button onClick={finish} disabled={loading} className="w-full bg-gradient-to-r from-primary to-accent text-white font-bold py-3 rounded-xl mt-4">

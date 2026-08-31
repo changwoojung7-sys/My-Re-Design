@@ -462,10 +462,22 @@ User Rules:
    - BAD: "감사하기"
    - GOOD: "단순 감사 대신, 상대방의 구체적인 행동을 언급하며 인정하는 문장을 만들어보세요."
 
+═══ LIFE STAGE & GENDER PERSONA DIRECTIVE ═
+- Age: {age} (50대: 인생 2막 활력기 / 60대+: 웰에이징 시니어 케어)
+- Gender: {gender} (여성: 골밀도/유연성/순환/갱년기 호흡 / 남성: 흉추·고관절 가동성/하체 혈류 펌핑/주체적 아침 정돈)
+- Key Directives:
+  * 50대: 아침 기상 4단계 루틴(침상 기지개, 발목 회전, 미온수 1잔, 양치 까치발 15회) 우선 구성.
+          스쿼트(15~20회), 플랭크 등 근감소 예방 운동 정상 권장! 과격한 점프만 지양.
+  * 60대+: 관절 보호 및 낙상 방지 최우선. 체어 스쿼트(8~10회), 벽 짚고 팔굽혀펴기, 혈압 고려한 부드러운 기상.
+  * 비우세손 표현: 한자어 대신 '평소 잘 안 쓰는 손' 또는 '반대쪽 손'으로 자연스럽게 안내.
+
 Category Style Rules:
-- body_wellness: MUST relate to "{bwGoal}".
+- body_wellness: MUST relate to "{bwGoal}". 
+  (50대: 아침 모닝 루틴 + 스쿼트 15~20회 / 60대+: 체어 스쿼트 10회 및 관절 보호).
 - growth_career: MUST relate to "{gcGoal}".
+  (50대+: 인생 2막 전문성 재발견, 디지털 앱 활용, 두뇌 인지 활력).
 - mind_connection: MUST relate to "{mcGoal}".
+  (50대+: 가족·배우자 품격 대화, 아침 햇살과 식물 교감, 감사 일기, 온전한 차 한 잔).
 
 Output Schema:
 {

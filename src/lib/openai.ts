@@ -1,16 +1,21 @@
 import { supabase } from './supabase';
 
 // Intelligent 3-Mission Generator for Demo & Fallback
-function generateDynamicCategoryMissions(category: string, goalText: string = '', language: string = 'ko'): MissionData[] {
+function generateDynamicCategoryMissions(category: string, goalText: string = '', language: string = 'ko', userProfile?: any): MissionData[] {
     const text = (goalText || '').toLowerCase();
     const isKo = language === 'ko';
+    const age = userProfile?.age ?? 35;
+    const is60sPlus = age >= 60;
+    const is50s = age >= 50 && age < 60;
 
     if (category === 'body_wellness') {
         if (text.includes('팔굽혀펴기') || text.includes('푸시업') || text.includes('pushup')) {
             return [
                 {
                     category: 'body_wellness',
-                    content: isKo ? '정자세로 팔굽혀펴기 20회 1세트 완료하기' : 'Complete 1 set of 20 strict push-ups',
+                    content: is60sPlus 
+                        ? (isKo ? '벽에 양손을 짚고 바른 자세로 팔굽혀펴기 10회 완료하기' : 'Complete 10 wall push-ups with good form')
+                        : (isKo ? '정자세로 팔굽혀펴기 15~20회 1세트 완료하기' : 'Complete 1 set of 15-20 strict push-ups'),
                     verification_type: 'image',
                     reasoning: { expected_impact: isKo ? '상체 근력과 코어 안정성을 높이는 기본 루틴입니다.' : 'Core upper body strength booster.' },
                     trust_score: 98
@@ -24,9 +29,9 @@ function generateDynamicCategoryMissions(category: string, goalText: string = ''
                 },
                 {
                     category: 'body_wellness',
-                    content: isKo ? '추가 팔굽혀펴기 15회 및 수분 500ml 섭취' : 'Complete 15 more push-ups & drink 500ml water',
-                    verification_type: 'image',
-                    reasoning: { expected_impact: isKo ? '점진적 과부하로 목표 달성을 가속화합니다.' : 'Progressive overload for target achievement.' },
+                    content: isKo ? '따뜻한 미온수 300ml 섭취하며 수분 보충' : 'Hydrate with warm water',
+                    verification_type: 'checkbox',
+                    reasoning: { expected_impact: isKo ? '신진대사 촉진과 빠른 혈액 순환을 돕습니다.' : 'Boosts circulation and recovery.' },
                     trust_score: 96
                 }
             ];
@@ -35,7 +40,9 @@ function generateDynamicCategoryMissions(category: string, goalText: string = ''
             return [
                 {
                     category: 'body_wellness',
-                    content: isKo ? '가벼운 페이스로 3km 아침 조깅하기' : 'Run 3km at an easy pace',
+                    content: is60sPlus
+                        ? (isKo ? '평지에서 바른 자세로 20분간 편안하게 산책하기' : 'Take a comfortable 20-minute flat walk')
+                        : (isKo ? '가벼운 페이스로 15~20분 아침 조깅하기' : 'Run 15-20 minutes at an easy pace'),
                     verification_type: 'image',
                     reasoning: { expected_impact: isKo ? '심폐 지구력 향상 및 활기찬 에너지 충전' : 'Cardio boost and energy ignition.' },
                     trust_score: 98
@@ -49,14 +56,69 @@ function generateDynamicCategoryMissions(category: string, goalText: string = ''
                 },
                 {
                     category: 'body_wellness',
-                    content: isKo ? '러닝 후 충분한 수분 섭취 및 단백질 식단' : 'Hydrate & enjoy a healthy recovery snack',
+                    content: isKo ? '운동 후 충분한 수분 섭취 및 단백질 식단' : 'Hydrate & enjoy a healthy recovery snack',
                     verification_type: 'image',
                     reasoning: { expected_impact: isKo ? '근육 피로 회복 및 체력 강화' : 'Muscle recovery and endurance building.' },
                     trust_score: 96
                 }
             ];
         }
-        // General Body Wellness (3 missions)
+
+        // 60대 이상 일반 웰에이징 미션 (안전 최우선 & 아침 모닝 루틴)
+        if (is60sPlus) {
+            return [
+                {
+                    category: 'body_wellness',
+                    content: isKo ? '기상 직후 침대에서 온몸 기지개 켜고 미온수 1잔 마시기' : 'Morning bedside stretch and drink warm water',
+                    verification_type: 'checkbox',
+                    reasoning: { expected_impact: isKo ? '굳어있던 관절을 부드럽게 깨우고 장기를 활성화합니다.' : 'Gently awakens joints and stimulates organs.' },
+                    trust_score: 98
+                },
+                {
+                    category: 'body_wellness',
+                    content: isKo ? '의자 등받이를 잡고 안전하게 일어났다 앉기(체어 스쿼트) 10회' : 'Chair squats 10 reps holding a chair',
+                    verification_type: 'checkbox',
+                    reasoning: { expected_impact: isKo ? '무릎 관절에 무리 없이 허벅지 근력과 낙상 예방력을 키웁니다.' : 'Safely strengthens legs without knee strain.' },
+                    trust_score: 97
+                },
+                {
+                    category: 'body_wellness',
+                    content: isKo ? '양치하며 거울 보며 뒤꿈치 들었다 내리는 까치발 운동 10회' : '10 calf raises while brushing teeth',
+                    verification_type: 'checkbox',
+                    reasoning: { expected_impact: isKo ? '제2의 심장인 종아리 근육을 펌핑하여 전신 혈액순환을 촉진합니다.' : 'Pumps calf muscles to enhance circulation.' },
+                    trust_score: 96
+                }
+            ];
+        }
+
+        // 50대 일반 인생 2막 미션 (아침 기상 루틴 + 적정 강도 스쿼트 15~20회)
+        if (is50s) {
+            return [
+                {
+                    category: 'body_wellness',
+                    content: isKo ? '기상 직후 침상에서 발목 까딱까딱 10회 & 전신 기지개 켜기' : 'Morning bed ankle pumps and full body stretch',
+                    verification_type: 'checkbox',
+                    reasoning: { expected_impact: isKo ? '수면 중 굳은 척추와 고관절을 깨우고 혈류를 돌립니다.' : 'Awakens spine and hips, stimulates morning blood flow.' },
+                    trust_score: 98
+                },
+                {
+                    category: 'body_wellness',
+                    content: isKo ? '일어나서 미온수 1잔 마시고 양치하며 까치발 15회' : 'Drink warm water and 15 calf raises while brushing teeth',
+                    verification_type: 'checkbox',
+                    reasoning: { expected_impact: isKo ? '신진대사를 깨우고 하체 정맥 순환을 활성화합니다.' : 'Kickstarts metabolism and lower-body venous return.' },
+                    trust_score: 97
+                },
+                {
+                    category: 'body_wellness',
+                    content: isKo ? '바른 자세로 스쿼트 15~20회 실시하여 하체 근감소 예방하기' : 'Complete 15-20 bodyweight squats with proper posture',
+                    verification_type: 'image',
+                    reasoning: { expected_impact: isKo ? '대퇴사두근과 둔근을 강화하여 활기찬 기초 대사량을 유지합니다.' : 'Strengthens quads and glutes to prevent sarcopenia.' },
+                    trust_score: 96
+                }
+            ];
+        }
+
+        // 2030 청년 일반 미션
         return [
             {
                 category: 'body_wellness',
@@ -263,7 +325,7 @@ export async function generateMissions(
         }
 
         // If returned fewer than 3 missions, fill with dynamic missions
-        const dynamicFallbacks = generateDynamicCategoryMissions(category, targetText, language);
+        const dynamicFallbacks = generateDynamicCategoryMissions(category, targetText, language, userProfile);
         return dynamicFallbacks;
 
     } catch (e: any) {
@@ -275,13 +337,13 @@ export async function generateMissions(
         }
 
         // Return 3 tailored missions
-        return generateDynamicCategoryMissions(category, targetText, language);
+        return generateDynamicCategoryMissions(category, targetText, language, userProfile);
     }
 }
 
 // Rich Dynamic FunPlay Pool (30+ Creative 30-Second Missions)
 const FUNPLAY_MISSIONS_KO: { content: string; reasoning: string; verification_type: string }[] = [
-    { content: "비우세손(왼손)으로 좋아하는 동물 30초 동안 그리기", reasoning: "우뇌 자극 및 창의적 유연성을 즉각적으로 높여줍니다.", verification_type: "image" },
+    { content: "평소 잘 안 쓰는 손(반대쪽 손)으로 좋아하는 동물 30초 동안 그리기", reasoning: "우뇌 자극 및 창의적 유연성을 즉각적으로 높여줍니다.", verification_type: "image" },
     { content: "주변에서 초록색/빨간색 물건 3개 30초 안에 찾아 터치하기", reasoning: "시각 집중력과 빠른 공간 인지 순발력을 깨워줍니다.", verification_type: "checkbox" },
     { content: "눈 감고 한 발로 15초 동안 균형 잡기 챌린지", reasoning: "고유수용성 감각과 신체 코어 밸런스를 향상시킵니다.", verification_type: "checkbox" },
     { content: "창밖을 바라보며 30초 동안 깊은 복식호흡 3회 진행", reasoning: "자율신경계를 안정시키고 뇌에 신선한 산소를 공급합니다.", verification_type: "checkbox" },

@@ -36,7 +36,7 @@ function Layout() {
   const showNav = user && !hideNavScopes.includes(location.pathname);
 
   return (
-    <div className="w-full h-[100dvh] max-w-md bg-background relative flex flex-col shadow-2xl overflow-hidden border-x border-slate-800">
+    <div className="w-full h-[100dvh] max-w-md bg-background relative flex flex-col shadow-2xl overflow-hidden border-x border-zinc-800">
       <Routes>
         {/* If not logged in, go to Login */}
         <Route path="/login" element={<Login />} />

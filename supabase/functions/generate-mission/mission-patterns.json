@@ -29,7 +29,7 @@
         },
         {
             "pattern_id": "BW04",
-            "brief": "한쪽만 사용(비우세손)로 생활 동작 20초",
+            "brief": "평소 잘 안 쓰는 손(반대쪽 손)으로 생활 동작 20초 해보기",
             "core_type": "non_dominant",
             "default_artifact_type": "micro_challenge",
             "primary_action": "use_non_dominant",
@@ -359,6 +359,96 @@
             "primary_action": "schedule",
             "tool": "phone",
             "place": "anywhere"
+        },
+        {
+            "pattern_id": "BW41",
+            "brief": "아침 기상 직후 침대에서 온몸 기지개 10초 켜기",
+            "core_type": "morning_stretch",
+            "default_artifact_type": "checkbox",
+            "primary_action": "stretch",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW42",
+            "brief": "기상 후 침대에 누운 채 발목 까딱까딱 10회 하며 종아리 깨우기",
+            "core_type": "ankle_pump",
+            "default_artifact_type": "checkbox",
+            "primary_action": "pump",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW43",
+            "brief": "일어나자마자 미온수 1잔 천천히 마시며 속 편안히 깨우기",
+            "core_type": "warm_water_reset",
+            "default_artifact_type": "checkbox",
+            "primary_action": "drink",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW44",
+            "brief": "양치하면서 거울 보며 뒤꿈치 들었다 내리는 까치발 15회",
+            "core_type": "calf_raise",
+            "default_artifact_type": "checkbox",
+            "primary_action": "raise",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW45",
+            "brief": "아침 창문 열고 바깥공기 마시며 가슴 펴는 흉곽 호흡 3회",
+            "core_type": "chest_breathe",
+            "default_artifact_type": "checkbox",
+            "primary_action": "breathe",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW46",
+            "brief": "의자 등받이 잡고 안전하게 일어났다 앉기(체어 스쿼트) 10회",
+            "core_type": "chair_squat",
+            "default_artifact_type": "checkbox",
+            "primary_action": "squat",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW47",
+            "brief": "벽에 양손을 짚고 바른 자세로 팔굽혀펴기 10회 진행하기",
+            "core_type": "wall_pushup",
+            "default_artifact_type": "checkbox",
+            "primary_action": "pushup",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW48",
+            "brief": "스쿼트 바른 자세로 15~20회 실시하여 하체 근력 다지기",
+            "core_type": "bodyweight_squat",
+            "default_artifact_type": "checkbox",
+            "primary_action": "squat",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW49",
+            "brief": "의자를 가볍게 짚고 한 발로 10초간 균형 잡기(좌우 각 1회)",
+            "core_type": "balance_support",
+            "default_artifact_type": "checkbox",
+            "primary_action": "balance",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "BW50",
+            "brief": "외출 시 평소보다 보폭을 반 뼘 넓혀 5분간 활기차게 걷기",
+            "core_type": "wide_stride_walk",
+            "default_artifact_type": "checkbox",
+            "primary_action": "walk",
+            "tool": "none",
+            "place": "outdoor"
         }
     ],
     "growth_career": [
@@ -1383,6 +1473,51 @@
             "core_type": "post_conversation_reflection",
             "default_artifact_type": "text",
             "primary_action": "summarize",
+            "tool": "phone",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC51",
+            "brief": "아침 햇살을 느끼며 따뜻한 차 한 잔과 함께 나만의 3분 음미하기",
+            "core_type": "morning_tea_mindfulness",
+            "default_artifact_type": "checkbox",
+            "primary_action": "savor",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "MC52",
+            "brief": "배우자나 가족에게 오늘 힘을 주는 따뜻한 말 한마디 건네기",
+            "core_type": "warm_word_family",
+            "default_artifact_type": "checkbox",
+            "primary_action": "speak",
+            "tool": "none",
+            "place": "home"
+        },
+        {
+            "pattern_id": "MC53",
+            "brief": "주변의 화초나 나무를 찬찬히 바라보며 생명력 관찰하기",
+            "core_type": "nature_connection",
+            "default_artifact_type": "checkbox",
+            "primary_action": "observe",
+            "tool": "none",
+            "place": "anywhere"
+        },
+        {
+            "pattern_id": "MC54",
+            "brief": "오늘 나에게 주어진 건강과 시간에 감사하는 한 문장 적기",
+            "core_type": "gratitude_sentence",
+            "default_artifact_type": "text",
+            "primary_action": "write",
+            "tool": "paper",
+            "place": "home"
+        },
+        {
+            "pattern_id": "MC55",
+            "brief": "오랜 지인이나 이웃에게 부담 없는 안부 문자 1통 보내기",
+            "core_type": "friendly_greeting",
+            "default_artifact_type": "checkbox",
+            "primary_action": "message",
             "tool": "phone",
             "place": "anywhere"
         }
